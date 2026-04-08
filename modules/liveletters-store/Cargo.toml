@@ -6,3 +6,6 @@ license = "MIT"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+rusqlite = { version = "0.37", features = ["bundled"] }

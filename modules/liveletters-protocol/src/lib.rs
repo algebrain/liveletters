@@ -1,3 +1,15 @@
+mod codec;
+mod envelope;
+mod error;
+mod message;
+mod payload;
+
+pub use codec::{decode_message, encode_message};
+pub use envelope::MessageEnvelope;
+pub use error::ProtocolError;
+pub use message::ProtocolMessage;
+pub use payload::DomainEventPayload;
+
 pub fn crate_name() -> &'static str {
     "liveletters-protocol"
 }
@@ -11,4 +23,3 @@ mod tests {
         assert_eq!(crate_name(), "liveletters-protocol");
     }
 }
-

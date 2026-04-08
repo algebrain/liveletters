@@ -1,3 +1,13 @@
+mod error;
+mod models;
+mod paths;
+mod store;
+
+pub use error::StoreError;
+pub use models::{CommentRecord, PostRecord};
+pub use paths::StorePaths;
+pub use store::Store;
+
 pub fn crate_name() -> &'static str {
     "liveletters-store"
 }
@@ -11,4 +21,3 @@ mod tests {
         assert_eq!(crate_name(), "liveletters-store");
     }
 }
-

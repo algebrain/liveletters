@@ -72,4 +72,9 @@ impl Comment {
         self.hidden = true;
         self
     }
+
+    pub fn edit(mut self, body: CommentBody) -> Self {
+        self.body = body;
+        self
+    }
 }

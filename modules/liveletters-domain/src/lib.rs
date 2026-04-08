@@ -8,7 +8,7 @@ mod visibility;
 
 pub use comment::Comment;
 pub use errors::DomainError;
-pub use events::{CommentCreated, PostCreated, PostHidden};
+pub use events::{CommentCreated, CommentEdited, CommentHidden, PostCreated, PostHidden};
 pub use ids::{AccountId, CommentId, EventId, PostId, ResourceId};
 pub use post::Post;
 pub use values::{CommentBody, PostBody, Timestamp};

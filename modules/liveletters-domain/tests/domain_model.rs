@@ -1,6 +1,6 @@
 use liveletters_domain::{
-    AccountId, Comment, CommentBody, CommentCreated, CommentId, DomainError, EventId, Post,
-    PostBody, PostCreated, PostId, ResourceId, Timestamp, Visibility,
+    AccountId, Comment, CommentBody, CommentCreated, CommentEdited, CommentHidden, CommentId,
+    DomainError, EventId, Post, PostBody, PostCreated, PostId, ResourceId, Timestamp, Visibility,
 };
 
 #[test]
@@ -110,6 +110,23 @@ fn comment_can_be_hidden() {
 }
 
 #[test]
+fn comment_can_be_edited() {
+    let comment = Comment::new(
+        CommentId::new("comment-1").unwrap(),
+        PostId::new("post-1").unwrap(),
+        None,
+        AccountId::new("alice").unwrap(),
+        Timestamp::from_unix_seconds(1_710_000_100),
+        CommentBody::new("Ответ").unwrap(),
+        Visibility::Public,
+    )
+    .unwrap()
+    .edit(CommentBody::new("Исправленный ответ").unwrap());
+
+    assert_eq!(comment.body().as_str(), "Исправленный ответ");
+}
+
+#[test]
 fn post_can_be_edited() {
     let post = Post::new(
         PostId::new("post-1").unwrap(),
@@ -206,4 +223,42 @@ fn post_hidden_event_keeps_identity_and_actor() {
     assert_eq!(event.resource_id().as_str(), "blog-1");
     assert_eq!(event.actor_id().as_str(), "alice");
     assert_eq!(event.created_at().as_unix_seconds(), 1_710_000_200);
+}
+
+#[test]
+fn comment_edited_event_keeps_identity_and_actor() {
+    let event = CommentEdited::new(
+        EventId::new("event-4").unwrap(),
+        CommentId::new("comment-1").unwrap(),
+        PostId::new("post-1").unwrap(),
+        ResourceId::new("blog-1").unwrap(),
+        AccountId::new("alice").unwrap(),
+        Timestamp::from_unix_seconds(1_710_000_300),
+    );
+
+    assert_eq!(event.event_id().as_str(), "event-4");
+    assert_eq!(event.comment_id().as_str(), "comment-1");
+    assert_eq!(event.post_id().as_str(), "post-1");
+    assert_eq!(event.resource_id().as_str(), "blog-1");
+    assert_eq!(event.actor_id().as_str(), "alice");
+    assert_eq!(event.created_at().as_unix_seconds(), 1_710_000_300);
+}
+
+#[test]
+fn comment_hidden_event_keeps_identity_and_actor() {
+    let event = CommentHidden::new(
+        EventId::new("event-5").unwrap(),
+        CommentId::new("comment-1").unwrap(),
+        PostId::new("post-1").unwrap(),
+        ResourceId::new("blog-1").unwrap(),
+        AccountId::new("alice").unwrap(),
+        Timestamp::from_unix_seconds(1_710_000_400),
+    );
+
+    assert_eq!(event.event_id().as_str(), "event-5");
+    assert_eq!(event.comment_id().as_str(), "comment-1");
+    assert_eq!(event.post_id().as_str(), "post-1");
+    assert_eq!(event.resource_id().as_str(), "blog-1");
+    assert_eq!(event.actor_id().as_str(), "alice");
+    assert_eq!(event.created_at().as_unix_seconds(), 1_710_000_400);
 }
