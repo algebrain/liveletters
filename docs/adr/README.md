@@ -14,7 +14,7 @@
 
 Файл:
 
-- [0001-monorepo-and-version-pinning.md](/home/algebrain/src/my/liveletters/docs/adr/0001-monorepo-and-version-pinning.md)
+- [0001-monorepo-and-version-pinning.md](./0001-monorepo-and-version-pinning.md)
 
 Суть:
 
@@ -33,13 +33,15 @@
 
 Файл:
 
-- [0002-development-invariants-and-internal-documents.md](/home/algebrain/src/my/liveletters/docs/adr/0002-development-invariants-and-internal-documents.md)
+- [0002-development-invariants-and-internal-documents.md](./0002-development-invariants-and-internal-documents.md)
 
 Суть:
 
 - если это осмысленно, работу начинаем с красных тестов;
 - документацию о реализованном поведении меняем только после зеленых тестов;
 - документацию пишем по-русски без лишних англицизмов;
+- в публичных документах не используем абсолютные пути;
+- ссылки на документы и файлы оформляем кликабельно;
 - у каждого подпроекта могут быть скрытые каталоги `.plans` и `.docs`;
 - внутренние документы именуются с временным префиксом `YYMMDD-HHMMSS-...`.
 
@@ -52,7 +54,7 @@
 
 Файл:
 
-- [0003-test-lint-format-and-shared-utils.md](/home/algebrain/src/my/liveletters/docs/adr/0003-test-lint-format-and-shared-utils.md)
+- [0003-test-lint-format-and-shared-utils.md](./0003-test-lint-format-and-shared-utils.md)
 
 Суть:
 
@@ -69,7 +71,7 @@
 
 Файл:
 
-- [0004-no-local-m2.md](/home/algebrain/src/my/liveletters/docs/adr/0004-no-local-m2.md)
+- [0004-no-local-m2.md](./0004-no-local-m2.md)
 
 Суть:
 
@@ -85,7 +87,7 @@
 
 Файл:
 
-- [0005-incremental-reports-in-docs.md](/home/algebrain/src/my/liveletters/docs/adr/0005-incremental-reports-in-docs.md)
+- [0005-incremental-reports-in-docs.md](./0005-incremental-reports-in-docs.md)
 
 Суть:
 
@@ -102,7 +104,7 @@
 
 Файл:
 
-- [0006-freeze-idea-documents.md](/home/algebrain/src/my/liveletters/docs/adr/0006-freeze-idea-documents.md)
+- [0006-freeze-idea-documents.md](./0006-freeze-idea-documents.md)
 
 Суть:
 
@@ -119,7 +121,7 @@
 
 Файл:
 
-- [0007-no-single-file-subprojects.md](/home/algebrain/src/my/liveletters/docs/adr/0007-no-single-file-subprojects.md)
+- [0007-no-single-file-subprojects.md](./0007-no-single-file-subprojects.md)
 
 Суть:
 
@@ -136,7 +138,7 @@
 
 Файл:
 
-- [0008-temporary-home-in-tests.md](/home/algebrain/src/my/liveletters/docs/adr/0008-temporary-home-in-tests.md)
+- [0008-temporary-home-in-tests.md](./0008-temporary-home-in-tests.md)
 
 Суть:
 

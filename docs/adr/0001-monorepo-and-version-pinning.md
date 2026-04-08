@@ -104,6 +104,6 @@ liveletters-domain = { git = "https://github.com/your-org/liveletters.git", rev 
 
 ## Связанные документы
 
-- [idea.technical.md](/home/algebrain/src/my/liveletters/docs/idea.technical.md)
-- [tauri-client-structure.md](/home/algebrain/src/my/liveletters/docs/tauri-client-structure.md)
-- [workspace-structure.md](/home/algebrain/src/my/liveletters/docs/workspace-structure.md)
+- [idea.technical.md](../idea.technical.md)
+- [tauri-client-structure.md](../tauri-client-structure.md)
+- [workspace-structure.md](../workspace-structure.md)

@@ -82,4 +82,4 @@
 
 ## Связанные документы
 
-- `/home/algebrain/src/my/liveletters/docs/workspace-structure.md`
+- [workspace-structure.md](../../docs/workspace-structure.md)

@@ -10,7 +10,7 @@
 
 ## Суть
 
-- `docs/idea.preliminary.md` и `docs/idea.technical.md` считаются историческими документами.
+- [idea.preliminary.md](../idea.preliminary.md) и [idea.technical.md](../idea.technical.md) считаются историческими документами.
 - Эти два файла больше не редактируются в рамках обычного развития проекта.
 - Это правило относится только к этим двум файлам и не означает, что на каждое изменение нужен новый документ.
 
@@ -18,8 +18,8 @@
 
 В проекте уже есть два важных документа раннего этапа:
 
-- [idea.preliminary.md](/home/algebrain/src/my/liveletters/docs/idea.preliminary.md)
-- [idea.technical.md](/home/algebrain/src/my/liveletters/docs/idea.technical.md)
+- [idea.preliminary.md](../idea.preliminary.md)
+- [idea.technical.md](../idea.technical.md)
 
 Они полезны как след истории проекта:
 
@@ -37,8 +37,8 @@
 
 Файлы:
 
-- `docs/idea.preliminary.md`
-- `docs/idea.technical.md`
+- [idea.preliminary.md](../idea.preliminary.md)
+- [idea.technical.md](../idea.technical.md)
 
 считаются замороженными историческими документами.
 
@@ -75,8 +75,8 @@
 
 ## Правила
 
-1. `docs/idea.preliminary.md` не редактируется в обычном порядке.
-2. `docs/idea.technical.md` не редактируется в обычном порядке.
+1. [idea.preliminary.md](../idea.preliminary.md) не редактируется в обычном порядке.
+2. [idea.technical.md](../idea.technical.md) не редактируется в обычном порядке.
 3. Это правило относится только к этим двум файлам.
 4. Остальная документация может развиваться обычным образом.
 5. Дальнейшая детализация должна вестись в тех документах, которые для этого подходят, без требования создавать новый документ на каждое мелкое изменение.
@@ -91,6 +91,6 @@
 
 ## Связанные документы
 
-- [idea.preliminary.md](/home/algebrain/src/my/liveletters/docs/idea.preliminary.md)
-- [idea.technical.md](/home/algebrain/src/my/liveletters/docs/idea.technical.md)
-- [README.md](/home/algebrain/src/my/liveletters/docs/adr/README.md)
+- [idea.preliminary.md](../idea.preliminary.md)
+- [idea.technical.md](../idea.technical.md)
+- [README.md](./README.md)

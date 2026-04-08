@@ -176,5 +176,5 @@
 
 ## Связанные документы
 
-- [0003-test-lint-format-and-shared-utils.md](/home/algebrain/src/my/liveletters/docs/adr/0003-test-lint-format-and-shared-utils.md)
-- [0004-no-local-m2.md](/home/algebrain/src/my/liveletters/docs/adr/0004-no-local-m2.md)
+- [0003-test-lint-format-and-shared-utils.md](./adr/0003-test-lint-format-and-shared-utils.md)
+- [0004-no-local-m2.md](./adr/0004-no-local-m2.md)

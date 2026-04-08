@@ -97,4 +97,4 @@
 
 ## Связанные документы
 
-- [0002-development-invariants-and-internal-documents.md](/home/algebrain/src/my/liveletters/docs/adr/0002-development-invariants-and-internal-documents.md)
+- [0002-development-invariants-and-internal-documents.md](./0002-development-invariants-and-internal-documents.md)

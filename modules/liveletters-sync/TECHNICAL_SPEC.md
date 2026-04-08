@@ -98,5 +98,5 @@
 
 ## Связанные документы
 
-- `/home/algebrain/src/my/liveletters/docs/idea.technical.md`
-- `/home/algebrain/src/my/liveletters/docs/workspace-structure.md`
+- [idea.technical.md](../../docs/idea.technical.md)
+- [workspace-structure.md](../../docs/workspace-structure.md)
