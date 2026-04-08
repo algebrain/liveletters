@@ -1,0 +1,14 @@
+{:source-paths ["src"
+                "test"
+                "../../modules/liveletters-ui-kit/src"
+                "../../modules/liveletters-ui-kit/test"
+                "../../modules/liveletters-ui-model/src"
+                "../../modules/liveletters-ui-model/test"
+                "../../modules/liveletters-frontend-api/src"
+                "../../modules/liveletters-frontend-api/test"]
+ :builds
+ {:test
+  {:target :node-test
+   :output-to ".shadow-cljs/node-tests.js"
+   :ns-regexp "-test$"
+   :autorun true}}}

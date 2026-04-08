@@ -1,0 +1,12 @@
+[package]
+name = "liveletters-rust-backend-app"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "liveletters-rust-backend-app"
+path = "src/main.rs"

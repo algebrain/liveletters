@@ -1,0 +1,13 @@
+{:paths ["src"
+         "test"
+         "../../modules/liveletters-ui-kit/src"
+         "../../modules/liveletters-ui-kit/test"
+         "../../modules/liveletters-ui-model/src"
+         "../../modules/liveletters-ui-model/test"
+         "../../modules/liveletters-frontend-api/src"
+         "../../modules/liveletters-frontend-api/test"]
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}}
+ :aliases
+ {:test
+  {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.20"}}
+   :main-opts ["-m" "shadow.cljs.devtools.cli" "compile" "test"]}}}
