@@ -1,3 +1,19 @@
+mod comment;
+mod errors;
+mod events;
+mod ids;
+mod post;
+mod values;
+mod visibility;
+
+pub use comment::Comment;
+pub use errors::DomainError;
+pub use events::{CommentCreated, PostCreated, PostHidden};
+pub use ids::{AccountId, CommentId, EventId, PostId, ResourceId};
+pub use post::Post;
+pub use values::{CommentBody, PostBody, Timestamp};
+pub use visibility::Visibility;
+
 pub fn crate_name() -> &'static str {
     "liveletters-domain"
 }
@@ -11,4 +27,3 @@ mod tests {
         assert_eq!(crate_name(), "liveletters-domain");
     }
 }
-
