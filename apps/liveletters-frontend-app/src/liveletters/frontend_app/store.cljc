@@ -7,6 +7,10 @@
 (defn create-store []
   (#?(:cljs r/atom :clj atom) (state/initial-state)))
 
+(defn- current-unix-seconds []
+  #?(:cljs (js/Math.floor (/ (.now js/Date) 1000))
+     :clj 0))
+
 (defn navigate! [store route]
   (swap! store assoc :route route))
 
@@ -57,12 +61,28 @@
 (defn update-create-post-form! [store values]
   (swap! store update :create-post merge values))
 
+(defn- normalize-create-post-form [form]
+  (let [created-at (or (not-empty (str (:created-at form))) "0")
+        created-at-value (if (= created-at "0")
+                           (current-unix-seconds)
+                           (:created-at form))
+        timestamp (max 1 created-at-value)]
+    (-> form
+        (update :body #(or % ""))
+        (assoc :created-at timestamp)
+        (update :resource-id #(if (seq %) % "blog-1"))
+        (update :author-id #(if (seq %) % "alice"))
+        (update :post-id #(if (seq %) % (str "post-" timestamp))))))
+
 (defn submit-create-post! [adapter store]
-  (let [{:keys [post-id resource-id author-id created-at body]} (:create-post @store)
+  (let [{:keys [post-id resource-id author-id created-at body] :as form}
+        (normalize-create-post-form (:create-post @store))
+        _ (swap! store assoc :create-post form)
         request (frontend-api/create-post-request post-id resource-id author-id created-at body)]
     (frontend-api/create-post! adapter request
                                (fn [_response]
                                  (clear-error! store)
+                                 (swap! store assoc :create-post (assoc form :post-id "" :created-at 0 :body ""))
                                  (refresh-home-feed! adapter store)
                                  (refresh-sync-status! adapter store))
                                #(set-error! store %))))
@@ -80,6 +100,7 @@
      (refresh-event-failures! adapter store))))
 
 (defn init! [adapter store]
+  (swap! store assoc-in [:runtime :adapter] adapter)
   (subscribe-backend-events! adapter store)
   (refresh-home-feed! adapter store)
   (refresh-sync-status! adapter store)

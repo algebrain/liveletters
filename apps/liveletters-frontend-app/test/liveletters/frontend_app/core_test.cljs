@@ -64,6 +64,7 @@
                                                                     :pending_outbox 1})
                                      nil))}
         app-state (core/create-app-state)]
+    (swap! app-state assoc-in [:runtime :adapter] adapter)
     (core/update-create-post-form! app-state {:post-id "post-1"
                                               :resource-id "blog-1"
                                               :author-id "alice"
@@ -79,6 +80,36 @@
             ["get_home_feed" nil]
             ["get_sync_status" nil]]
            @calls))))
+
+(deftest create-post-intent-fills-runnable-defaults-when-form-is-minimal
+  (let [calls (atom [])
+        adapter {:invoke-command (fn [command payload on-success _on-error]
+                                   (swap! calls conj [command payload])
+                                   (case command
+                                     "create_post" (on-success {:ok true})
+                                     "get_home_feed" (on-success {:posts []})
+                                     "get_sync_status" (on-success {:status "healthy"
+                                                                    :applied_messages 0
+                                                                    :duplicate_messages 0
+                                                                    :replayed_messages 0
+                                                                    :unauthorized_messages 0
+                                                                    :invalid_messages 0
+                                                                    :malformed_messages 0
+                                                                    :deferred_events 0
+                                                                    :pending_outbox 0})
+                                     nil))}
+        app-state (core/create-app-state)]
+    (swap! app-state assoc :create-post {:post-id ""
+                                         :resource-id ""
+                                         :author-id ""
+                                         :created-at 0
+                                         :body "Runnable post"})
+    (core/submit-create-post! adapter app-state)
+    (is (= "create_post" (ffirst @calls)))
+    (is (= "blog-1" (get-in @calls [0 1 :resource-id])))
+    (is (= "alice" (get-in @calls [0 1 :author-id])))
+    (is (pos-int? (get-in @calls [0 1 :created-at])))
+    (is (re-matches #"post-\d+" (get-in @calls [0 1 :post-id])))))
 
 (deftest load-post-thread-updates-route-and-thread
   (let [adapter {:invoke-command (fn [command payload on-success _on-error]
@@ -149,6 +180,7 @@
                        :incoming-failures []
                        :event-failures []
                        :create-post {}
+                       :runtime {:adapter nil}
                        :ui {}})
     (is (= :main (first (core/root-view app-state))))
     (is (= "Sync"

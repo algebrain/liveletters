@@ -5,10 +5,13 @@
   {:module :liveletters-ui-kit
    :language :cljc})
 
-(defn button [{:keys [label variant]
-               :or {variant :primary}}]
-  [:button {:type "button"
-            :class (str "ll-button ll-button--" (name variant))}
+(defn button [{:keys [label variant on-click disabled?]
+               :or {variant :primary
+                    disabled? false}}]
+  [:button (cond-> {:type "button"
+                    :class (str "ll-button ll-button--" (name variant))
+                    :disabled disabled?}
+             on-click (assoc :on-click on-click))
    label])
 
 (defn text-input [{:keys [label value placeholder on-change]

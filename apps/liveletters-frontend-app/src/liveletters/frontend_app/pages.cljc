@@ -1,30 +1,38 @@
 (ns liveletters.frontend-app.pages
-  (:require [liveletters.ui-kit.core :as ui-kit]
+  (:require [liveletters.frontend-app.store :as app-store]
+            [liveletters.ui-kit.core :as ui-kit]
             [liveletters.ui-model.core :as ui-model]))
 
-(defn feed-page [state]
+(defn feed-page [store state]
   (let [feed (ui-model/feed-view-model (:feed state))
-        form (:create-post state)]
+        form (:create-post state)
+        adapter (get-in state [:runtime :adapter])]
     [ui-kit/section
      {:title "Home feed"
       :children
       [[:div {:class "ll-compose"}
         [ui-kit/text-input {:label "Post body"
                             :value (:body form)
-                            :placeholder "Write your post"}]
-        [ui-kit/button {:label "Create post"}]]
+                            :placeholder "Write your post"
+                            :on-change #(app-store/update-create-post-form!
+                                         store
+                                         {:body (.. % -target -value)})}]
+        [ui-kit/button {:label "Create post"
+                        :disabled? (or (nil? adapter) (empty? (:body form)))
+                        :on-click #(app-store/submit-create-post! adapter store)}]]
        (if (:empty? feed)
          [ui-kit/empty-state {:message "Nothing here yet"}]
          [:ul {:class "ll-feed"}
           (for [item (:items feed)]
             ^{:key (:id item)}
-            [:li {:class "ll-feed__item"}
+            [:li {:class "ll-feed__item"
+                  :on-click #(app-store/load-post-thread! adapter store (:id item))}
              [:h3 {} (:title item)]
              [:p {} (:meta item)]
              (when (:hidden? item)
                [:span {:class "ll-feed__flag"} "Hidden"])])])]}]))
 
-(defn post-page [state]
+(defn post-page [_store state]
   (let [thread (ui-model/post-thread-view-model (:thread state))]
     [ui-kit/section
      {:title "Post thread"
@@ -45,7 +53,7 @@
            [:p {} (:body comment)]
            [:small {} (:author comment)]])]]}]))
 
-(defn sync-page [state]
+(defn sync-page [_store state]
   (let [sync-status (ui-model/sync-status-view-model (:sync-status state))]
     [ui-kit/section
      {:title "Sync"
@@ -62,7 +70,7 @@
          [:li {} (str "Deferred: " (get-in sync-status [:details :deferred]))]
          [:li {} (str "Outbox: " (get-in sync-status [:details :outbox]))]]]]}]))
 
-(defn diagnostics-page [state]
+(defn diagnostics-page [_store state]
   (let [failures (ui-model/incoming-failures-view-model (:incoming-failures state))
         event-failures (ui-model/event-failures-view-model (:event-failures state))]
     [ui-kit/section

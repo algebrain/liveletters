@@ -9,9 +9,22 @@
 
 (deftest button-renders-stable-hiccup-shape
   (is (= [:button {:type "button"
-                   :class "ll-button ll-button--primary"}
+                   :class "ll-button ll-button--primary"
+                   :disabled false}
           "Create post"]
          (core/button {:label "Create post"}))))
+
+(deftest button-can-render-click-handler-and-disabled-state
+  (let [handler (fn [_event] nil)]
+    (is (= [:button {:type "button"
+                     :class "ll-button ll-button--secondary"
+                     :disabled true
+                     :on-click handler}
+            "Retry"]
+           (core/button {:label "Retry"
+                         :variant :secondary
+                         :disabled? true
+                         :on-click handler})))))
 
 (deftest input-renders-label-and-value
   (is (= [:label {:class "ll-field"}

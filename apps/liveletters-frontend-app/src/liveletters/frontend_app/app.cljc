@@ -13,11 +13,11 @@
       [:button {:type "button"
                 :on-click #(swap! store assoc :route (routes/sync-route))}
        "Sync"]
-      [:button {:type "button"
+     [:button {:type "button"
                 :on-click #(swap! store assoc :route (routes/diagnostics-route))}
        "Diagnostics"]]
      (case (selectors/current-page state)
-       :post (pages/post-page state)
-       :sync (pages/sync-page state)
-       :diagnostics (pages/diagnostics-page state)
-       (pages/feed-page state))]))
+       :post (pages/post-page store state)
+       :sync (pages/sync-page store state)
+       :diagnostics (pages/diagnostics-page store state)
+       (pages/feed-page store state))]))

@@ -8,9 +8,10 @@
    :incoming-failures []
    :event-failures []
    :create-post {:post-id ""
-                 :resource-id ""
-                 :author-id ""
+                 :resource-id "blog-1"
+                 :author-id "alice"
                  :created-at 0
                  :body ""}
+   :runtime {:adapter nil}
    :ui {:loading? false
         :error nil}})
