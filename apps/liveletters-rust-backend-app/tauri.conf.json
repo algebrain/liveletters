@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LiveLetters",
+  "version": "0.1.0",
+  "identifier": "dev.liveletters.app",
+  "build": {
+    "frontendDist": "../liveletters-frontend-app/resources"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LiveLetters",
+        "width": 1200,
+        "height": 800,
+        "resizable": true
+      }
+    ]
+  }
+}

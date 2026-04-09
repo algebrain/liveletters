@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>LiveLetters</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      (function () {
+        function emitFrontendError(payload) {
+          try {
+            if (
+              window.__TAURI__ &&
+              window.__TAURI__.event &&
+              typeof window.__TAURI__.event.emit === "function"
+            ) {
+              window.__TAURI__.event.emit("frontend-error", payload);
+            }
+          } catch (_e) {}
+        }
+
+        window.addEventListener("error", function (event) {
+          emitFrontendError({
+            kind: "bootstrap.onerror",
+            message: String(event.message || "unknown bootstrap error"),
+            stack: event.error && event.error.stack ? String(event.error.stack) : null,
+            source: event.filename ? String(event.filename) : null,
+            location:
+              typeof event.lineno === "number" && typeof event.colno === "number"
+                ? String(event.lineno) + ":" + String(event.colno)
+                : null,
+          });
+        });
+
+        window.addEventListener("unhandledrejection", function (event) {
+          var reason = event.reason;
+          emitFrontendError({
+            kind: "bootstrap.unhandledrejection",
+            message: typeof reason === "string" ? reason : String(reason),
+            stack: reason && reason.stack ? String(reason.stack) : null,
+            source: null,
+            location: null,
+          });
+        });
+      })();
+    </script>
+    <script src="./js/main.js"></script>
+  </body>
+</html>

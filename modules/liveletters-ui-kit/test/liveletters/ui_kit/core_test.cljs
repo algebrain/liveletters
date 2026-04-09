@@ -19,16 +19,30 @@
           [:input {:type "text"
                    :value "Hello"
                    :placeholder "Write title"
-                   :class "ll-input"}]]
+                   :class "ll-input"
+                   :read-only true}]]
          (core/text-input {:label "Title"
                            :value "Hello"
                            :placeholder "Write title"}))))
+
+(deftest input-renders-on-change-when-field-is-editable
+  (let [handler (fn [_event] nil)]
+    (is (= [:label {:class "ll-field"}
+            [:span {:class "ll-field__label"} "Body"]
+            [:input {:type "text"
+                     :value "Editable"
+                     :placeholder ""
+                     :class "ll-input"
+                     :on-change handler}]]
+           (core/text-input {:label "Body"
+                             :value "Editable"
+                             :on-change handler})))))
 
 (deftest section-wraps-title-and-children
   (is (= [:section {:class "ll-section"}
           [:h2 {:class "ll-section__title"} "Feed"]
           [:div {:class "ll-section__body"}
-           [[:p {} "Item"]]]]
+           [:p {} "Item"]]]
          (core/section {:title "Feed"
                         :children [[:p {} "Item"]]}))))
 

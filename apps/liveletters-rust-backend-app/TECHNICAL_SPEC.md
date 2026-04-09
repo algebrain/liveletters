@@ -141,3 +141,4 @@
 
 - [tauri-client-structure.md](../../docs/tauri-client-structure.md)
 - [workspace-structure.md](../../docs/workspace-structure.md)
+- [tauri-linux-prerequisites.md](../../docs/tauri-linux-prerequisites.md)

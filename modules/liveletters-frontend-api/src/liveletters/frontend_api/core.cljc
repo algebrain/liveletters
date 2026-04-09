@@ -45,31 +45,45 @@
      :message "unexpected backend error"
      :details nil}))
 
-(defn invoke-command [adapter command payload]
-  ((:invoke-command adapter) command payload))
+(defn invoke-command! [adapter command payload on-success on-error]
+  ((:invoke-command adapter) command payload on-success on-error))
 
-(defn subscribe-event [adapter event-name handler]
+(defn subscribe-event! [adapter event-name handler]
   ((:subscribe-event adapter) event-name handler))
 
-(defn create-post [adapter request]
-  (invoke-command adapter "create_post" request))
+(defn emit-event! [adapter event-name payload]
+  ((:emit-event adapter) event-name payload))
 
-(defn get-home-feed [adapter]
-  (invoke-command adapter "get_home_feed" nil))
+(defn create-post! [adapter request on-success on-error]
+  (invoke-command! adapter "create_post" request on-success on-error))
 
-(defn get-post-thread [adapter request]
-  (invoke-command adapter "get_post_thread" request))
+(defn get-home-feed! [adapter on-success on-error]
+  (invoke-command! adapter "get_home_feed" nil
+                   (fn [response]
+                     (on-success (or (:posts response) [])))
+                   on-error))
 
-(defn get-sync-status [adapter]
-  (some-> (invoke-command adapter "get_sync_status" nil)
-          sync-status-dto))
+(defn get-post-thread! [adapter request on-success on-error]
+  (invoke-command! adapter "get_post_thread" request on-success on-error))
 
-(defn list-incoming-failures [adapter]
-  (invoke-command adapter "list_incoming_failures" nil))
+(defn get-sync-status! [adapter on-success on-error]
+  (invoke-command! adapter "get_sync_status" nil
+                   (fn [response]
+                     (on-success (some-> response sync-status-dto)))
+                   on-error))
 
-(defn list-event-failures [adapter]
-  (some->> (invoke-command adapter "list_event_failures" nil)
-           (mapv event-failure-dto)))
+(defn list-incoming-failures! [adapter on-success on-error]
+  (invoke-command! adapter "list_incoming_failures" nil on-success on-error))
 
-(defn subscribe-sync-status-changed [adapter handler]
-  (subscribe-event adapter "sync-status-changed" handler))
+(defn list-event-failures! [adapter on-success on-error]
+  (invoke-command! adapter "list_event_failures" nil
+                   (fn [response]
+                     (on-success (some->> response
+                                          (mapv event-failure-dto))))
+                   on-error))
+
+(defn subscribe-sync-status-changed! [adapter handler]
+  (subscribe-event! adapter "sync-status-changed" handler))
+
+(defn subscribe-feed-updated! [adapter handler]
+  (subscribe-event! adapter "feed-updated" handler))

@@ -11,22 +11,23 @@
             :class (str "ll-button ll-button--" (name variant))}
    label])
 
-(defn text-input [{:keys [label value placeholder]
+(defn text-input [{:keys [label value placeholder on-change]
                    :or {value ""
                         placeholder ""}}]
   [:label {:class "ll-field"}
    [:span {:class "ll-field__label"} label]
-   [:input {:type "text"
-            :value value
-            :placeholder placeholder
-            :class "ll-input"}]])
+   [:input (cond-> {:type "text"
+                    :value value
+                    :placeholder placeholder
+                    :class "ll-input"}
+             on-change (assoc :on-change on-change)
+             (nil? on-change) (assoc :read-only true))]])
 
 (defn section [{:keys [title children]
                 :or {children []}}]
   [:section {:class "ll-section"}
    [:h2 {:class "ll-section__title"} title]
-   [:div {:class "ll-section__body"}
-    children]])
+   (into [:div {:class "ll-section__body"}] children)])
 
 (defn loading-state [{:keys [message]}]
   [:div {:class "ll-state ll-state--loading"

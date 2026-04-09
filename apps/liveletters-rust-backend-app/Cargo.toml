@@ -3,6 +3,7 @@ name = "liveletters-rust-backend-app"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+build = "build.rs"
 
 [lib]
 path = "src/lib.rs"
@@ -11,7 +12,17 @@ path = "src/lib.rs"
 name = "liveletters-rust-backend-app"
 path = "src/main.rs"
 
+[features]
+default = []
+tauri-runtime = ["dep:tauri"]
+
 [dependencies]
 liveletters-app-core = { path = "../../modules/liveletters-app-core" }
 liveletters-diagnostics = { path = "../../modules/liveletters-diagnostics" }
 liveletters-store = { path = "../../modules/liveletters-store" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [], optional = true }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

@@ -4,11 +4,17 @@
 
 # Rust
 target
+target-tauri-check
+apps/liveletters-rust-backend-app/target-tauri-check/
+apps/liveletters-rust-backend-app/gen/
 
 # Clojure / ClojureScript
 .cpcache
 .shadow-cljs
 .clj-kondo
+
+# Frontend build output
+apps/liveletters-frontend-app/resources/js/
 
 # Node / frontend tooling
 node_modules

@@ -7,7 +7,14 @@
                 "../../modules/liveletters-frontend-api/src"
                 "../../modules/liveletters-frontend-api/test"]
  :builds
- {:test
+ {:app
+  {:target :browser
+   :output-dir "resources/js"
+   :asset-path "./js"
+   :modules {:main {:entries [liveletters.frontend-app.runtime]
+                    :init-fn liveletters.frontend-app.runtime/init!}}
+   :devtools {:watch-dir "resources"}}
+  :test
   {:target :node-test
    :output-to ".shadow-cljs/node-tests.js"
    :ns-regexp "-test$"

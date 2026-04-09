@@ -1,0 +1,12 @@
+[[permission]]
+identifier = "default"
+description = "Allows the frontend to use the minimal LiveLetters backend commands."
+commands.allow = [
+  "create_post",
+  "get_home_feed",
+  "get_post_thread",
+  "get_sync_status",
+  "list_incoming_failures",
+  "list_event_failures",
+  "log_frontend_error"
+]

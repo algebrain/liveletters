@@ -9,41 +9,51 @@
 
 (deftest create-post-command-is-forwarded-through-adapter
   (let [calls (atom [])
-        adapter {:invoke-command (fn [command payload]
+        adapter {:invoke-command (fn [command payload on-success _on-error]
                                    (swap! calls conj [command payload])
-                                   {:ok true})}
+                                   (on-success {:ok true}))}
         request {:post-id "post-1"
                  :resource-id "blog-1"
                  :author-id "alice"
                  :created-at 1
                  :body "First post"}]
-    (is (= {:ok true}
-           (core/create-post adapter request)))
+    (core/create-post! adapter request identity identity)
     (is (= [["create_post" request]]
            @calls))))
 
 (deftest query-functions-use-query-command-names
   (let [calls (atom [])
-        adapter {:invoke-command (fn [command payload]
+        adapter {:invoke-command (fn [command payload on-success _on-error]
                                    (swap! calls conj [command payload])
-                                    {:items []})}]
-    (is (= {:items []}
-           (core/get-home-feed adapter)))
-    (is (= {:items []}
-           (core/get-post-thread adapter {:post-id "post-1"})))
+                                   (on-success {:posts []}))}
+        post-thread (atom nil)
+        event-failures (atom nil)]
+    (core/get-home-feed! adapter identity identity)
+    (core/get-post-thread! {:invoke-command (fn [command payload on-success _on-error]
+                                              (swap! calls conj [command payload])
+                                              (on-success {:post {:post_id "post-1"}
+                                                           :comments []}))}
+                           {:post-id "post-1"}
+                           #(reset! post-thread %)
+                           identity)
+    (core/list-event-failures!
+     {:invoke-command (fn [command payload on-success _on-error]
+                        (swap! calls conj [command payload])
+                        (on-success [{:event_id "event-1"
+                                      :event_type "comment_edited"
+                                      :resource_id "blog-1"
+                                      :apply_status "unauthorized"
+                                      :failure_reason "actor_cannot_edit_comment"}]))}
+     #(reset! event-failures %)
+     identity)
+    (is (= {:post {:post_id "post-1"} :comments []}
+           @post-thread))
     (is (= [{:event-id "event-1"
              :event-type "comment_edited"
              :resource-id "blog-1"
              :apply-status :unauthorized
              :failure-reason "actor_cannot_edit_comment"}]
-           (core/list-event-failures
-            {:invoke-command (fn [command payload]
-                               (swap! calls conj [command payload])
-                               [{:event_id "event-1"
-                                 :event_type "comment_edited"
-                                 :resource_id "blog-1"
-                                 :apply_status "unauthorized"
-                                 :failure_reason "actor_cannot_edit_comment"}])})))
+           @event-failures))
     (is (= [["get_home_feed" nil]
             ["get_post_thread" {:post-id "post-1"}]
             ["list_event_failures" nil]]
@@ -64,13 +74,20 @@
 (deftest event-subscription-layer-is-mockable
   (let [calls (atom [])
         handler (fn [_event] :ok)
+        emitted (atom [])
         adapter {:subscribe-event (fn [event-name event-handler]
                                     (swap! calls conj [event-name event-handler])
-                                    :subscription-token)}]
+                                    :subscription-token)
+                 :emit-event (fn [event-name payload]
+                               (swap! emitted conj [event-name payload])
+                               (js/Promise.resolve true))}]
     (is (= :subscription-token
-           (core/subscribe-sync-status-changed adapter handler)))
+           (core/subscribe-sync-status-changed! adapter handler)))
+    (core/emit-event! adapter "frontend-error" {:kind "manual"})
     (is (= [["sync-status-changed" handler]]
-           @calls))))
+           @calls))
+    (is (= [["frontend-error" {:kind "manual"}]]
+           @emitted))))
 
 (deftest dto-shapes-are-stable
   (is (= {:post-id "post-1"
