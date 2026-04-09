@@ -1,0 +1,33 @@
+From: alice@example.test
+To: bob@example.test
+Subject: LiveLetters fixture
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="liveletters-boundary"
+
+--liveletters-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Человекочитаемая часть письма.
+--liveletters-boundary
+Content-Type: application/json
+
+{
+  "envelope": {
+    "schema_version": "1",
+    "event_type": "comment_created",
+    "resource_id": "blog-1",
+    "event_id": "event-2"
+  },
+  "human_readable_body": "Новый комментарий",
+  "payload": {
+    "kind": "comment_created",
+    "comment_id": "comment-1",
+    "post_id": "post-1",
+    "parent_comment_id": null,
+    "resource_id": "blog-1",
+    "actor_id": "alice",
+    "created_at": 1710000100,
+    "visibility": "public"
+  }
+}
+--liveletters-boundary--

@@ -2,7 +2,10 @@ use std::{fs, path::Path};
 
 use rusqlite::{params, Connection};
 
-use crate::{CommentRecord, PostRecord, StoreError, StorePaths};
+use crate::{
+    CommentRecord, DeferredEventRecord, OutboxRecord, PostRecord, RawEventRecord, RawMessageRecord,
+    StoreError, StorePaths,
+};
 
 pub struct Store {
     connection: Connection,
@@ -55,6 +58,33 @@ impl Store {
                 body TEXT NOT NULL,
                 visibility TEXT NOT NULL,
                 hidden INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS outbox (
+                event_id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                resource_id TEXT NOT NULL,
+                message_body TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS raw_messages (
+                message_id TEXT PRIMARY KEY,
+                raw_message TEXT NOT NULL,
+                status TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS raw_events (
+                event_id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                resource_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS deferred_events (
+                event_id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                payload_json TEXT NOT NULL
             );
             "#,
         )?;
@@ -136,6 +166,31 @@ impl Store {
         Ok(posts)
     }
 
+    pub fn get_post_record(&self, post_id: &str) -> Result<Option<PostRecord>, StoreError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT post_id, resource_id, author_id, created_at, body, visibility, hidden
+            FROM posts
+            WHERE post_id = ?1
+            "#,
+        )?;
+
+        let mut rows = stmt.query([post_id])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+
+        Ok(Some(PostRecord {
+            post_id: row.get(0)?,
+            resource_id: row.get(1)?,
+            author_id: row.get(2)?,
+            created_at: row.get::<_, i64>(3)? as u64,
+            body: row.get(4)?,
+            visibility: row.get(5)?,
+            hidden: row.get::<_, i64>(6)? != 0,
+        }))
+    }
+
     pub fn list_comments_for_post(&self, post_id: &str) -> Result<Vec<CommentRecord>, StoreError> {
         let mut stmt = self.connection.prepare(
             r#"
@@ -165,5 +220,216 @@ impl Store {
         }
 
         Ok(comments)
+    }
+
+    pub fn get_comment_record(&self, comment_id: &str) -> Result<Option<CommentRecord>, StoreError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT comment_id, post_id, parent_comment_id, author_id, created_at, body, visibility, hidden
+            FROM comments
+            WHERE comment_id = ?1
+            "#,
+        )?;
+
+        let mut rows = stmt.query([comment_id])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+
+        Ok(Some(CommentRecord {
+            comment_id: row.get(0)?,
+            post_id: row.get(1)?,
+            parent_comment_id: row.get(2)?,
+            author_id: row.get(3)?,
+            created_at: row.get::<_, i64>(4)? as u64,
+            body: row.get(5)?,
+            visibility: row.get(6)?,
+            hidden: row.get::<_, i64>(7)? != 0,
+        }))
+    }
+
+    pub fn save_outbox_record(&self, record: &OutboxRecord) -> Result<(), StoreError> {
+        self.connection.execute(
+            r#"
+            INSERT OR REPLACE INTO outbox
+                (event_id, event_type, resource_id, message_body)
+            VALUES
+                (?1, ?2, ?3, ?4)
+            "#,
+            params![
+                record.event_id,
+                record.event_type,
+                record.resource_id,
+                record.message_body,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn list_outbox_records(&self) -> Result<Vec<OutboxRecord>, StoreError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT event_id, event_type, resource_id, message_body
+            FROM outbox
+            ORDER BY rowid ASC
+            "#,
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(OutboxRecord {
+                event_id: row.get(0)?,
+                event_type: row.get(1)?,
+                resource_id: row.get(2)?,
+                message_body: row.get(3)?,
+            })
+        })?;
+
+        let mut records = Vec::new();
+        for row in rows {
+            records.push(row?);
+        }
+
+        Ok(records)
+    }
+
+    pub fn save_raw_message_record(&self, record: &RawMessageRecord) -> Result<(), StoreError> {
+        self.connection.execute(
+            r#"
+            INSERT OR REPLACE INTO raw_messages
+                (message_id, raw_message, status)
+            VALUES
+                (?1, ?2, ?3)
+            "#,
+            params![record.message_id, record.raw_message, record.status],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn list_raw_message_records(&self) -> Result<Vec<RawMessageRecord>, StoreError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT message_id, raw_message, status
+            FROM raw_messages
+            ORDER BY rowid ASC
+            "#,
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(RawMessageRecord {
+                message_id: row.get(0)?,
+                raw_message: row.get(1)?,
+                status: row.get(2)?,
+            })
+        })?;
+
+        let mut records = Vec::new();
+        for row in rows {
+            records.push(row?);
+        }
+
+        Ok(records)
+    }
+
+    pub fn save_raw_event_record(&self, record: &RawEventRecord) -> Result<(), StoreError> {
+        self.connection.execute(
+            r#"
+            INSERT OR REPLACE INTO raw_events
+                (event_id, event_type, resource_id, payload_json)
+            VALUES
+                (?1, ?2, ?3, ?4)
+            "#,
+            params![
+                record.event_id,
+                record.event_type,
+                record.resource_id,
+                record.payload_json,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn list_raw_event_records(&self) -> Result<Vec<RawEventRecord>, StoreError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT event_id, event_type, resource_id, payload_json
+            FROM raw_events
+            ORDER BY rowid ASC
+            "#,
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(RawEventRecord {
+                event_id: row.get(0)?,
+                event_type: row.get(1)?,
+                resource_id: row.get(2)?,
+                payload_json: row.get(3)?,
+            })
+        })?;
+
+        let mut records = Vec::new();
+        for row in rows {
+            records.push(row?);
+        }
+
+        Ok(records)
+    }
+
+    pub fn has_raw_event(&self, event_id: &str) -> Result<bool, StoreError> {
+        let mut stmt = self.connection.prepare(
+            "SELECT 1 FROM raw_events WHERE event_id = ?1 LIMIT 1",
+        )?;
+        let mut rows = stmt.query([event_id])?;
+        Ok(rows.next()?.is_some())
+    }
+
+    pub fn save_deferred_event_record(
+        &self,
+        record: &DeferredEventRecord,
+    ) -> Result<(), StoreError> {
+        self.connection.execute(
+            r#"
+            INSERT OR REPLACE INTO deferred_events
+                (event_id, event_type, reason, payload_json)
+            VALUES
+                (?1, ?2, ?3, ?4)
+            "#,
+            params![
+                record.event_id,
+                record.event_type,
+                record.reason,
+                record.payload_json,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn list_deferred_event_records(&self) -> Result<Vec<DeferredEventRecord>, StoreError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT event_id, event_type, reason, payload_json
+            FROM deferred_events
+            ORDER BY rowid ASC
+            "#,
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(DeferredEventRecord {
+                event_id: row.get(0)?,
+                event_type: row.get(1)?,
+                reason: row.get(2)?,
+                payload_json: row.get(3)?,
+            })
+        })?;
+
+        let mut records = Vec::new();
+        for row in rows {
+            records.push(row?);
+        }
+
+        Ok(records)
     }
 }

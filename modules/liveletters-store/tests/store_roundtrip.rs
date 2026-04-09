@@ -4,7 +4,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use liveletters_store::{CommentRecord, PostRecord, Store, StorePaths};
+use liveletters_store::{
+    CommentRecord, DeferredEventRecord, OutboxRecord, PostRecord, RawEventRecord, RawMessageRecord,
+    Store, StorePaths,
+};
 
 fn temp_home_dir() -> PathBuf {
     let unique = SystemTime::now()
@@ -22,6 +25,10 @@ fn in_memory_store_starts_with_empty_state() {
 
     assert!(store.list_posts().unwrap().is_empty());
     assert!(store.list_comments_for_post("post-1").unwrap().is_empty());
+    assert!(store.list_outbox_records().unwrap().is_empty());
+    assert!(store.list_raw_message_records().unwrap().is_empty());
+    assert!(store.list_raw_event_records().unwrap().is_empty());
+    assert!(store.list_deferred_event_records().unwrap().is_empty());
 }
 
 #[test]
@@ -128,4 +135,68 @@ fn file_store_persists_records_under_temp_home() {
     assert_eq!(posts[0].post_id, "post-1");
 
     fs::remove_dir_all(home_dir).unwrap();
+}
+
+#[test]
+fn outbox_records_can_be_saved_and_listed() {
+    let store = Store::open_in_memory().unwrap();
+
+    store
+        .save_outbox_record(&OutboxRecord {
+            event_id: "event-1".into(),
+            event_type: "post_created".into(),
+            resource_id: "blog-1".into(),
+            message_body: "{\"kind\":\"post_created\"}".into(),
+        })
+        .unwrap();
+
+    let outbox = store.list_outbox_records().unwrap();
+
+    assert_eq!(outbox.len(), 1);
+    assert_eq!(outbox[0].event_id, "event-1");
+    assert_eq!(outbox[0].event_type, "post_created");
+}
+
+#[test]
+fn raw_message_and_event_journals_can_be_saved() {
+    let store = Store::open_in_memory().unwrap();
+
+    store
+        .save_raw_message_record(&RawMessageRecord {
+            message_id: "message-1".into(),
+            raw_message: "raw email".into(),
+            status: "applied".into(),
+        })
+        .unwrap();
+    store
+        .save_raw_event_record(&RawEventRecord {
+            event_id: "event-1".into(),
+            event_type: "post_created".into(),
+            resource_id: "blog-1".into(),
+            payload_json: "{\"kind\":\"post_created\"}".into(),
+        })
+        .unwrap();
+
+    assert_eq!(store.list_raw_message_records().unwrap().len(), 1);
+    assert_eq!(store.list_raw_event_records().unwrap().len(), 1);
+    assert!(store.has_raw_event("event-1").unwrap());
+}
+
+#[test]
+fn deferred_events_can_be_saved_and_listed() {
+    let store = Store::open_in_memory().unwrap();
+
+    store
+        .save_deferred_event_record(&DeferredEventRecord {
+            event_id: "event-2".into(),
+            event_type: "comment_created".into(),
+            reason: "missing_post".into(),
+            payload_json: "{\"kind\":\"comment_created\"}".into(),
+        })
+        .unwrap();
+
+    let deferred = store.list_deferred_event_records().unwrap();
+
+    assert_eq!(deferred.len(), 1);
+    assert_eq!(deferred[0].reason, "missing_post");
 }

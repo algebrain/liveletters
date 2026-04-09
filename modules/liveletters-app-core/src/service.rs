@@ -1,0 +1,61 @@
+use liveletters_store::Store;
+
+use crate::{
+    AppCoreError, CreateCommentCommand, CreateCommentResult, CreatePostCommand, CreatePostResult,
+    EditCommentCommand, EditCommentResult, GetHomeFeedQuery, GetPendingOutboxQuery,
+    GetPostThreadQuery, HidePostCommand, HidePostResult, HomeFeed, PendingOutbox, PostThread,
+    commands, queries,
+};
+
+pub struct AppCore<'a> {
+    store: &'a Store,
+}
+
+impl<'a> AppCore<'a> {
+    pub fn new(store: &'a Store) -> Self {
+        Self { store }
+    }
+
+    pub fn create_post(
+        &self,
+        command: CreatePostCommand<'_>,
+    ) -> Result<CreatePostResult, AppCoreError> {
+        commands::create_post(&self.store, command)
+    }
+
+    pub fn create_comment(
+        &self,
+        command: CreateCommentCommand<'_>,
+    ) -> Result<CreateCommentResult, AppCoreError> {
+        commands::create_comment(&self.store, command)
+    }
+
+    pub fn get_home_feed(&self, query: GetHomeFeedQuery) -> Result<HomeFeed, AppCoreError> {
+        queries::get_home_feed(&self.store, query)
+    }
+
+    pub fn hide_post(&self, command: HidePostCommand<'_>) -> Result<HidePostResult, AppCoreError> {
+        commands::hide_post(&self.store, command)
+    }
+
+    pub fn edit_comment(
+        &self,
+        command: EditCommentCommand<'_>,
+    ) -> Result<EditCommentResult, AppCoreError> {
+        commands::edit_comment(&self.store, command)
+    }
+
+    pub fn get_post_thread(
+        &self,
+        query: GetPostThreadQuery<'_>,
+    ) -> Result<PostThread, AppCoreError> {
+        queries::get_post_thread(&self.store, query)
+    }
+
+    pub fn get_pending_outbox(
+        &self,
+        query: GetPendingOutboxQuery,
+    ) -> Result<PendingOutbox, AppCoreError> {
+        queries::get_pending_outbox(&self.store, query)
+    }
+}

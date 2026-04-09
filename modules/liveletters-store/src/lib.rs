@@ -4,7 +4,9 @@ mod paths;
 mod store;
 
 pub use error::StoreError;
-pub use models::{CommentRecord, PostRecord};
+pub use models::{
+    CommentRecord, DeferredEventRecord, OutboxRecord, PostRecord, RawEventRecord, RawMessageRecord,
+};
 pub use paths::StorePaths;
 pub use store::Store;
 

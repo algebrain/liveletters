@@ -81,3 +81,51 @@ fn blank_human_body_is_rejected() {
 
     assert_eq!(error, ProtocolError::BlankHumanReadableBody);
 }
+
+#[test]
+fn post_hidden_round_trip_keeps_payload() {
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "post_hidden", "blog-1", "event-3").unwrap(),
+        "Запись скрыта",
+        DomainEventPayload::PostHidden {
+            post_id: "post-1".into(),
+            resource_id: "blog-1".into(),
+            actor_id: "alice".into(),
+            created_at: 1_710_000_200,
+        },
+    )
+    .unwrap();
+
+    let encoded = encode_message(&message).unwrap();
+    let decoded = decode_message(&encoded).unwrap();
+
+    assert_eq!(decoded.payload(), message.payload());
+}
+
+#[test]
+fn comment_edited_round_trip_keeps_new_body() {
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "comment_edited", "blog-1", "event-4").unwrap(),
+        "Комментарий изменен",
+        DomainEventPayload::CommentEdited {
+            comment_id: "comment-1".into(),
+            post_id: "post-1".into(),
+            resource_id: "blog-1".into(),
+            actor_id: "alice".into(),
+            created_at: 1_710_000_300,
+            body: "Исправленный комментарий".into(),
+            visibility: "public".into(),
+        },
+    )
+    .unwrap();
+
+    let encoded = encode_message(&message).unwrap();
+    let decoded = decode_message(&encoded).unwrap();
+
+    match decoded.payload() {
+        DomainEventPayload::CommentEdited { body, .. } => {
+            assert_eq!(body, "Исправленный комментарий")
+        }
+        other => panic!("unexpected payload after decode: {other:?}"),
+    }
+}

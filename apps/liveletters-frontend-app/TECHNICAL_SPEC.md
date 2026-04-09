@@ -28,10 +28,11 @@
 ## Основные подсистемы
 
 - `app shell` и bootstrap;
+- `app-store` как клиентский application layer;
 - routing;
 - pages;
 - feature-level UI flows;
-- local UI state;
+- локальное UI state там, где оно не обязано жить в общем store;
 - integration with frontend API;
 - subscriptions to backend events;
 - error presentation and recoverability.
@@ -98,6 +99,33 @@
 - описание интеграции с `liveletters-frontend-api`;
 - соглашения по структуре UI-кода;
 - правила управления состоянием.
+
+## Правила управления состоянием
+
+Для `liveletters-frontend-app` принимается консервативная state-centric схема:
+
+- базовый UI-путь это `Reagent`;
+- на frontend есть единый `app-store` как центр прикладного состояния и orchestration;
+- базовая техническая форма этого store по умолчанию это один корневой `app-state` в `atom`;
+- дополнительные `atom` допустимы только при явно обоснованной ответственности;
+- не все вообще состояние обязано жить в app-store;
+- локальное эфемерное UI-состояние допустимо держать рядом с компонентом;
+- `liveletters-frontend-api` не хранит UI state, а только вызывает backend и подписывается на события;
+- `liveletters-ui-model` дает чистые selectors и view model;
+- orchestration пользовательских intents, effects и обновлений прикладного состояния живет в app-store внутри frontend app.
+
+`re-frame` не считается обязательным базовым слоем и не вводится по умолчанию.
+
+Практический смысл этой схемы:
+
+- frontend app должен выглядеть не как набор разрозненных page handlers, а как единый клиентский application layer;
+- экранный слой должен быть максимально разгружен;
+- app-store должен скрывать backend-вызовы, orchestration и значимую часть прикладного поведения от версточного слоя.
+
+Следствие для следующих этапов:
+
+- если модулю `liveletters-ui-kit` или самому `liveletters-frontend-app` нужен `Reagent`, его нужно использовать прямо;
+- не требуется искусственно держать frontend runtime-нейтральным, если это уже противоречит принятому стеку проекта.
 
 ## Критерии готовности
 

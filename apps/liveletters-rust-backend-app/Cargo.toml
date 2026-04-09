@@ -10,3 +10,8 @@ path = "src/lib.rs"
 [[bin]]
 name = "liveletters-rust-backend-app"
 path = "src/main.rs"
+
+[dependencies]
+liveletters-app-core = { path = "../../modules/liveletters-app-core" }
+liveletters-diagnostics = { path = "../../modules/liveletters-diagnostics" }
+liveletters-store = { path = "../../modules/liveletters-store" }

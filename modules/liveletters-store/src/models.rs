@@ -20,3 +20,34 @@ pub struct CommentRecord {
     pub visibility: String,
     pub hidden: bool,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutboxRecord {
+    pub event_id: String,
+    pub event_type: String,
+    pub resource_id: String,
+    pub message_body: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawMessageRecord {
+    pub message_id: String,
+    pub raw_message: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawEventRecord {
+    pub event_id: String,
+    pub event_type: String,
+    pub resource_id: String,
+    pub payload_json: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeferredEventRecord {
+    pub event_id: String,
+    pub event_type: String,
+    pub reason: String,
+    pub payload_json: String,
+}

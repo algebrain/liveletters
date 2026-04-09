@@ -6,3 +6,8 @@ license = "MIT"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+liveletters-domain = { path = "../liveletters-domain" }
+liveletters-protocol = { path = "../liveletters-protocol" }
+liveletters-store = { path = "../liveletters-store" }

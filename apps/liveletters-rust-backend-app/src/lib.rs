@@ -1,3 +1,11 @@
+mod backend;
+mod dto;
+mod errors;
+
+pub use backend::BackendApp;
+pub use dto::{CreatePostRequest, IncomingFailureDto, SyncStatusDto};
+pub use errors::BackendError;
+
 pub fn app_name() -> &'static str {
     "liveletters-rust-backend-app"
 }
@@ -11,4 +19,3 @@ mod tests {
         assert_eq!(app_name(), "liveletters-rust-backend-app");
     }
 }
-

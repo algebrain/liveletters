@@ -6,3 +6,81 @@
   (is (= {:module :liveletters-ui-model
           :language :cljc}
          (core/module-info))))
+
+(deftest builds-feed-view-model
+  (is (= {:items [{:id "post-2"
+                   :title "Second post"
+                   :meta "alice in blog-1"
+                   :hidden? false}
+                  {:id "post-1"
+                   :title "First post"
+                   :meta "alice in blog-1"
+                   :hidden? true}]
+          :empty? false}
+         (core/feed-view-model
+          [{:post_id "post-1"
+            :resource_id "blog-1"
+            :author_id "alice"
+            :body "First post"
+            :hidden true}
+           {:post_id "post-2"
+            :resource_id "blog-1"
+            :author_id "alice"
+            :body "Second post"
+            :hidden false}]))))
+
+(deftest builds-empty-feed-view-model
+  (is (= {:items []
+          :empty? true}
+         (core/feed-view-model []))))
+
+(deftest builds-post-thread-view-model
+  (is (= {:post {:id "post-1"
+                 :title "First post"
+                 :hidden? false}
+          :comments [{:id "comment-1"
+                      :body "First comment"
+                      :author "bob"
+                      :reply-to nil}
+                     {:id "comment-2"
+                      :body "Reply"
+                      :author "alice"
+                      :reply-to "comment-1"}]
+          :comment-count 2}
+         (core/post-thread-view-model
+          {:post {:post_id "post-1"
+                  :body "First post"
+                  :hidden false}
+           :comments [{:comment_id "comment-1"
+                       :body "First comment"
+                       :author_id "bob"
+                       :parent_comment_id nil}
+                      {:comment_id "comment-2"
+                       :body "Reply"
+                       :author_id "alice"
+                       :parent_comment_id "comment-1"}]}))))
+
+(deftest formats-sync-status-for-ui
+  (is (= {:label "Healthy"
+          :tone :positive
+          :details {:applied 3
+                    :duplicates 1
+                    :malformed 0
+                    :deferred 0
+                    :outbox 2}}
+         (core/sync-status-view-model
+          {:status :healthy
+           :applied-messages 3
+           :duplicate-messages 1
+           :malformed-messages 0
+           :deferred-events 0
+           :pending-outbox 2}))))
+
+(deftest normalizes-incoming-failures-for-screen
+  (is (= [{:id "message-1"
+           :kind :malformed
+           :preview "bad message"}]
+         (core/incoming-failures-view-model
+          [{:message_id "message-1"
+            :status "malformed"
+            :preview "bad message"}]))))

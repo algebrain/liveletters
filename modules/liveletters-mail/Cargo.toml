@@ -6,3 +6,6 @@ license = "MIT"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+liveletters-protocol = { path = "../liveletters-protocol" }

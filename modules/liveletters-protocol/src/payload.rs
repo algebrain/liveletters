@@ -19,4 +19,19 @@ pub enum DomainEventPayload {
         created_at: u64,
         visibility: String,
     },
+    PostHidden {
+        post_id: String,
+        resource_id: String,
+        actor_id: String,
+        created_at: u64,
+    },
+    CommentEdited {
+        comment_id: String,
+        post_id: String,
+        resource_id: String,
+        actor_id: String,
+        created_at: u64,
+        body: String,
+        visibility: String,
+    },
 }

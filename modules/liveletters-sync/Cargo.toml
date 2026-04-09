@@ -6,3 +6,9 @@ license = "MIT"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+liveletters-mail = { path = "../liveletters-mail" }
+liveletters-protocol = { path = "../liveletters-protocol" }
+liveletters-store = { path = "../liveletters-store" }
+serde_json = "1.0"

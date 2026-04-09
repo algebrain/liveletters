@@ -6,7 +6,8 @@
          "../../modules/liveletters-ui-model/test"
          "../../modules/liveletters-frontend-api/src"
          "../../modules/liveletters-frontend-api/test"]
- :deps {org.clojure/clojure {:mvn/version "1.11.1"}}
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        reagent/reagent {:mvn/version "1.2.0"}}
  :aliases
  {:test
   {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.20"}}
