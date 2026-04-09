@@ -482,6 +482,12 @@
 4. ошибки проходят через `normalize-error` и затем уже обрабатываются приложением;
 5. подписки на backend events тоже заводятся через этот модуль.
 
+Для initial setup и settings flow это теперь означает:
+
+6. сначала вызвать `get-bootstrap-state!`;
+7. затем вызвать `get-settings!`;
+8. затем сохранять форму через `save-settings!`.
+
 То есть `liveletters-frontend-api` должен быть единственной точкой прямого общения frontend с backend boundary.
 
 ## Что этот модуль специально не делает
@@ -512,6 +518,13 @@
 4. формы normalized DTO;
 5. `normalize-error` как единая точка frontend-side error mapping;
 6. `tauri-adapter` как рабочая runtime-реализация.
+
+Текущее дополнение к этому контракту:
+
+7. `bootstrap-state-dto`;
+8. `settings-dto`;
+9. `save-settings-request`;
+10. helper-функции initial setup и settings flow.
 
 Изменение этих элементов почти наверняка требует согласованных правок в:
 

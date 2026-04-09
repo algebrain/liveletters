@@ -51,6 +51,19 @@
                              :value "Editable"
                              :on-change handler})))))
 
+(deftest password-input-renders-password-field
+  (let [handler (fn [_event] nil)]
+    (is (= [:label {:class "ll-field"}
+            [:span {:class "ll-field__label"} "SMTP password"]
+            [:input {:type "password"
+                     :value "secret"
+                     :placeholder ""
+                     :class "ll-input"
+                     :on-change handler}]]
+           (core/password-input {:label "SMTP password"
+                                 :value "secret"
+                                 :on-change handler})))))
+
 (deftest section-wraps-title-and-children
   (is (= [:section {:class "ll-section"}
           [:h2 {:class "ll-section__title"} "Feed"]

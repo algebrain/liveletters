@@ -54,6 +54,13 @@ impl From<BackendError> for CommandErrorDto {
                 message: format!("{error:?}"),
                 details: None,
             },
+            BackendError::AppCore(
+                liveletters_app_core::AppCoreError::SettingsValidation { field, message },
+            ) => Self {
+                code: "validation_error".into(),
+                message,
+                details: Some(field),
+            },
             BackendError::AppCore(error) => Self {
                 code: "app_core_error".into(),
                 message: format!("{error:?}"),

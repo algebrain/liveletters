@@ -34,6 +34,24 @@
                                    (swap! store assoc :sync-status sync-status))
                                  #(set-error! store %)))
 
+(defn refresh-bootstrap-state! [adapter store on-complete]
+  (frontend-api/get-bootstrap-state! adapter
+                                     (fn [bootstrap]
+                                       (clear-error! store)
+                                       (swap! store assoc :bootstrap (merge {:checked? true} bootstrap))
+                                       (when on-complete
+                                         (on-complete bootstrap)))
+                                     #(set-error! store %)))
+
+(defn load-settings! [adapter store on-complete]
+  (frontend-api/get-settings! adapter
+                              (fn [settings]
+                                (clear-error! store)
+                                (swap! store assoc :settings-form settings)
+                                (when on-complete
+                                  (on-complete settings)))
+                              #(set-error! store %)))
+
 (defn refresh-incoming-failures! [adapter store]
   (frontend-api/list-incoming-failures! adapter
                                         (fn [failures]
@@ -61,6 +79,9 @@
 (defn update-create-post-form! [store values]
   (swap! store update :create-post merge values))
 
+(defn update-settings-form! [store values]
+  (swap! store update :settings-form merge values))
+
 (defn- normalize-create-post-form [form]
   (let [created-at (or (not-empty (str (:created-at form))) "0")
         created-at-value (if (= created-at "0")
@@ -87,6 +108,50 @@
                                  (refresh-sync-status! adapter store))
                                #(set-error! store %))))
 
+(defn- normalize-settings-form [form]
+  (-> form
+      (update :nickname #(or % ""))
+      (update :email-address #(or % ""))
+      (update :avatar-url #(or % ""))
+      (update :smtp-host #(or % ""))
+      (update :smtp-port #(if (string? %)
+                            (js/parseInt % 10)
+                            %))
+      (update :smtp-username #(or % ""))
+      (update :smtp-password #(or % ""))
+      (update :smtp-hello-domain #(or % ""))
+      (update :imap-host #(or % ""))
+      (update :imap-port #(if (string? %)
+                            (js/parseInt % 10)
+                            %))
+      (update :imap-username #(or % ""))
+      (update :imap-password #(or % ""))
+      (update :imap-mailbox #(or % "INBOX"))
+      (update :smtp-port #(if (js/isNaN %) 0 %))
+      (update :imap-port #(if (js/isNaN %) 0 %))))
+
+(defn submit-settings! [adapter store]
+  (let [page (get-in @store [:route :page])
+        form (normalize-settings-form (:settings-form @store))
+        request (frontend-api/save-settings-request form)]
+    (swap! store assoc :settings-form form)
+    (frontend-api/save-settings! adapter request
+                                 (fn [saved]
+                                   (clear-error! store)
+                                   (swap! store assoc
+                                          :settings-form saved
+                                          :bootstrap {:checked? true
+                                                      :setup-completed? true})
+                                   (if (= page :initial-setup)
+                                     (do
+                                       (navigate! store (routes/feed-route))
+                                       (refresh-home-feed! adapter store)
+                                       (refresh-sync-status! adapter store)
+                                       (refresh-incoming-failures! adapter store)
+                                       (refresh-event-failures! adapter store))
+                                     (navigate! store (routes/settings-route))))
+                                 #(set-error! store %))))
+
 (defn subscribe-backend-events! [adapter store]
   (frontend-api/subscribe-feed-updated!
    adapter
@@ -102,8 +167,17 @@
 (defn init! [adapter store]
   (swap! store assoc-in [:runtime :adapter] adapter)
   (subscribe-backend-events! adapter store)
-  (refresh-home-feed! adapter store)
-  (refresh-sync-status! adapter store)
-  (refresh-incoming-failures! adapter store)
-  (refresh-event-failures! adapter store)
+  (refresh-bootstrap-state!
+   adapter
+   store
+   (fn [bootstrap]
+     (load-settings! adapter store nil)
+     (if (:setup-completed? bootstrap)
+       (do
+         (navigate! store (routes/feed-route))
+         (refresh-home-feed! adapter store)
+         (refresh-sync-status! adapter store)
+         (refresh-incoming-failures! adapter store)
+         (refresh-event-failures! adapter store))
+       (navigate! store (routes/initial-setup-route)))))
   store)

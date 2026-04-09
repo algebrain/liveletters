@@ -30,6 +30,8 @@
 - `resources`;
 - `posts`;
 - `comments`;
+- `user_settings`;
+- `mail_settings`;
 - `subscriptions`;
 - `memberships`;
 - `raw_messages`;
@@ -61,6 +63,8 @@
   - `raw_messages`
   - `raw_events`
   - `deferred_events`
+  - `user_settings`
+  - `mail_settings`
 - repository-like операции для чтения и записи этих сущностей;
 - home-scoped путь хранения по умолчанию;
 - тестовый сценарий с временным `HOME`.
@@ -75,6 +79,13 @@
 - сохранение отложенного события;
 - чтение очереди отложенных событий;
 - удаление события после успешной или окончательной переобработки.
+
+Текущий settings contour уже поддерживает:
+
+- хранение локального профиля пользователя;
+- хранение SMTP/IMAP конфигурации;
+- чтение persistent-признака `setup_completed`;
+- file-based round-trip для first-run сценария.
 
 ## Требования к структуре каталога
 

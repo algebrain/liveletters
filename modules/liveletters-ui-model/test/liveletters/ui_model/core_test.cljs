@@ -103,3 +103,34 @@
             :resource-id "blog-1"
             :apply-status :unauthorized
             :failure-reason "actor_cannot_edit_comment"}]))))
+
+(deftest builds-settings-form-view-model
+  (is (= {:nickname "alice"
+          :email-address "alice@example.com"
+          :avatar-url ""
+          :smtp-host "smtp.example.com"
+          :smtp-port 587
+          :smtp-username "alice"
+          :smtp-password "secret"
+          :smtp-hello-domain "example.com"
+          :imap-host "imap.example.com"
+          :imap-port 143
+          :imap-username "alice"
+          :imap-password "secret"
+          :imap-mailbox "INBOX"
+          :setup-completed? true}
+         (core/settings-form-view-model
+          {:nickname "alice"
+           :email-address "alice@example.com"
+           :avatar-url nil
+           :smtp-host "smtp.example.com"
+           :smtp-port 587
+           :smtp-username "alice"
+           :smtp-password "secret"
+           :smtp-hello-domain "example.com"
+           :imap-host "imap.example.com"
+           :imap-port 143
+           :imap-username "alice"
+           :imap-password "secret"
+           :imap-mailbox "INBOX"
+           :setup-completed? true}))))

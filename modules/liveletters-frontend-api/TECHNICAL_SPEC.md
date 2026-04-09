@@ -26,6 +26,9 @@
 
 ## Основные команды и запросы
 
+- `get-bootstrap-state`;
+- `get-settings`;
+- `save-settings`;
 - `create-post`;
 - `edit-post`;
 - `create-comment`;
@@ -58,6 +61,9 @@
 Сейчас модуль уже включает:
 
 - command/query helpers для:
+  - `get-bootstrap-state`
+  - `get-settings`
+  - `save-settings`
   - `create-post`
   - `get-home-feed`
   - `get-post-thread`
@@ -65,6 +71,9 @@
   - `list-incoming-failures`
   - `list-event-failures`
 - DTO normalization для:
+  - `bootstrap-state-dto`
+  - `settings-dto`
+  - `save-settings-request`
   - `create-post-request`
   - `sync-status-dto`
   - `event-failure-dto`

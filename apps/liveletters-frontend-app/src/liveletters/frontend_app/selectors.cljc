@@ -6,6 +6,9 @@
 (defn current-page [state]
   (get-in state [:route :page]))
 
+(defn bootstrap [state]
+  (:bootstrap state))
+
 (defn feed [state]
   (:feed state))
 
@@ -23,3 +26,6 @@
 
 (defn create-post-form [state]
   (:create-post state))
+
+(defn settings-form [state]
+  (:settings-form state))

@@ -584,6 +584,13 @@
 5. `ReprocessDeferredEventsCommand` как прикладной вход в deferred reprocessing;
 6. `AppCoreError` как единый прикладной error boundary.
 
+Текущее дополнение к этому контракту:
+
+7. `GetBootstrapStateQuery`;
+8. `GetSettingsQuery`;
+9. `SaveSettingsCommand`;
+10. read models `BootstrapState` и `AppSettings`.
+
 Изменение этих элементов почти наверняка требует согласованных правок в:
 
 - backend app;

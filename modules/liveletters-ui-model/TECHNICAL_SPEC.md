@@ -27,6 +27,7 @@
 
 ## Основные сценарии
 
+- построение settings form model;
 - построение feed view model;
 - построение resource page model;
 - построение post thread model;
@@ -51,6 +52,7 @@
 
 Сейчас модуль уже включает:
 
+- `settings-form-view-model`;
 - `feed-view-model`;
 - `post-thread-view-model`;
 - `sync-status-view-model`;
@@ -71,6 +73,11 @@
 
 - incoming failures;
 - event failures.
+
+Текущий settings contour дает screen-friendly форму для:
+
+- initial setup page;
+- повторного открытия тех же данных на settings page.
 
 ## Роль относительно `Reagent` и `app-state`
 

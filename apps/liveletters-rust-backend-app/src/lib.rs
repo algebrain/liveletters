@@ -11,9 +11,9 @@ mod runtime;
 
 pub use backend::BackendApp;
 pub use dto::{
-    CommentSummaryDto, CreatePostCommandRequest, CreatePostRequest, EventFailureDto,
-    FrontendErrorLogRequest, HomeFeedDto, IncomingFailureDto, PostSummaryDto, PostThreadDto,
-    SyncStatusDto,
+    BootstrapStateDto, CommentSummaryDto, CreatePostCommandRequest, CreatePostRequest,
+    EventFailureDto, FrontendErrorLogRequest, HomeFeedDto, IncomingFailureDto, PostSummaryDto,
+    PostThreadDto, SaveSettingsCommandRequest, SaveSettingsRequest, SettingsDto, SyncStatusDto,
 };
 pub use errors::{BackendError, CommandErrorDto};
 pub use events::FrontendEvent;

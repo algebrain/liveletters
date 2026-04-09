@@ -39,6 +39,7 @@
 
 ## Основные экраны
 
+- initial setup;
 - главная лента;
 - страница ресурса;
 - страница поста;
@@ -71,11 +72,17 @@
 
 - единый `app-state`;
 - route switching между:
+  - initial setup
   - feed
   - post thread
   - sync
   - diagnostics
+  - settings
+- bootstrap-first init path, который сначала проверяет `setup_completed`;
+- settings form и save intent для initial setup и повторного редактирования;
 - store-level intents и refresh functions для:
+  - bootstrap state
+  - settings
   - feed
   - sync status
   - incoming failures
@@ -88,7 +95,8 @@
 
 - `sync-status` хранится в expanded форме;
 - diagnostics state разделен на `incoming-failures` и `event-failures`;
-- UI по-прежнему остается thin относительно `frontend-api` и `ui-model`.
+- UI по-прежнему остается thin относительно `frontend-api` и `ui-model`;
+- first-run flow больше не зависит от feed-first дефолта.
 
 ## Требования к структуре каталога
 

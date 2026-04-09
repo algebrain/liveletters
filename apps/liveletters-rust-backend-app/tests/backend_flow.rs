@@ -1,4 +1,6 @@
-use liveletters_rust_backend_app::{BackendApp, CreatePostRequest};
+use liveletters_rust_backend_app::{
+    BackendApp, CreatePostRequest, SaveSettingsRequest,
+};
 use liveletters_store::{RawEventRecord, RawMessageRecord, Store};
 
 #[test]
@@ -93,4 +95,54 @@ fn backend_failure_boundary_can_expose_raw_event_failures() {
         failures[0].failure_reason.as_deref(),
         Some("actor_cannot_edit_comment")
     );
+}
+
+#[test]
+fn backend_exposes_bootstrap_state_and_settings_boundary() {
+    let backend = BackendApp::open_in_memory().expect("backend should open");
+
+    let bootstrap = backend
+        .get_bootstrap_state()
+        .expect("bootstrap state should load");
+    let settings = backend.get_settings().expect("settings should load");
+
+    assert!(!bootstrap.setup_completed);
+    assert_eq!(settings.nickname, "");
+    assert_eq!(settings.smtp_port, 587);
+    assert_eq!(settings.imap_mailbox, "INBOX");
+}
+
+#[test]
+fn backend_can_save_settings_through_app_core_boundary() {
+    let backend = BackendApp::open_in_memory().expect("backend should open");
+
+    let settings = backend
+        .save_settings(SaveSettingsRequest {
+            nickname: "alice",
+            email_address: "alice@example.com",
+            avatar_url: Some("https://example.com/avatar.png"),
+            smtp_host: "smtp.example.com",
+            smtp_port: 587,
+            smtp_username: "alice",
+            smtp_password: "secret",
+            smtp_hello_domain: "example.com",
+            imap_host: "imap.example.com",
+            imap_port: 143,
+            imap_username: "alice",
+            imap_password: "secret",
+            imap_mailbox: "INBOX",
+        })
+        .expect("settings should save");
+
+    assert!(settings.setup_completed);
+    assert_eq!(settings.nickname, "alice");
+
+    let bootstrap = backend
+        .get_bootstrap_state()
+        .expect("bootstrap state should load");
+    let loaded = backend.get_settings().expect("settings should load");
+
+    assert!(bootstrap.setup_completed);
+    assert_eq!(loaded.email_address, "alice@example.com");
+    assert_eq!(loaded.smtp_host, "smtp.example.com");
 }

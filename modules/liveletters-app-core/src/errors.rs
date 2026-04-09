@@ -9,6 +9,7 @@ pub enum AppCoreError {
     Protocol(ProtocolError),
     Sync(SyncError),
     Store(StoreError),
+    SettingsValidation { field: String, message: String },
     PostNotFound { post_id: String },
     CommentNotFound { comment_id: String },
 }

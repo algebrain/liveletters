@@ -7,13 +7,17 @@ mod service;
 pub use commands::{
     CreateCommentCommand, CreateCommentResult, CreatePostCommand, CreatePostResult,
     EditCommentCommand, EditCommentResult, HidePostCommand, HidePostResult,
-    ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult,
+    ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult, SaveSettingsCommand,
+    SaveSettingsResult,
 };
 pub use errors::AppCoreError;
-pub use queries::{GetHomeFeedQuery, GetPendingOutboxQuery, GetPostThreadQuery};
+pub use queries::{
+    GetBootstrapStateQuery, GetHomeFeedQuery, GetPendingOutboxQuery, GetPostThreadQuery,
+    GetSettingsQuery,
+};
 pub use read_models::{
-    CommentSummary, DeferredReprocessingSummary, HomeFeed, OutboxEntry, PendingOutbox, PostSummary,
-    PostThread,
+    AppSettings, BootstrapState, CommentSummary, DeferredReprocessingSummary, HomeFeed,
+    OutboxEntry, PendingOutbox, PostSummary, PostThread,
 };
 pub use service::AppCore;
 

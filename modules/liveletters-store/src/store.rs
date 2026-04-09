@@ -3,8 +3,8 @@ use std::{fs, path::Path};
 use rusqlite::{params, Connection};
 
 use crate::{
-    CommentRecord, DeferredEventRecord, OutboxRecord, PostRecord, RawEventRecord, RawMessageRecord,
-    StoreError, StorePaths,
+    CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxRecord, PostRecord,
+    RawEventRecord, RawMessageRecord, StoreError, StorePaths, UserSettingsRecord,
 };
 
 pub struct Store {
@@ -87,6 +87,28 @@ impl Store {
                 event_type TEXT NOT NULL,
                 reason TEXT NOT NULL,
                 payload_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS user_settings (
+                profile_id TEXT PRIMARY KEY,
+                nickname TEXT NOT NULL,
+                email_address TEXT NOT NULL,
+                avatar_url TEXT,
+                setup_completed INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mail_settings (
+                profile_id TEXT PRIMARY KEY,
+                smtp_host TEXT NOT NULL,
+                smtp_port INTEGER NOT NULL,
+                smtp_username TEXT NOT NULL,
+                smtp_password TEXT NOT NULL,
+                smtp_hello_domain TEXT NOT NULL,
+                imap_host TEXT NOT NULL,
+                imap_port INTEGER NOT NULL,
+                imap_username TEXT NOT NULL,
+                imap_password TEXT NOT NULL,
+                imap_mailbox TEXT NOT NULL
             );
             "#,
         )?;
@@ -446,5 +468,138 @@ impl Store {
         )?;
 
         Ok(())
+    }
+
+    pub fn save_user_settings_record(
+        &self,
+        record: &UserSettingsRecord,
+    ) -> Result<(), StoreError> {
+        self.connection.execute(
+            r#"
+            INSERT OR REPLACE INTO user_settings
+                (profile_id, nickname, email_address, avatar_url, setup_completed)
+            VALUES
+                (?1, ?2, ?3, ?4, ?5)
+            "#,
+            params![
+                record.profile_id,
+                record.nickname,
+                record.email_address,
+                record.avatar_url,
+                record.setup_completed as i64,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn get_user_settings_record(
+        &self,
+        profile_id: &str,
+    ) -> Result<Option<UserSettingsRecord>, StoreError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT profile_id, nickname, email_address, avatar_url, setup_completed
+            FROM user_settings
+            WHERE profile_id = ?1
+            "#,
+        )?;
+
+        let mut rows = stmt.query([profile_id])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+
+        Ok(Some(UserSettingsRecord {
+            profile_id: row.get(0)?,
+            nickname: row.get(1)?,
+            email_address: row.get(2)?,
+            avatar_url: row.get(3)?,
+            setup_completed: row.get::<_, i64>(4)? != 0,
+        }))
+    }
+
+    pub fn save_mail_settings_record(
+        &self,
+        record: &MailSettingsRecord,
+    ) -> Result<(), StoreError> {
+        self.connection.execute(
+            r#"
+            INSERT OR REPLACE INTO mail_settings
+                (
+                    profile_id,
+                    smtp_host,
+                    smtp_port,
+                    smtp_username,
+                    smtp_password,
+                    smtp_hello_domain,
+                    imap_host,
+                    imap_port,
+                    imap_username,
+                    imap_password,
+                    imap_mailbox
+                )
+            VALUES
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            "#,
+            params![
+                record.profile_id,
+                record.smtp_host,
+                record.smtp_port as i64,
+                record.smtp_username,
+                record.smtp_password,
+                record.smtp_hello_domain,
+                record.imap_host,
+                record.imap_port as i64,
+                record.imap_username,
+                record.imap_password,
+                record.imap_mailbox,
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn get_mail_settings_record(
+        &self,
+        profile_id: &str,
+    ) -> Result<Option<MailSettingsRecord>, StoreError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT
+                profile_id,
+                smtp_host,
+                smtp_port,
+                smtp_username,
+                smtp_password,
+                smtp_hello_domain,
+                imap_host,
+                imap_port,
+                imap_username,
+                imap_password,
+                imap_mailbox
+            FROM mail_settings
+            WHERE profile_id = ?1
+            "#,
+        )?;
+
+        let mut rows = stmt.query([profile_id])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+
+        Ok(Some(MailSettingsRecord {
+            profile_id: row.get(0)?,
+            smtp_host: row.get(1)?,
+            smtp_port: row.get::<_, i64>(2)? as u16,
+            smtp_username: row.get(3)?,
+            smtp_password: row.get(4)?,
+            smtp_hello_domain: row.get(5)?,
+            imap_host: row.get(6)?,
+            imap_port: row.get::<_, i64>(7)? as u16,
+            imap_username: row.get(8)?,
+            imap_password: row.get(9)?,
+            imap_mailbox: row.get(10)?,
+        }))
     }
 }

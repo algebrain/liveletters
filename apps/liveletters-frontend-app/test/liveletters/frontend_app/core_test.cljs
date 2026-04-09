@@ -12,6 +12,21 @@
         adapter {:invoke-command (fn [command payload on-success _on-error]
                                    (swap! calls conj [command payload])
                                    (case command
+                                     "get_bootstrap_state" (on-success {:setup_completed true})
+                                     "get_settings" (on-success {:nickname "alice"
+                                                                 :email_address "alice@example.com"
+                                                                 :avatar_url nil
+                                                                 :smtp_host "smtp.example.com"
+                                                                 :smtp_port 587
+                                                                 :smtp_username "alice"
+                                                                 :smtp_password "secret"
+                                                                 :smtp_hello_domain "example.com"
+                                                                 :imap_host "imap.example.com"
+                                                                 :imap_port 143
+                                                                 :imap_username "alice"
+                                                                 :imap_password "secret"
+                                                                 :imap_mailbox "INBOX"
+                                                                 :setup_completed true})
                                      "get_home_feed" (on-success {:posts [{:post_id "post-1"
                                                                            :resource_id "blog-1"
                                                                            :author_id "alice"
@@ -32,14 +47,48 @@
                  :subscribe-event (fn [_event-name _handler] :subscription-token)}
         app-state (core/create-app-state)]
     (core/init! adapter app-state)
+    (is (= {:checked? true :setup-completed? true} (:bootstrap @app-state)))
     (is (= 1 (count (:feed @app-state))))
     (is (= :healthy (get-in @app-state [:sync-status :status])))
     (is (= [] (:incoming-failures @app-state)))
     (is (= [] (:event-failures @app-state)))
-    (is (= [["get_home_feed" nil]
+    (is (= {:page :feed} (:route @app-state)))
+    (is (= [["get_bootstrap_state" nil]
+            ["get_settings" nil]
+            ["get_home_feed" nil]
             ["get_sync_status" nil]
             ["list_incoming_failures" nil]
             ["list_event_failures" nil]]
+           @calls))))
+
+(deftest init_routes_to_initial_setup_when_bootstrap_is_incomplete
+  (let [calls (atom [])
+        adapter {:invoke-command (fn [command payload on-success _on-error]
+                                   (swap! calls conj [command payload])
+                                   (case command
+                                     "get_bootstrap_state" (on-success {:setup_completed false})
+                                     "get_settings" (on-success {:nickname ""
+                                                                 :email_address ""
+                                                                 :avatar_url nil
+                                                                 :smtp_host ""
+                                                                 :smtp_port 587
+                                                                 :smtp_username ""
+                                                                 :smtp_password ""
+                                                                 :smtp_hello_domain ""
+                                                                 :imap_host ""
+                                                                 :imap_port 143
+                                                                 :imap_username ""
+                                                                 :imap_password ""
+                                                                 :imap_mailbox "INBOX"
+                                                                 :setup_completed false})
+                                     nil))
+                 :subscribe-event (fn [_event-name _handler] :subscription-token)}
+        app-state (core/create-app-state)]
+    (core/init! adapter app-state)
+    (is (= {:page :initial-setup} (:route @app-state)))
+    (is (= "" (get-in @app-state [:settings-form :nickname])))
+    (is (= [["get_bootstrap_state" nil]
+            ["get_settings" nil]]
            @calls))))
 
 (deftest create-post-intent-calls-frontend-api-and-refreshes-feed
@@ -133,6 +182,21 @@
         adapter {:invoke-command (fn [command payload on-success _on-error]
                                    (swap! calls conj [command payload])
                                    (case command
+                                     "get_bootstrap_state" (on-success {:setup_completed true})
+                                     "get_settings" (on-success {:nickname "alice"
+                                                                 :email_address "alice@example.com"
+                                                                 :avatar_url nil
+                                                                 :smtp_host "smtp.example.com"
+                                                                 :smtp_port 587
+                                                                 :smtp_username "alice"
+                                                                 :smtp_password "secret"
+                                                                 :smtp_hello_domain "example.com"
+                                                                 :imap_host "imap.example.com"
+                                                                 :imap_port 143
+                                                                 :imap_username "alice"
+                                                                 :imap_password "secret"
+                                                                 :imap_mailbox "INBOX"
+                                                                 :setup_completed true})
                                      "get_home_feed" (on-success {:posts []})
                                      "get_sync_status" (on-success {:status "degraded"
                                                                     :applied_messages 0
@@ -163,9 +227,66 @@
     (is (= 1 (count (:incoming-failures @app-state))))
     (is (= 1 (count (:event-failures @app-state))))))
 
+(deftest save-settings-intent-updates-bootstrap-and_navigates_from_initial_setup
+  (let [calls (atom [])
+        adapter {:invoke-command (fn [command payload on-success _on-error]
+                                   (swap! calls conj [command payload])
+                                   (case command
+                                     "save_settings" (on-success {:nickname "alice"
+                                                                  :email_address "alice@example.com"
+                                                                  :avatar_url nil
+                                                                  :smtp_host "smtp.example.com"
+                                                                  :smtp_port 587
+                                                                  :smtp_username "alice"
+                                                                  :smtp_password "secret"
+                                                                  :smtp_hello_domain "example.com"
+                                                                  :imap_host "imap.example.com"
+                                                                  :imap_port 143
+                                                                  :imap_username "alice"
+                                                                  :imap_password "secret"
+                                                                  :imap_mailbox "INBOX"
+                                                                  :setup_completed true})
+                                     "get_home_feed" (on-success {:posts []})
+                                     "get_sync_status" (on-success {:status "healthy"
+                                                                    :applied_messages 0
+                                                                    :duplicate_messages 0
+                                                                    :replayed_messages 0
+                                                                    :unauthorized_messages 0
+                                                                    :invalid_messages 0
+                                                                    :malformed_messages 0
+                                                                    :deferred_events 0
+                                                                    :pending_outbox 0})
+                                     "list_incoming_failures" (on-success [])
+                                     "list_event_failures" (on-success [])
+                                     nil))}
+        app-state (core/create-app-state)]
+    (swap! app-state assoc
+           :route {:page :initial-setup}
+           :runtime {:adapter adapter}
+           :settings-form {:nickname "alice"
+                           :email-address "alice@example.com"
+                           :avatar-url ""
+                           :smtp-host "smtp.example.com"
+                           :smtp-port 587
+                           :smtp-username "alice"
+                           :smtp-password "secret"
+                           :smtp-hello-domain "example.com"
+                           :imap-host "imap.example.com"
+                           :imap-port 143
+                           :imap-username "alice"
+                           :imap-password "secret"
+                           :imap-mailbox "INBOX"})
+    (core/submit-settings! adapter app-state)
+    (is (= {:checked? true :setup-completed? true} (:bootstrap @app-state)))
+    (is (= {:page :feed} (:route @app-state)))
+    (is (= "alice" (get-in @app-state [:settings-form :nickname])))
+    (is (= "save_settings" (ffirst @calls)))))
+
 (deftest root-view-renders-current-page-shell
   (let [app-state (core/create-app-state)]
     (reset! app-state {:route {:page :sync}
+                       :bootstrap {:checked? true
+                                   :setup-completed? true}
                        :feed []
                        :thread nil
                        :sync-status {:status :healthy
@@ -179,6 +300,7 @@
                                      :pending-outbox 1}
                        :incoming-failures []
                        :event-failures []
+                       :settings-form {}
                        :create-post {}
                        :runtime {:adapter nil}
                        :ui {}})

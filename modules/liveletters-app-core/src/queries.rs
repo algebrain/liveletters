@@ -1,8 +1,8 @@
 use liveletters_store::{CommentRecord, OutboxRecord, PostRecord, Store};
 
 use crate::{
-    AppCoreError, CommentSummary, HomeFeed, OutboxEntry, PendingOutbox, PostSummary, PostThread,
-    decode_visibility_name,
+    AppCoreError, AppSettings, BootstrapState, CommentSummary, HomeFeed, OutboxEntry,
+    PendingOutbox, PostSummary, PostThread, decode_visibility_name,
 };
 
 pub struct GetHomeFeedQuery;
@@ -12,6 +12,8 @@ pub struct GetPostThreadQuery<'a> {
 }
 
 pub struct GetPendingOutboxQuery;
+pub struct GetBootstrapStateQuery;
+pub struct GetSettingsQuery;
 
 pub fn get_home_feed(store: &Store, _query: GetHomeFeedQuery) -> Result<HomeFeed, AppCoreError> {
     let posts = store
@@ -57,6 +59,48 @@ pub fn get_pending_outbox(
     Ok(PendingOutbox::new(entries))
 }
 
+pub fn get_bootstrap_state(
+    store: &Store,
+    _query: GetBootstrapStateQuery,
+) -> Result<BootstrapState, AppCoreError> {
+    let settings = store.get_user_settings_record(default_profile_id())?;
+
+    Ok(BootstrapState::new(
+        settings.map(|record| record.setup_completed).unwrap_or(false),
+    ))
+}
+
+pub fn get_settings(
+    store: &Store,
+    _query: GetSettingsQuery,
+) -> Result<AppSettings, AppCoreError> {
+    let user = store.get_user_settings_record(default_profile_id())?;
+    let mail = store.get_mail_settings_record(default_profile_id())?;
+    let mut settings = AppSettings::empty();
+
+    if let Some(user) = user {
+        settings.nickname = user.nickname;
+        settings.email_address = user.email_address;
+        settings.avatar_url = user.avatar_url;
+        settings.setup_completed = user.setup_completed;
+    }
+
+    if let Some(mail) = mail {
+        settings.smtp_host = mail.smtp_host;
+        settings.smtp_port = mail.smtp_port;
+        settings.smtp_username = mail.smtp_username;
+        settings.smtp_password = mail.smtp_password;
+        settings.smtp_hello_domain = mail.smtp_hello_domain;
+        settings.imap_host = mail.imap_host;
+        settings.imap_port = mail.imap_port;
+        settings.imap_username = mail.imap_username;
+        settings.imap_password = mail.imap_password;
+        settings.imap_mailbox = mail.imap_mailbox;
+    }
+
+    Ok(settings)
+}
+
 fn post_summary_from_record(record: PostRecord) -> PostSummary {
     PostSummary {
         post_id: record.post_id,
@@ -89,4 +133,8 @@ fn outbox_entry_from_record(record: OutboxRecord) -> OutboxEntry {
         resource_id: record.resource_id,
         message_body: record.message_body,
     }
+}
+
+fn default_profile_id() -> &'static str {
+    "default"
 }

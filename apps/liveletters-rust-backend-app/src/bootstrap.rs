@@ -19,6 +19,9 @@ pub fn build() -> Result<Builder<tauri::Wry>, BackendError> {
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::create_post,
+            commands::get_bootstrap_state,
+            commands::get_settings,
+            commands::save_settings,
             commands::get_home_feed,
             commands::get_post_thread,
             commands::get_sync_status,

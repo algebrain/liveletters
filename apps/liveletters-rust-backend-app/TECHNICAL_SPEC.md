@@ -45,6 +45,9 @@
 
 ## Основные команды
 
+- `get_bootstrap_state`;
+- `get_settings`;
+- `save_settings`;
 - `create_post`;
 - `edit_post`;
 - `create_comment`;
@@ -65,6 +68,9 @@
   - `liveletters-app-core`
   - `liveletters-diagnostics`
 - backend boundary для:
+  - `get_bootstrap_state`
+  - `get_settings`
+  - `save_settings`
   - `create_post`
   - `get_home_feed`
   - `get_post_thread`
@@ -81,6 +87,12 @@
 - `malformed`;
 - `deferred`;
 - `pending_outbox`.
+
+Текущий backend boundary теперь уже покрывает initial setup contour:
+
+- чтение bootstrap state;
+- чтение сохраненных настроек;
+- сохранение локального профиля и mail config.
 
 Текущий backend app все еще остается runtime-neutral integration layer, а не настоящим Tauri bootstrap.
 

@@ -58,6 +58,63 @@ pub struct EventFailureDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct BootstrapStateDto {
+    pub setup_completed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SettingsDto {
+    pub nickname: String,
+    pub email_address: String,
+    pub avatar_url: Option<String>,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub smtp_hello_domain: String,
+    pub imap_host: String,
+    pub imap_port: u16,
+    pub imap_username: String,
+    pub imap_password: String,
+    pub imap_mailbox: String,
+    pub setup_completed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SaveSettingsRequest<'a> {
+    pub nickname: &'a str,
+    pub email_address: &'a str,
+    pub avatar_url: Option<&'a str>,
+    pub smtp_host: &'a str,
+    pub smtp_port: u16,
+    pub smtp_username: &'a str,
+    pub smtp_password: &'a str,
+    pub smtp_hello_domain: &'a str,
+    pub imap_host: &'a str,
+    pub imap_port: u16,
+    pub imap_username: &'a str,
+    pub imap_password: &'a str,
+    pub imap_mailbox: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct SaveSettingsCommandRequest {
+    pub nickname: String,
+    pub email_address: String,
+    pub avatar_url: Option<String>,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub smtp_hello_domain: String,
+    pub imap_host: String,
+    pub imap_port: u16,
+    pub imap_username: String,
+    pub imap_password: String,
+    pub imap_mailbox: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PostSummaryDto {
     pub post_id: String,
     pub resource_id: String,
@@ -138,6 +195,35 @@ impl From<liveletters_app_core::CommentSummary> for CommentSummaryDto {
             body: value.body,
             visibility: value.visibility,
             hidden: value.hidden,
+        }
+    }
+}
+
+impl From<liveletters_app_core::BootstrapState> for BootstrapStateDto {
+    fn from(value: liveletters_app_core::BootstrapState) -> Self {
+        Self {
+            setup_completed: value.setup_completed,
+        }
+    }
+}
+
+impl From<liveletters_app_core::AppSettings> for SettingsDto {
+    fn from(value: liveletters_app_core::AppSettings) -> Self {
+        Self {
+            nickname: value.nickname,
+            email_address: value.email_address,
+            avatar_url: value.avatar_url,
+            smtp_host: value.smtp_host,
+            smtp_port: value.smtp_port,
+            smtp_username: value.smtp_username,
+            smtp_password: value.smtp_password,
+            smtp_hello_domain: value.smtp_hello_domain,
+            imap_host: value.imap_host,
+            imap_port: value.imap_port,
+            imap_username: value.imap_username,
+            imap_password: value.imap_password,
+            imap_mailbox: value.imap_mailbox,
+            setup_completed: value.setup_completed,
         }
     }
 }

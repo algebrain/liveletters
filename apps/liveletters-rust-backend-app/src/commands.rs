@@ -4,9 +4,9 @@ use tauri::{AppHandle, State};
 
 use crate::{
     runtime::{append_runtime_log, emit_frontend_event, runtime_log_line, BackendState},
-    CommandErrorDto, CreatePostCommandRequest, CreatePostRequest, EventFailureDto,
-    FrontendErrorLogRequest, FrontendEvent, HomeFeedDto, IncomingFailureDto, PostThreadDto,
-    SyncStatusDto,
+    BootstrapStateDto, CommandErrorDto, CreatePostCommandRequest, CreatePostRequest,
+    EventFailureDto, FrontendErrorLogRequest, FrontendEvent, HomeFeedDto, IncomingFailureDto,
+    PostThreadDto, SaveSettingsCommandRequest, SaveSettingsRequest, SettingsDto, SyncStatusDto,
 };
 
 #[tauri::command]
@@ -38,6 +38,48 @@ pub fn get_home_feed(state: State<'_, BackendState>) -> Result<HomeFeedDto, Comm
     state
         .with_backend(|backend| backend.get_home_feed())
         .map(HomeFeedDto::from)
+        .map_err(CommandErrorDto::from)
+}
+
+#[tauri::command]
+pub fn get_bootstrap_state(
+    state: State<'_, BackendState>,
+) -> Result<BootstrapStateDto, CommandErrorDto> {
+    state
+        .with_backend(|backend| backend.get_bootstrap_state())
+        .map_err(CommandErrorDto::from)
+}
+
+#[tauri::command]
+pub fn get_settings(state: State<'_, BackendState>) -> Result<SettingsDto, CommandErrorDto> {
+    state
+        .with_backend(|backend| backend.get_settings())
+        .map_err(CommandErrorDto::from)
+}
+
+#[tauri::command]
+pub fn save_settings(
+    state: State<'_, BackendState>,
+    request: SaveSettingsCommandRequest,
+) -> Result<SettingsDto, CommandErrorDto> {
+    state
+        .with_backend(|backend| {
+            backend.save_settings(SaveSettingsRequest {
+                nickname: &request.nickname,
+                email_address: &request.email_address,
+                avatar_url: request.avatar_url.as_deref(),
+                smtp_host: &request.smtp_host,
+                smtp_port: request.smtp_port,
+                smtp_username: &request.smtp_username,
+                smtp_password: &request.smtp_password,
+                smtp_hello_domain: &request.smtp_hello_domain,
+                imap_host: &request.imap_host,
+                imap_port: request.imap_port,
+                imap_username: &request.imap_username,
+                imap_password: &request.imap_password,
+                imap_mailbox: &request.imap_mailbox,
+            })
+        })
         .map_err(CommandErrorDto::from)
 }
 

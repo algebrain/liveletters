@@ -26,6 +26,18 @@
              on-change (assoc :on-change on-change)
              (nil? on-change) (assoc :read-only true))]])
 
+(defn password-input [{:keys [label value placeholder on-change]
+                       :or {value ""
+                            placeholder ""}}]
+  [:label {:class "ll-field"}
+   [:span {:class "ll-field__label"} label]
+   [:input (cond-> {:type "password"
+                    :value value
+                    :placeholder placeholder
+                    :class "ll-input"}
+             on-change (assoc :on-change on-change)
+             (nil? on-change) (assoc :read-only true))]])
+
 (defn section [{:keys [title children]
                 :or {children []}}]
   [:section {:class "ll-section"}

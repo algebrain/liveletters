@@ -53,3 +53,27 @@ pub struct DeferredEventRecord {
     pub reason: String,
     pub payload_json: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserSettingsRecord {
+    pub profile_id: String,
+    pub nickname: String,
+    pub email_address: String,
+    pub avatar_url: Option<String>,
+    pub setup_completed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MailSettingsRecord {
+    pub profile_id: String,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub smtp_hello_domain: String,
+    pub imap_host: String,
+    pub imap_port: u16,
+    pub imap_username: String,
+    pub imap_password: String,
+    pub imap_mailbox: String,
+}

@@ -1,10 +1,14 @@
 use liveletters_app_core::{
-    AppCore, CreatePostCommand, GetHomeFeedQuery, GetPostThreadQuery, HomeFeed, PostThread,
+    AppCore, CreatePostCommand, GetBootstrapStateQuery, GetHomeFeedQuery, GetPostThreadQuery,
+    GetSettingsQuery, HomeFeed, PostThread, SaveSettingsCommand,
 };
 use liveletters_diagnostics::{DiagnosticsReader, HealthStatus};
 use liveletters_store::Store;
 
-use crate::{BackendError, CreatePostRequest, EventFailureDto, IncomingFailureDto, SyncStatusDto};
+use crate::{
+    BackendError, BootstrapStateDto, CreatePostRequest, EventFailureDto, IncomingFailureDto,
+    SaveSettingsRequest, SettingsDto, SyncStatusDto,
+};
 
 pub struct BackendApp {
     store: Store,
@@ -38,6 +42,44 @@ impl BackendApp {
     pub fn get_home_feed(&self) -> Result<HomeFeed, BackendError> {
         let app_core = AppCore::new(&self.store);
         Ok(app_core.get_home_feed(GetHomeFeedQuery)?)
+    }
+
+    pub fn get_bootstrap_state(&self) -> Result<BootstrapStateDto, BackendError> {
+        let app_core = AppCore::new(&self.store);
+        Ok(app_core
+            .get_bootstrap_state(GetBootstrapStateQuery)?
+            .into())
+    }
+
+    pub fn get_settings(&self) -> Result<SettingsDto, BackendError> {
+        let app_core = AppCore::new(&self.store);
+        Ok(app_core.get_settings(GetSettingsQuery)?.into())
+    }
+
+    pub fn save_settings(
+        &self,
+        request: SaveSettingsRequest<'_>,
+    ) -> Result<SettingsDto, BackendError> {
+        let app_core = AppCore::new(&self.store);
+        Ok(app_core
+            .save_settings(SaveSettingsCommand {
+                nickname: request.nickname,
+                email_address: request.email_address,
+                avatar_url: request.avatar_url,
+                smtp_host: request.smtp_host,
+                smtp_port: request.smtp_port,
+                smtp_username: request.smtp_username,
+                smtp_password: request.smtp_password,
+                smtp_hello_domain: request.smtp_hello_domain,
+                imap_host: request.imap_host,
+                imap_port: request.imap_port,
+                imap_username: request.imap_username,
+                imap_password: request.imap_password,
+                imap_mailbox: request.imap_mailbox,
+            })?
+            .settings()
+            .clone()
+            .into())
     }
 
     pub fn get_post_thread(&self, post_id: &str) -> Result<PostThread, BackendError> {

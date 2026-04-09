@@ -1,6 +1,7 @@
 use liveletters_app_core::{
-    AppCore, CommentSummary, CreateCommentCommand, CreatePostCommand, GetHomeFeedQuery,
-    GetPendingOutboxQuery, GetPostThreadQuery, PostSummary, ReprocessDeferredEventsCommand,
+    AppCore, AppSettings, CommentSummary, CreateCommentCommand, CreatePostCommand,
+    GetBootstrapStateQuery, GetHomeFeedQuery, GetPendingOutboxQuery, GetPostThreadQuery,
+    GetSettingsQuery, PostSummary, ReprocessDeferredEventsCommand, SaveSettingsCommand,
 };
 use liveletters_mail::{ReceivedEmail, build_protocol_email};
 use liveletters_protocol::{DomainEventPayload, decode_message};
@@ -288,4 +289,89 @@ fn reprocesses_deferred_events_through_app_core_orchestration() {
         .expect("thread should load");
     assert_eq!(thread.comments().len(), 1);
     assert_eq!(thread.comments()[0].comment_id, "comment-1");
+}
+
+#[test]
+fn settings_default_to_incomplete_before_first_save() {
+    let store = Store::open_in_memory().expect("store should open");
+    let app = AppCore::new(&store);
+
+    let bootstrap = app
+        .get_bootstrap_state(GetBootstrapStateQuery)
+        .expect("bootstrap state should load");
+    let settings = app
+        .get_settings(GetSettingsQuery)
+        .expect("settings should load");
+
+    assert!(!bootstrap.setup_completed);
+    assert_eq!(settings, AppSettings::empty());
+}
+
+#[test]
+fn save_settings_persists_profile_and_mail_configuration() {
+    let store = Store::open_in_memory().expect("store should open");
+    let app = AppCore::new(&store);
+
+    let saved = app
+        .save_settings(SaveSettingsCommand {
+            nickname: "alice",
+            email_address: "alice@example.com",
+            avatar_url: Some("https://example.com/avatar.png"),
+            smtp_host: "smtp.example.com",
+            smtp_port: 587,
+            smtp_username: "alice",
+            smtp_password: "secret",
+            smtp_hello_domain: "example.com",
+            imap_host: "imap.example.com",
+            imap_port: 143,
+            imap_username: "alice",
+            imap_password: "secret",
+            imap_mailbox: "INBOX",
+        })
+        .expect("settings should save");
+
+    assert!(saved.settings().setup_completed);
+    assert_eq!(saved.settings().nickname, "alice");
+
+    let bootstrap = app
+        .get_bootstrap_state(GetBootstrapStateQuery)
+        .expect("bootstrap state should load");
+    let settings = app
+        .get_settings(GetSettingsQuery)
+        .expect("settings should load");
+
+    assert!(bootstrap.setup_completed);
+    assert_eq!(settings.nickname, "alice");
+    assert_eq!(settings.smtp_host, "smtp.example.com");
+    assert_eq!(settings.imap_mailbox, "INBOX");
+}
+
+#[test]
+fn save_settings_rejects_blank_required_fields() {
+    let store = Store::open_in_memory().expect("store should open");
+    let app = AppCore::new(&store);
+
+    let error = app
+        .save_settings(SaveSettingsCommand {
+            nickname: "",
+            email_address: "alice@example.com",
+            avatar_url: None,
+            smtp_host: "smtp.example.com",
+            smtp_port: 587,
+            smtp_username: "alice",
+            smtp_password: "secret",
+            smtp_hello_domain: "example.com",
+            imap_host: "imap.example.com",
+            imap_port: 143,
+            imap_username: "alice",
+            imap_password: "secret",
+            imap_mailbox: "INBOX",
+        })
+        .expect_err("blank nickname should be rejected");
+
+    assert!(matches!(
+        error,
+        liveletters_app_core::AppCoreError::SettingsValidation { field, .. }
+        if field == "nickname"
+    ));
 }

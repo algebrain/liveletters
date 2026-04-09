@@ -5,8 +5,8 @@ use std::{
 };
 
 use liveletters_store::{
-    CommentRecord, DeferredEventRecord, OutboxRecord, PostRecord, RawEventRecord, RawMessageRecord,
-    Store, StorePaths,
+    CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxRecord, PostRecord,
+    RawEventRecord, RawMessageRecord, Store, StorePaths, UserSettingsRecord,
 };
 
 fn temp_home_dir() -> PathBuf {
@@ -29,6 +29,8 @@ fn in_memory_store_starts_with_empty_state() {
     assert!(store.list_raw_message_records().unwrap().is_empty());
     assert!(store.list_raw_event_records().unwrap().is_empty());
     assert!(store.list_deferred_event_records().unwrap().is_empty());
+    assert!(store.get_user_settings_record("default").unwrap().is_none());
+    assert!(store.get_mail_settings_record("default").unwrap().is_none());
 }
 
 #[test]
@@ -220,4 +222,89 @@ fn deferred_event_can_be_deleted_after_reprocessing() {
     store.delete_deferred_event_record("event-2").unwrap();
 
     assert!(store.list_deferred_event_records().unwrap().is_empty());
+}
+
+#[test]
+fn user_and_mail_settings_can_be_saved_and_read_back() {
+    let store = Store::open_in_memory().unwrap();
+
+    store
+        .save_user_settings_record(&UserSettingsRecord {
+            profile_id: "default".into(),
+            nickname: "alice".into(),
+            email_address: "alice@example.com".into(),
+            avatar_url: Some("https://example.com/avatar.png".into()),
+            setup_completed: true,
+        })
+        .unwrap();
+
+    store
+        .save_mail_settings_record(&MailSettingsRecord {
+            profile_id: "default".into(),
+            smtp_host: "smtp.example.com".into(),
+            smtp_port: 587,
+            smtp_username: "alice".into(),
+            smtp_password: "secret".into(),
+            smtp_hello_domain: "example.com".into(),
+            imap_host: "imap.example.com".into(),
+            imap_port: 143,
+            imap_username: "alice".into(),
+            imap_password: "secret".into(),
+            imap_mailbox: "INBOX".into(),
+        })
+        .unwrap();
+
+    let user = store.get_user_settings_record("default").unwrap().unwrap();
+    let mail = store.get_mail_settings_record("default").unwrap().unwrap();
+
+    assert_eq!(user.nickname, "alice");
+    assert_eq!(user.email_address, "alice@example.com");
+    assert!(user.setup_completed);
+    assert_eq!(mail.smtp_host, "smtp.example.com");
+    assert_eq!(mail.smtp_port, 587);
+    assert_eq!(mail.imap_mailbox, "INBOX");
+}
+
+#[test]
+fn file_store_persists_user_and_mail_settings_under_temp_home() {
+    let home_dir = temp_home_dir();
+    let paths = StorePaths::for_home_dir(&home_dir);
+
+    {
+        let store = Store::open_at(paths.database_path()).unwrap();
+        store
+            .save_user_settings_record(&UserSettingsRecord {
+                profile_id: "default".into(),
+                nickname: "alice".into(),
+                email_address: "alice@example.com".into(),
+                avatar_url: None,
+                setup_completed: true,
+            })
+            .unwrap();
+        store
+            .save_mail_settings_record(&MailSettingsRecord {
+                profile_id: "default".into(),
+                smtp_host: "smtp.example.com".into(),
+                smtp_port: 587,
+                smtp_username: "alice".into(),
+                smtp_password: "secret".into(),
+                smtp_hello_domain: "example.com".into(),
+                imap_host: "imap.example.com".into(),
+                imap_port: 143,
+                imap_username: "alice".into(),
+                imap_password: "secret".into(),
+                imap_mailbox: "INBOX".into(),
+            })
+            .unwrap();
+    }
+
+    let reopened = Store::open_at(paths.database_path()).unwrap();
+    let user = reopened.get_user_settings_record("default").unwrap().unwrap();
+    let mail = reopened.get_mail_settings_record("default").unwrap().unwrap();
+
+    assert_eq!(user.nickname, "alice");
+    assert!(user.setup_completed);
+    assert_eq!(mail.smtp_username, "alice");
+
+    fs::remove_dir_all(home_dir).unwrap();
 }

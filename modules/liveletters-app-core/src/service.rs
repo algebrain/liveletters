@@ -1,10 +1,12 @@
 use liveletters_store::Store;
 
 use crate::{
-    AppCoreError, CreateCommentCommand, CreateCommentResult, CreatePostCommand, CreatePostResult,
-    EditCommentCommand, EditCommentResult, GetHomeFeedQuery, GetPendingOutboxQuery,
-    GetPostThreadQuery, HidePostCommand, HidePostResult, HomeFeed, PendingOutbox, PostThread,
-    ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult, commands, queries,
+    AppCoreError, AppSettings, BootstrapState, CreateCommentCommand, CreateCommentResult,
+    CreatePostCommand, CreatePostResult, EditCommentCommand, EditCommentResult,
+    GetBootstrapStateQuery, GetHomeFeedQuery, GetPendingOutboxQuery, GetPostThreadQuery,
+    GetSettingsQuery, HidePostCommand, HidePostResult, HomeFeed, PendingOutbox, PostThread,
+    ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult, SaveSettingsCommand,
+    SaveSettingsResult, commands, queries,
 };
 
 pub struct AppCore<'a> {
@@ -59,10 +61,28 @@ impl<'a> AppCore<'a> {
         queries::get_pending_outbox(&self.store, query)
     }
 
+    pub fn get_bootstrap_state(
+        &self,
+        query: GetBootstrapStateQuery,
+    ) -> Result<BootstrapState, AppCoreError> {
+        queries::get_bootstrap_state(&self.store, query)
+    }
+
+    pub fn get_settings(&self, query: GetSettingsQuery) -> Result<AppSettings, AppCoreError> {
+        queries::get_settings(&self.store, query)
+    }
+
     pub fn reprocess_deferred_events(
         &self,
         command: ReprocessDeferredEventsCommand,
     ) -> Result<ReprocessDeferredEventsResult, AppCoreError> {
         commands::reprocess_deferred_events(&self.store, command)
+    }
+
+    pub fn save_settings(
+        &self,
+        command: SaveSettingsCommand<'_>,
+    ) -> Result<SaveSettingsResult, AppCoreError> {
+        commands::save_settings(&self.store, command)
     }
 }

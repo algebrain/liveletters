@@ -54,6 +54,29 @@ pub struct DeferredReprocessingSummary {
     pub still_deferred: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BootstrapState {
+    pub setup_completed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppSettings {
+    pub nickname: String,
+    pub email_address: String,
+    pub avatar_url: Option<String>,
+    pub smtp_host: String,
+    pub smtp_port: u16,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub smtp_hello_domain: String,
+    pub imap_host: String,
+    pub imap_port: u16,
+    pub imap_username: String,
+    pub imap_password: String,
+    pub imap_mailbox: String,
+    pub setup_completed: bool,
+}
+
 impl HomeFeed {
     pub fn new(posts: Vec<PostSummary>) -> Self {
         Self { posts }
@@ -102,6 +125,33 @@ impl DeferredReprocessingSummary {
             unauthorized,
             invalid,
             still_deferred,
+        }
+    }
+}
+
+impl BootstrapState {
+    pub fn new(setup_completed: bool) -> Self {
+        Self { setup_completed }
+    }
+}
+
+impl AppSettings {
+    pub fn empty() -> Self {
+        Self {
+            nickname: String::new(),
+            email_address: String::new(),
+            avatar_url: None,
+            smtp_host: String::new(),
+            smtp_port: 587,
+            smtp_username: String::new(),
+            smtp_password: String::new(),
+            smtp_hello_domain: String::new(),
+            imap_host: String::new(),
+            imap_port: 143,
+            imap_username: String::new(),
+            imap_password: String::new(),
+            imap_mailbox: "INBOX".to_owned(),
+            setup_completed: false,
         }
     }
 }

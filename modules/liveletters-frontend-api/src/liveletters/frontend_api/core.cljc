@@ -11,6 +11,40 @@
    :created-at created-at
    :body body})
 
+(defn bootstrap-state-dto [backend-response]
+  {:setup-completed? (boolean (:setup_completed backend-response))})
+
+(defn settings-dto [backend-response]
+  {:nickname (:nickname backend-response)
+   :email-address (:email_address backend-response)
+   :avatar-url (:avatar_url backend-response)
+   :smtp-host (:smtp_host backend-response)
+   :smtp-port (:smtp_port backend-response)
+   :smtp-username (:smtp_username backend-response)
+   :smtp-password (:smtp_password backend-response)
+   :smtp-hello-domain (:smtp_hello_domain backend-response)
+   :imap-host (:imap_host backend-response)
+   :imap-port (:imap_port backend-response)
+   :imap-username (:imap_username backend-response)
+   :imap-password (:imap_password backend-response)
+   :imap-mailbox (:imap_mailbox backend-response)
+   :setup-completed? (boolean (:setup_completed backend-response))})
+
+(defn save-settings-request [form]
+  {:nickname (:nickname form)
+   :email-address (:email-address form)
+   :avatar-url (:avatar-url form)
+   :smtp-host (:smtp-host form)
+   :smtp-port (:smtp-port form)
+   :smtp-username (:smtp-username form)
+   :smtp-password (:smtp-password form)
+   :smtp-hello-domain (:smtp-hello-domain form)
+   :imap-host (:imap-host form)
+   :imap-port (:imap-port form)
+   :imap-username (:imap-username form)
+   :imap-password (:imap-password form)
+   :imap-mailbox (:imap-mailbox form)})
+
 (defn sync-status-dto [backend-response]
   {:status (keyword (:status backend-response))
    :applied-messages (:applied_messages backend-response)
@@ -61,6 +95,24 @@
   (invoke-command! adapter "get_home_feed" nil
                    (fn [response]
                      (on-success (or (:posts response) [])))
+                   on-error))
+
+(defn get-bootstrap-state! [adapter on-success on-error]
+  (invoke-command! adapter "get_bootstrap_state" nil
+                   (fn [response]
+                     (on-success (some-> response bootstrap-state-dto)))
+                   on-error))
+
+(defn get-settings! [adapter on-success on-error]
+  (invoke-command! adapter "get_settings" nil
+                   (fn [response]
+                     (on-success (some-> response settings-dto)))
+                   on-error))
+
+(defn save-settings! [adapter request on-success on-error]
+  (invoke-command! adapter "save_settings" request
+                   (fn [response]
+                     (on-success (some-> response settings-dto)))
                    on-error))
 
 (defn get-post-thread! [adapter request on-success on-error]

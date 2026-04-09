@@ -24,6 +24,9 @@
 
 ## Основные use cases
 
+- чтение bootstrap state;
+- чтение локальных настроек;
+- сохранение локальных настроек;
 - создание поста;
 - редактирование поста;
 - создание комментария;
@@ -55,17 +58,26 @@
 Сейчас модуль уже включает:
 
 - command use cases для:
+  - `save_settings`
   - `create_post`
   - `create_comment`
   - `hide_post`
   - `edit_comment`
   - `reprocess_deferred_events`
 - query use cases для:
+  - `get_bootstrap_state`
+  - `get_settings`
   - `get_home_feed`
   - `get_post_thread`
   - `get_pending_outbox`
-- read models для feed, thread, outbox и deferred reprocessing summary;
+- read models для bootstrap state, settings, feed, thread, outbox и deferred reprocessing summary;
 - orchestration поверх `liveletters-store` и `liveletters-sync` без переноса этой логики в app layer.
+
+Текущий settings use case contour теперь уже закрывает:
+
+- first-run readiness decision;
+- прикладную валидацию базовых settings полей;
+- сохранение локального профиля и mail config в `liveletters-store`.
 
 Текущий deferred reprocessing use case работает так:
 

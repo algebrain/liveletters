@@ -21,6 +21,88 @@
     (is (= [["create_post" request]]
            @calls))))
 
+(deftest settings-commands-use-settings-command-names-and-dto-shapes
+  (let [calls (atom [])
+        bootstrap (atom nil)
+        settings (atom nil)
+        saved (atom nil)]
+    (core/get-bootstrap-state!
+     {:invoke-command (fn [command payload on-success _on-error]
+                        (swap! calls conj [command payload])
+                        (on-success {:setup_completed true}))}
+     #(reset! bootstrap %)
+     identity)
+    (core/get-settings!
+     {:invoke-command (fn [command payload on-success _on-error]
+                        (swap! calls conj [command payload])
+                        (on-success {:nickname "alice"
+                                     :email_address "alice@example.com"
+                                     :avatar_url "https://example.com/avatar.png"
+                                     :smtp_host "smtp.example.com"
+                                     :smtp_port 587
+                                     :smtp_username "alice"
+                                     :smtp_password "secret"
+                                     :smtp_hello_domain "example.com"
+                                     :imap_host "imap.example.com"
+                                     :imap_port 143
+                                     :imap_username "alice"
+                                     :imap_password "secret"
+                                     :imap_mailbox "INBOX"
+                                     :setup_completed true}))}
+     #(reset! settings %)
+     identity)
+    (core/save-settings!
+     {:invoke-command (fn [command payload on-success _on-error]
+                        (swap! calls conj [command payload])
+                        (on-success {:nickname (:nickname payload)
+                                     :email_address (:email-address payload)
+                                     :avatar_url (:avatar-url payload)
+                                     :smtp_host (:smtp-host payload)
+                                     :smtp_port (:smtp-port payload)
+                                     :smtp_username (:smtp-username payload)
+                                     :smtp_password (:smtp-password payload)
+                                     :smtp_hello_domain (:smtp-hello-domain payload)
+                                     :imap_host (:imap-host payload)
+                                     :imap_port (:imap-port payload)
+                                     :imap_username (:imap-username payload)
+                                     :imap_password (:imap-password payload)
+                                     :imap_mailbox (:imap-mailbox payload)
+                                     :setup_completed true}))}
+     {:nickname "alice"
+      :email-address "alice@example.com"
+      :avatar-url nil
+      :smtp-host "smtp.example.com"
+      :smtp-port 587
+      :smtp-username "alice"
+      :smtp-password "secret"
+      :smtp-hello-domain "example.com"
+      :imap-host "imap.example.com"
+      :imap-port 143
+      :imap-username "alice"
+      :imap-password "secret"
+      :imap-mailbox "INBOX"}
+     #(reset! saved %)
+     identity)
+    (is (= {:setup-completed? true} @bootstrap))
+    (is (= "alice" (:nickname @settings)))
+    (is (= 587 (:smtp-port @saved)))
+    (is (= [["get_bootstrap_state" nil]
+            ["get_settings" nil]
+            ["save_settings" {:nickname "alice"
+                              :email-address "alice@example.com"
+                              :avatar-url nil
+                              :smtp-host "smtp.example.com"
+                              :smtp-port 587
+                              :smtp-username "alice"
+                              :smtp-password "secret"
+                              :smtp-hello-domain "example.com"
+                              :imap-host "imap.example.com"
+                              :imap-port 143
+                              :imap-username "alice"
+                              :imap-password "secret"
+                              :imap-mailbox "INBOX"}]]
+           @calls))))
+
 (deftest query-functions-use-query-command-names
   (let [calls (atom [])
         adapter {:invoke-command (fn [command payload on-success _on-error]
@@ -96,6 +178,62 @@
           :created-at 1
           :body "First post"}
          (core/create-post-request "post-1" "blog-1" "alice" 1 "First post")))
+  (is (= {:setup-completed? true}
+         (core/bootstrap-state-dto {:setup_completed true})))
+  (is (= {:nickname "alice"
+          :email-address "alice@example.com"
+          :avatar-url nil
+          :smtp-host "smtp.example.com"
+          :smtp-port 587
+          :smtp-username "alice"
+          :smtp-password "secret"
+          :smtp-hello-domain "example.com"
+          :imap-host "imap.example.com"
+          :imap-port 143
+          :imap-username "alice"
+          :imap-password "secret"
+          :imap-mailbox "INBOX"
+          :setup-completed? true}
+         (core/settings-dto {:nickname "alice"
+                             :email_address "alice@example.com"
+                             :avatar_url nil
+                             :smtp_host "smtp.example.com"
+                             :smtp_port 587
+                             :smtp_username "alice"
+                             :smtp_password "secret"
+                             :smtp_hello_domain "example.com"
+                             :imap_host "imap.example.com"
+                             :imap_port 143
+                             :imap_username "alice"
+                             :imap_password "secret"
+                             :imap_mailbox "INBOX"
+                             :setup_completed true})))
+  (is (= {:nickname "alice"
+          :email-address "alice@example.com"
+          :avatar-url nil
+          :smtp-host "smtp.example.com"
+          :smtp-port 587
+          :smtp-username "alice"
+          :smtp-password "secret"
+          :smtp-hello-domain "example.com"
+          :imap-host "imap.example.com"
+          :imap-port 143
+          :imap-username "alice"
+          :imap-password "secret"
+          :imap-mailbox "INBOX"}
+         (core/save-settings-request {:nickname "alice"
+                                      :email-address "alice@example.com"
+                                      :avatar-url nil
+                                      :smtp-host "smtp.example.com"
+                                      :smtp-port 587
+                                      :smtp-username "alice"
+                                      :smtp-password "secret"
+                                      :smtp-hello-domain "example.com"
+                                      :imap-host "imap.example.com"
+                                      :imap-port 143
+                                      :imap-username "alice"
+                                      :imap-password "secret"
+                                      :imap-mailbox "INBOX"})))
   (is (= {:status :healthy
           :applied-messages 3
           :duplicate-messages 1

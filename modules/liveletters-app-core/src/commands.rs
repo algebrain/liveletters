@@ -6,9 +6,11 @@ use liveletters_protocol::{
     DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message,
 };
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
-use liveletters_store::{CommentRecord, OutboxRecord, PostRecord, Store};
+use liveletters_store::{
+    CommentRecord, MailSettingsRecord, OutboxRecord, PostRecord, Store, UserSettingsRecord,
+};
 
-use crate::{AppCoreError, DeferredReprocessingSummary};
+use crate::{AppCoreError, AppSettings, DeferredReprocessingSummary};
 
 pub struct CreatePostCommand<'a> {
     pub post_id: &'a str,
@@ -42,6 +44,22 @@ pub struct EditCommentCommand<'a> {
 
 pub struct ReprocessDeferredEventsCommand;
 
+pub struct SaveSettingsCommand<'a> {
+    pub nickname: &'a str,
+    pub email_address: &'a str,
+    pub avatar_url: Option<&'a str>,
+    pub smtp_host: &'a str,
+    pub smtp_port: u16,
+    pub smtp_username: &'a str,
+    pub smtp_password: &'a str,
+    pub smtp_hello_domain: &'a str,
+    pub imap_host: &'a str,
+    pub imap_port: u16,
+    pub imap_username: &'a str,
+    pub imap_password: &'a str,
+    pub imap_mailbox: &'a str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreatePostResult {
     post: Post,
@@ -69,6 +87,11 @@ pub struct EditCommentResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReprocessDeferredEventsResult {
     summary: DeferredReprocessingSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SaveSettingsResult {
+    settings: AppSettings,
 }
 
 impl CreatePostResult {
@@ -114,6 +137,12 @@ impl EditCommentResult {
 impl ReprocessDeferredEventsResult {
     pub fn summary(&self) -> &DeferredReprocessingSummary {
         &self.summary
+    }
+}
+
+impl SaveSettingsResult {
+    pub fn settings(&self) -> &AppSettings {
+        &self.settings
     }
 }
 
@@ -430,6 +459,68 @@ pub fn reprocess_deferred_events(
     })
 }
 
+pub fn save_settings(
+    store: &Store,
+    command: SaveSettingsCommand<'_>,
+) -> Result<SaveSettingsResult, AppCoreError> {
+    validate_non_blank("nickname", command.nickname)?;
+    validate_email(command.email_address)?;
+    validate_non_blank("smtp_host", command.smtp_host)?;
+    validate_port("smtp_port", command.smtp_port)?;
+    validate_non_blank("smtp_username", command.smtp_username)?;
+    validate_non_blank("smtp_password", command.smtp_password)?;
+    validate_non_blank("smtp_hello_domain", command.smtp_hello_domain)?;
+    validate_non_blank("imap_host", command.imap_host)?;
+    validate_port("imap_port", command.imap_port)?;
+    validate_non_blank("imap_username", command.imap_username)?;
+    validate_non_blank("imap_password", command.imap_password)?;
+    validate_non_blank("imap_mailbox", command.imap_mailbox)?;
+
+    let settings = AppSettings {
+        nickname: command.nickname.trim().to_owned(),
+        email_address: command.email_address.trim().to_owned(),
+        avatar_url: command
+            .avatar_url
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned),
+        smtp_host: command.smtp_host.trim().to_owned(),
+        smtp_port: command.smtp_port,
+        smtp_username: command.smtp_username.trim().to_owned(),
+        smtp_password: command.smtp_password.to_owned(),
+        smtp_hello_domain: command.smtp_hello_domain.trim().to_owned(),
+        imap_host: command.imap_host.trim().to_owned(),
+        imap_port: command.imap_port,
+        imap_username: command.imap_username.trim().to_owned(),
+        imap_password: command.imap_password.to_owned(),
+        imap_mailbox: command.imap_mailbox.trim().to_owned(),
+        setup_completed: true,
+    };
+
+    store.save_user_settings_record(&UserSettingsRecord {
+        profile_id: default_profile_id().to_owned(),
+        nickname: settings.nickname.clone(),
+        email_address: settings.email_address.clone(),
+        avatar_url: settings.avatar_url.clone(),
+        setup_completed: settings.setup_completed,
+    })?;
+    store.save_mail_settings_record(&MailSettingsRecord {
+        profile_id: default_profile_id().to_owned(),
+        smtp_host: settings.smtp_host.clone(),
+        smtp_port: settings.smtp_port,
+        smtp_username: settings.smtp_username.clone(),
+        smtp_password: settings.smtp_password.clone(),
+        smtp_hello_domain: settings.smtp_hello_domain.clone(),
+        imap_host: settings.imap_host.clone(),
+        imap_port: settings.imap_port,
+        imap_username: settings.imap_username.clone(),
+        imap_password: settings.imap_password.clone(),
+        imap_mailbox: settings.imap_mailbox.clone(),
+    })?;
+
+    Ok(SaveSettingsResult { settings })
+}
+
 fn encode_visibility(visibility: Visibility) -> String {
     match visibility {
         Visibility::Public => "public",
@@ -447,6 +538,52 @@ fn decode_visibility(value: &str) -> Visibility {
         "private_community" => Visibility::PrivateCommunity,
         _ => Visibility::Public,
     }
+}
+
+fn default_profile_id() -> &'static str {
+    "default"
+}
+
+fn validate_non_blank(field: &str, value: &str) -> Result<(), AppCoreError> {
+    if value.trim().is_empty() {
+        return Err(AppCoreError::SettingsValidation {
+            field: field.to_owned(),
+            message: "must not be blank".to_owned(),
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_email(value: &str) -> Result<(), AppCoreError> {
+    let trimmed = value.trim();
+
+    if trimmed.is_empty() {
+        return Err(AppCoreError::SettingsValidation {
+            field: "email_address".to_owned(),
+            message: "must not be blank".to_owned(),
+        });
+    }
+
+    if !trimmed.contains('@') {
+        return Err(AppCoreError::SettingsValidation {
+            field: "email_address".to_owned(),
+            message: "must contain @".to_owned(),
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_port(field: &str, value: u16) -> Result<(), AppCoreError> {
+    if value == 0 {
+        return Err(AppCoreError::SettingsValidation {
+            field: field.to_owned(),
+            message: "must be greater than zero".to_owned(),
+        });
+    }
+
+    Ok(())
 }
 
 fn enqueue_message(

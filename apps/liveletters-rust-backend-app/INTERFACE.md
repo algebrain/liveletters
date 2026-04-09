@@ -576,6 +576,11 @@ Payload сейчас очень маленький:
 4. имена frontend events;
 5. формат `CommandErrorDto`.
 
+Текущее дополнение к этому контракту:
+
+6. bootstrap-first команды `get_bootstrap_state`, `get_settings`, `save_settings`;
+7. DTO `BootstrapStateDto` и `SettingsDto`.
+
 Именно эти элементы нельзя менять без синхронного изменения:
 
 - `liveletters-frontend-api`;
