@@ -11,6 +11,7 @@
 (def refresh-home-feed! store/refresh-home-feed!)
 (def refresh-sync-status! store/refresh-sync-status!)
 (def refresh-incoming-failures! store/refresh-incoming-failures!)
+(def refresh-event-failures! store/refresh-event-failures!)
 (def load-post-thread! store/load-post-thread!)
 (def update-create-post-form! store/update-create-post-form!)
 (def submit-create-post! store/submit-create-post!)

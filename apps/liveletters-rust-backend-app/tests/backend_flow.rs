@@ -1,4 +1,5 @@
 use liveletters_rust_backend_app::{BackendApp, CreatePostRequest};
+use liveletters_store::{RawEventRecord, RawMessageRecord, Store};
 
 #[test]
 fn backend_wires_app_core_and_exposes_feed() {
@@ -31,4 +32,65 @@ fn backend_exposes_sync_status_and_failures_boundary() {
 
     assert_eq!(status.status, "healthy");
     assert!(failures.is_empty());
+}
+
+#[test]
+fn backend_sync_status_reflects_richer_diagnostics_counters() {
+    let store = Store::open_in_memory().expect("store should open");
+    store
+        .save_raw_message_record(&RawMessageRecord {
+            message_id: "message-1".into(),
+            raw_message: "unauthorized".into(),
+            status: "unauthorized".into(),
+        })
+        .unwrap();
+    store
+        .save_raw_message_record(&RawMessageRecord {
+            message_id: "message-2".into(),
+            raw_message: "invalid".into(),
+            status: "invalid".into(),
+        })
+        .unwrap();
+    store
+        .save_raw_message_record(&RawMessageRecord {
+            message_id: "message-3".into(),
+            raw_message: "replay".into(),
+            status: "replay".into(),
+        })
+        .unwrap();
+
+    let backend = BackendApp::from_store(store);
+    let status = backend.get_sync_status().expect("status should load");
+
+    assert_eq!(status.status, "degraded");
+    assert_eq!(status.unauthorized_messages, 1);
+    assert_eq!(status.invalid_messages, 1);
+    assert_eq!(status.replayed_messages, 1);
+}
+
+#[test]
+fn backend_failure_boundary_can_expose_raw_event_failures() {
+    let store = Store::open_in_memory().expect("store should open");
+    store
+        .save_raw_event_record(&RawEventRecord {
+            event_id: "event-1".into(),
+            event_type: "comment_edited".into(),
+            resource_id: "blog-1".into(),
+            payload_json: "{\"kind\":\"comment_edited\"}".into(),
+            apply_status: "unauthorized".into(),
+            failure_reason: Some("actor_cannot_edit_comment".into()),
+        })
+        .unwrap();
+
+    let backend = BackendApp::from_store(store);
+    let failures = backend
+        .list_event_failures()
+        .expect("event failures should load");
+
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].apply_status, "unauthorized");
+    assert_eq!(
+        failures[0].failure_reason.as_deref(),
+        Some("actor_cannot_edit_comment")
+    );
 }

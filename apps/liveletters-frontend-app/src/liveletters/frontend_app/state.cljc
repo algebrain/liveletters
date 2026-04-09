@@ -6,6 +6,7 @@
    :thread nil
    :sync-status nil
    :incoming-failures []
+   :event-failures []
    :create-post {:post-id ""
                  :resource-id ""
                  :author-id ""

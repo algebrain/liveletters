@@ -20,19 +20,25 @@
                                      "get_sync_status" {:status "healthy"
                                                         :applied_messages 1
                                                         :duplicate_messages 0
+                                                        :replayed_messages 0
+                                                        :unauthorized_messages 0
+                                                        :invalid_messages 0
                                                         :malformed_messages 0
                                                         :deferred_events 0
                                                         :pending_outbox 1}
                                      "list_incoming_failures" []
+                                     "list_event_failures" []
                                      nil))}
         app-state (core/create-app-state)]
     (core/init! adapter app-state)
     (is (= 1 (count (:feed @app-state))))
     (is (= :healthy (get-in @app-state [:sync-status :status])))
     (is (= [] (:incoming-failures @app-state)))
+    (is (= [] (:event-failures @app-state)))
     (is (= [["get_home_feed" nil]
             ["get_sync_status" nil]
-            ["list_incoming_failures" nil]]
+            ["list_incoming_failures" nil]
+            ["list_event_failures" nil]]
            @calls))))
 
 (deftest create-post-intent-calls-frontend-api-and-refreshes-feed
@@ -87,10 +93,14 @@
                        :sync-status {:status :healthy
                                      :applied-messages 1
                                      :duplicate-messages 0
+                                     :replayed-messages 0
+                                     :unauthorized-messages 0
+                                     :invalid-messages 0
                                      :malformed-messages 0
                                      :deferred-events 0
                                      :pending-outbox 1}
                        :incoming-failures []
+                       :event-failures []
                        :create-post {}
                        :ui {}})
     (is (= :main (first (core/root-view app-state))))

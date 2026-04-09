@@ -7,10 +7,14 @@ mod service;
 pub use commands::{
     CreateCommentCommand, CreateCommentResult, CreatePostCommand, CreatePostResult,
     EditCommentCommand, EditCommentResult, HidePostCommand, HidePostResult,
+    ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult,
 };
 pub use errors::AppCoreError;
 pub use queries::{GetHomeFeedQuery, GetPendingOutboxQuery, GetPostThreadQuery};
-pub use read_models::{CommentSummary, HomeFeed, OutboxEntry, PendingOutbox, PostSummary, PostThread};
+pub use read_models::{
+    CommentSummary, DeferredReprocessingSummary, HomeFeed, OutboxEntry, PendingOutbox, PostSummary,
+    PostThread,
+};
 pub use service::AppCore;
 
 pub fn crate_name() -> &'static str {

@@ -18,5 +18,8 @@
 (defn incoming-failures [state]
   (:incoming-failures state))
 
+(defn event-failures [state]
+  (:event-failures state))
+
 (defn create-post-form [state]
   (:create-post state))

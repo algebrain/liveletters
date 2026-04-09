@@ -37,6 +37,9 @@
            :neutral)
    :details {:applied (:applied-messages sync-status)
              :duplicates (:duplicate-messages sync-status)
+             :replays (:replayed-messages sync-status)
+             :unauthorized (:unauthorized-messages sync-status)
+             :invalid (:invalid-messages sync-status)
              :malformed (:malformed-messages sync-status)
              :deferred (:deferred-events sync-status)
              :outbox (:pending-outbox sync-status)}})
@@ -46,4 +49,13 @@
           {:id (:message_id failure)
            :kind (keyword (:status failure))
            :preview (:preview failure)})
+        failures))
+
+(defn event-failures-view-model [failures]
+  (mapv (fn [failure]
+          {:id (:event-id failure)
+           :event-type (:event-type failure)
+           :resource-id (:resource-id failure)
+           :kind (:apply-status failure)
+           :reason (:failure-reason failure)})
         failures))

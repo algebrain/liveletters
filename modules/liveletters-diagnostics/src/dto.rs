@@ -9,6 +9,9 @@ pub struct SyncHealth {
     pub status: HealthStatus,
     pub applied_messages: usize,
     pub duplicate_messages: usize,
+    pub replayed_messages: usize,
+    pub unauthorized_messages: usize,
+    pub invalid_messages: usize,
     pub malformed_messages: usize,
     pub deferred_events: usize,
     pub pending_outbox: usize,
@@ -29,6 +32,15 @@ pub struct DeferredEventDiagnostic {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawEventDiagnostic {
+    pub event_id: String,
+    pub event_type: String,
+    pub resource_id: String,
+    pub apply_status: String,
+    pub failure_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutboxDiagnostic {
     pub event_id: String,
     pub event_type: String,
@@ -40,6 +52,7 @@ pub struct OutboxDiagnostic {
 pub struct DiagnosticsSnapshot {
     sync_health: SyncHealth,
     raw_messages: Vec<RawMessageDiagnostic>,
+    raw_events: Vec<RawEventDiagnostic>,
     deferred_events: Vec<DeferredEventDiagnostic>,
     outbox_entries: Vec<OutboxDiagnostic>,
 }
@@ -48,12 +61,14 @@ impl DiagnosticsSnapshot {
     pub fn new(
         sync_health: SyncHealth,
         raw_messages: Vec<RawMessageDiagnostic>,
+        raw_events: Vec<RawEventDiagnostic>,
         deferred_events: Vec<DeferredEventDiagnostic>,
         outbox_entries: Vec<OutboxDiagnostic>,
     ) -> Self {
         Self {
             sync_health,
             raw_messages,
+            raw_events,
             deferred_events,
             outbox_entries,
         }
@@ -65,6 +80,10 @@ impl DiagnosticsSnapshot {
 
     pub fn raw_messages(&self) -> &[RawMessageDiagnostic] {
         &self.raw_messages
+    }
+
+    pub fn raw_events(&self) -> &[RawEventDiagnostic] {
+        &self.raw_events
     }
 
     pub fn deferred_events(&self) -> &[DeferredEventDiagnostic] {

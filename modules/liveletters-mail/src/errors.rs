@@ -6,4 +6,6 @@ pub enum TransportError {
     MissingHumanReadablePart,
     MissingTechnicalPart,
     Protocol(String),
+    UnexpectedResponse(String),
+    UnsupportedAuthMechanism(&'static str),
 }

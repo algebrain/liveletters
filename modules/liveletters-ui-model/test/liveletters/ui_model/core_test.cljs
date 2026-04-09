@@ -65,6 +65,9 @@
           :tone :positive
           :details {:applied 3
                     :duplicates 1
+                    :replays 2
+                    :unauthorized 1
+                    :invalid 4
                     :malformed 0
                     :deferred 0
                     :outbox 2}}
@@ -72,6 +75,9 @@
           {:status :healthy
            :applied-messages 3
            :duplicate-messages 1
+           :replayed-messages 2
+           :unauthorized-messages 1
+           :invalid-messages 4
            :malformed-messages 0
            :deferred-events 0
            :pending-outbox 2}))))
@@ -84,3 +90,16 @@
           [{:message_id "message-1"
             :status "malformed"
             :preview "bad message"}]))))
+
+(deftest normalizes-event-failures-for-screen
+  (is (= [{:id "event-1"
+           :event-type "comment_edited"
+           :resource-id "blog-1"
+           :kind :unauthorized
+           :reason "actor_cannot_edit_comment"}]
+         (core/event-failures-view-model
+          [{:event-id "event-1"
+            :event-type "comment_edited"
+            :resource-id "blog-1"
+            :apply-status :unauthorized
+            :failure-reason "actor_cannot_edit_comment"}]))))

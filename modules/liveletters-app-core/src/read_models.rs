@@ -45,6 +45,15 @@ pub struct PendingOutbox {
     entries: Vec<OutboxEntry>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeferredReprocessingSummary {
+    pub applied: usize,
+    pub replayed: usize,
+    pub unauthorized: usize,
+    pub invalid: usize,
+    pub still_deferred: usize,
+}
+
 impl HomeFeed {
     pub fn new(posts: Vec<PostSummary>) -> Self {
         Self { posts }
@@ -76,5 +85,23 @@ impl PendingOutbox {
 
     pub fn entries(&self) -> &[OutboxEntry] {
         &self.entries
+    }
+}
+
+impl DeferredReprocessingSummary {
+    pub fn new(
+        applied: usize,
+        replayed: usize,
+        unauthorized: usize,
+        invalid: usize,
+        still_deferred: usize,
+    ) -> Self {
+        Self {
+            applied,
+            replayed,
+            unauthorized,
+            invalid,
+            still_deferred,
+        }
     }
 }

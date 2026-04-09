@@ -47,6 +47,31 @@
 - стабильные контракты для frontend-app;
 - пригодность для работы поверх state slices из корневого `app-state`.
 
+## Текущее минимальное состояние реализации
+
+Сейчас модуль уже включает:
+
+- `feed-view-model`;
+- `post-thread-view-model`;
+- `sync-status-view-model`;
+- `incoming-failures-view-model`;
+- `event-failures-view-model`.
+
+Текущий `sync-status-view-model` уже знает richer diagnostics contour:
+
+- `duplicates`;
+- `replays`;
+- `unauthorized`;
+- `invalid`;
+- `malformed`;
+- `deferred`;
+- `outbox`.
+
+Текущий diagnostics-related contour разделен на два разных screen-friendly списка:
+
+- incoming failures;
+- event failures.
+
 ## Роль относительно `Reagent` и `app-state`
 
 `liveletters-ui-model` должен работать как слой между:
@@ -98,6 +123,17 @@
 - модели представления устойчивы;
 - контракты documented;
 - тесты покрывают ключевые selectors и mapping.
+
+Для текущего этапа второго прохода practically уже покрыты:
+
+- richer sync status formatting;
+- diagnostics-related mapping для message failures и event failures.
+
+Но модуль еще не считается завершенным:
+
+- нет более богатых selectors поверх app-store slices;
+- formatting policy пока минимальна;
+- screen-specific модели для более полного diagnostic UI еще не выделены.
 
 ## Связанные документы
 

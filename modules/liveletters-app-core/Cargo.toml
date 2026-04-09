@@ -10,4 +10,8 @@ path = "src/lib.rs"
 [dependencies]
 liveletters-domain = { path = "../liveletters-domain" }
 liveletters-protocol = { path = "../liveletters-protocol" }
+liveletters-sync = { path = "../liveletters-sync" }
 liveletters-store = { path = "../liveletters-store" }
+
+[dev-dependencies]
+liveletters-mail = { path = "../liveletters-mail" }

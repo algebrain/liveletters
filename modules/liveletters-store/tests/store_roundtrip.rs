@@ -174,12 +174,15 @@ fn raw_message_and_event_journals_can_be_saved() {
             event_type: "post_created".into(),
             resource_id: "blog-1".into(),
             payload_json: "{\"kind\":\"post_created\"}".into(),
+            apply_status: "applied".into(),
+            failure_reason: None,
         })
         .unwrap();
 
     assert_eq!(store.list_raw_message_records().unwrap().len(), 1);
     assert_eq!(store.list_raw_event_records().unwrap().len(), 1);
     assert!(store.has_raw_event("event-1").unwrap());
+    assert_eq!(store.list_raw_event_records().unwrap()[0].apply_status, "applied");
 }
 
 #[test]
@@ -199,4 +202,22 @@ fn deferred_events_can_be_saved_and_listed() {
 
     assert_eq!(deferred.len(), 1);
     assert_eq!(deferred[0].reason, "missing_post");
+}
+
+#[test]
+fn deferred_event_can_be_deleted_after_reprocessing() {
+    let store = Store::open_in_memory().unwrap();
+
+    store
+        .save_deferred_event_record(&DeferredEventRecord {
+            event_id: "event-2".into(),
+            event_type: "comment_created".into(),
+            reason: "missing_post".into(),
+            payload_json: "{\"kind\":\"comment_created\"}".into(),
+        })
+        .unwrap();
+
+    store.delete_deferred_event_record("event-2").unwrap();
+
+    assert!(store.list_deferred_event_records().unwrap().is_empty());
 }

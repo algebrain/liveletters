@@ -53,6 +53,34 @@
 - минимальная зависимость от конкретного Tauri runtime;
 - пригодность для использования из `Reagent`-приложения без протечки backend details в UI-компоненты.
 
+## Текущее минимальное состояние реализации
+
+Сейчас модуль уже включает:
+
+- command/query helpers для:
+  - `create-post`
+  - `get-home-feed`
+  - `get-post-thread`
+  - `get-sync-status`
+  - `list-incoming-failures`
+  - `list-event-failures`
+- DTO normalization для:
+  - `create-post-request`
+  - `sync-status-dto`
+  - `event-failure-dto`
+- единый `normalize-error`;
+- subscription helper для `sync-status-changed`.
+
+Текущий `sync-status-dto` уже отражает richer backend contour:
+
+- `duplicate`;
+- `replay`;
+- `unauthorized`;
+- `invalid`;
+- `malformed`;
+- `deferred`;
+- `pending_outbox`.
+
 ## Технологическая граница
 
 Хотя текущий frontend-путь в проекте это `Reagent`, сам `liveletters-frontend-api` не должен превращаться в библиотеку UI-компонентов.
@@ -103,6 +131,18 @@
 - backend contracts централизованы;
 - ошибки нормализуются единообразно;
 - тесты покрывают adapters и subscriptions.
+
+Для текущего этапа второго прохода practically уже покрыты:
+
+- richer sync status boundary;
+- incoming failure boundary;
+- event failure boundary для diagnostics экрана.
+
+Но модуль еще не считается завершенным:
+
+- нет реального Tauri runtime adapter;
+- нет более полной event subscription model;
+- error mapping пока остается минимальным.
 
 ## Связанные документы
 

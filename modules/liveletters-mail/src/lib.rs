@@ -1,3 +1,4 @@
+mod config;
 mod errors;
 mod imap;
 mod message;
@@ -5,16 +6,19 @@ mod mime;
 mod parser;
 mod retry;
 mod smtp;
+mod status;
 
 use liveletters_protocol::{ProtocolMessage, ProtocolError, decode_message, encode_message};
 
+pub use config::{ImapMailboxConfig, MailAuth, SmtpTransportConfig};
 pub use errors::TransportError;
-pub use imap::InMemoryImapMailbox;
+pub use imap::{ConfiguredImapMailbox, InMemoryImapMailbox};
 pub use message::{ExtractedMailParts, OutgoingEmail, ParsedEmail, ReceivedEmail};
 pub use mime::extract_liveletters_parts;
 pub use parser::parse_email;
 pub use retry::MailRetryPolicy;
-pub use smtp::InMemorySmtpTransport;
+pub use smtp::{ConfiguredSmtpTransport, InMemorySmtpTransport};
+pub use status::{FetchBatch, FetchStatus, MailboxCursor, SendStatus};
 
 pub fn crate_name() -> &'static str {
     "liveletters-mail"

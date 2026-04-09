@@ -4,7 +4,7 @@ use crate::{
     AppCoreError, CreateCommentCommand, CreateCommentResult, CreatePostCommand, CreatePostResult,
     EditCommentCommand, EditCommentResult, GetHomeFeedQuery, GetPendingOutboxQuery,
     GetPostThreadQuery, HidePostCommand, HidePostResult, HomeFeed, PendingOutbox, PostThread,
-    commands, queries,
+    ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult, commands, queries,
 };
 
 pub struct AppCore<'a> {
@@ -57,5 +57,12 @@ impl<'a> AppCore<'a> {
         query: GetPendingOutboxQuery,
     ) -> Result<PendingOutbox, AppCoreError> {
         queries::get_pending_outbox(&self.store, query)
+    }
+
+    pub fn reprocess_deferred_events(
+        &self,
+        command: ReprocessDeferredEventsCommand,
+    ) -> Result<ReprocessDeferredEventsResult, AppCoreError> {
+        commands::reprocess_deferred_events(&self.store, command)
     }
 }

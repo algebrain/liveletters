@@ -3,7 +3,7 @@ mod dto;
 mod errors;
 
 pub use backend::BackendApp;
-pub use dto::{CreatePostRequest, IncomingFailureDto, SyncStatusDto};
+pub use dto::{CreatePostRequest, EventFailureDto, IncomingFailureDto, SyncStatusDto};
 pub use errors::BackendError;
 
 pub fn app_name() -> &'static str {

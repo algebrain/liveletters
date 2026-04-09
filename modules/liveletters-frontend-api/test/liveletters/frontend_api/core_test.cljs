@@ -26,13 +26,27 @@
   (let [calls (atom [])
         adapter {:invoke-command (fn [command payload]
                                    (swap! calls conj [command payload])
-                                   {:items []})}]
+                                    {:items []})}]
     (is (= {:items []}
            (core/get-home-feed adapter)))
     (is (= {:items []}
            (core/get-post-thread adapter {:post-id "post-1"})))
+    (is (= [{:event-id "event-1"
+             :event-type "comment_edited"
+             :resource-id "blog-1"
+             :apply-status :unauthorized
+             :failure-reason "actor_cannot_edit_comment"}]
+           (core/list-event-failures
+            {:invoke-command (fn [command payload]
+                               (swap! calls conj [command payload])
+                               [{:event_id "event-1"
+                                 :event_type "comment_edited"
+                                 :resource_id "blog-1"
+                                 :apply_status "unauthorized"
+                                 :failure_reason "actor_cannot_edit_comment"}])})))
     (is (= [["get_home_feed" nil]
-            ["get_post_thread" {:post-id "post-1"}]]
+            ["get_post_thread" {:post-id "post-1"}]
+            ["list_event_failures" nil]]
            @calls))))
 
 (deftest backend-errors-are-normalized-for-ui
@@ -68,12 +82,18 @@
   (is (= {:status :healthy
           :applied-messages 3
           :duplicate-messages 1
+          :replayed-messages 2
+          :unauthorized-messages 1
+          :invalid-messages 4
           :malformed-messages 0
           :deferred-events 0
           :pending-outbox 2}
          (core/sync-status-dto {:status "healthy"
                                 :applied_messages 3
                                 :duplicate_messages 1
+                                :replayed_messages 2
+                                :unauthorized_messages 1
+                                :invalid_messages 4
                                 :malformed_messages 0
                                 :deferred_events 0
                                 :pending_outbox 2}))))

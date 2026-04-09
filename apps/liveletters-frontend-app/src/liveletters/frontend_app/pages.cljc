@@ -55,20 +55,38 @@
         [:ul {}
          [:li {} (str "Applied: " (get-in sync-status [:details :applied]))]
          [:li {} (str "Duplicates: " (get-in sync-status [:details :duplicates]))]
+         [:li {} (str "Replays: " (get-in sync-status [:details :replays]))]
+         [:li {} (str "Unauthorized: " (get-in sync-status [:details :unauthorized]))]
+         [:li {} (str "Invalid: " (get-in sync-status [:details :invalid]))]
          [:li {} (str "Malformed: " (get-in sync-status [:details :malformed]))]
          [:li {} (str "Deferred: " (get-in sync-status [:details :deferred]))]
          [:li {} (str "Outbox: " (get-in sync-status [:details :outbox]))]]]]}]))
 
 (defn diagnostics-page [state]
-  (let [failures (ui-model/incoming-failures-view-model (:incoming-failures state))]
+  (let [failures (ui-model/incoming-failures-view-model (:incoming-failures state))
+        event-failures (ui-model/event-failures-view-model (:event-failures state))]
     [ui-kit/section
      {:title "Diagnostics"
       :children
-      [(if (empty? failures)
-         [ui-kit/empty-state {:message "No incoming failures"}]
-         [:ul {:class "ll-failures"}
-          (for [failure failures]
-            ^{:key (:id failure)}
-            [:li {:class "ll-failures__item"}
-             [:strong {} (name (:kind failure))]
-             [:p {} (:preview failure)]])])]}]))
+      [(if (and (empty? failures) (empty? event-failures))
+         [ui-kit/empty-state {:message "No diagnostic failures"}]
+         [:div {:class "ll-diagnostics"}
+          (when-not (empty? failures)
+            [:<>
+             [:h3 {} "Incoming failures"]
+             [:ul {:class "ll-failures"}
+              (for [failure failures]
+                ^{:key (:id failure)}
+                [:li {:class "ll-failures__item"}
+                 [:strong {} (name (:kind failure))]
+                 [:p {} (:preview failure)]])]])
+          (when-not (empty? event-failures)
+            [:<>
+             [:h3 {} "Event failures"]
+             [:ul {:class "ll-event-failures"}
+              (for [failure event-failures]
+                ^{:key (:id failure)}
+                [:li {:class "ll-event-failures__item"}
+                 [:strong {} (name (:kind failure))]
+                 [:p {} (:event-type failure)]
+                 [:small {} (:reason failure)]])]])])]}]))

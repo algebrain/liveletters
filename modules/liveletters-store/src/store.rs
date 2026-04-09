@@ -77,7 +77,9 @@ impl Store {
                 event_id TEXT PRIMARY KEY,
                 event_type TEXT NOT NULL,
                 resource_id TEXT NOT NULL,
-                payload_json TEXT NOT NULL
+                payload_json TEXT NOT NULL,
+                apply_status TEXT NOT NULL DEFAULT 'pending',
+                failure_reason TEXT
             );
 
             CREATE TABLE IF NOT EXISTS deferred_events (
@@ -336,15 +338,17 @@ impl Store {
         self.connection.execute(
             r#"
             INSERT OR REPLACE INTO raw_events
-                (event_id, event_type, resource_id, payload_json)
+                (event_id, event_type, resource_id, payload_json, apply_status, failure_reason)
             VALUES
-                (?1, ?2, ?3, ?4)
+                (?1, ?2, ?3, ?4, ?5, ?6)
             "#,
             params![
                 record.event_id,
                 record.event_type,
                 record.resource_id,
                 record.payload_json,
+                record.apply_status,
+                record.failure_reason,
             ],
         )?;
 
@@ -354,7 +358,7 @@ impl Store {
     pub fn list_raw_event_records(&self) -> Result<Vec<RawEventRecord>, StoreError> {
         let mut stmt = self.connection.prepare(
             r#"
-            SELECT event_id, event_type, resource_id, payload_json
+            SELECT event_id, event_type, resource_id, payload_json, apply_status, failure_reason
             FROM raw_events
             ORDER BY rowid ASC
             "#,
@@ -366,6 +370,8 @@ impl Store {
                 event_type: row.get(1)?,
                 resource_id: row.get(2)?,
                 payload_json: row.get(3)?,
+                apply_status: row.get(4)?,
+                failure_reason: row.get(5)?,
             })
         })?;
 
@@ -431,5 +437,14 @@ impl Store {
         }
 
         Ok(records)
+    }
+
+    pub fn delete_deferred_event_record(&self, event_id: &str) -> Result<(), StoreError> {
+        self.connection.execute(
+            "DELETE FROM deferred_events WHERE event_id = ?1",
+            [event_id],
+        )?;
+
+        Ok(())
     }
 }

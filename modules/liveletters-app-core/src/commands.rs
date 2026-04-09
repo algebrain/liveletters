@@ -5,9 +5,10 @@ use liveletters_domain::{
 use liveletters_protocol::{
     DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message,
 };
+use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 use liveletters_store::{CommentRecord, OutboxRecord, PostRecord, Store};
 
-use crate::AppCoreError;
+use crate::{AppCoreError, DeferredReprocessingSummary};
 
 pub struct CreatePostCommand<'a> {
     pub post_id: &'a str,
@@ -39,6 +40,8 @@ pub struct EditCommentCommand<'a> {
     pub body: &'a str,
 }
 
+pub struct ReprocessDeferredEventsCommand;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreatePostResult {
     post: Post,
@@ -61,6 +64,11 @@ pub struct HidePostResult {
 pub struct EditCommentResult {
     comment: Comment,
     event: CommentEdited,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReprocessDeferredEventsResult {
+    summary: DeferredReprocessingSummary,
 }
 
 impl CreatePostResult {
@@ -100,6 +108,12 @@ impl EditCommentResult {
 
     pub fn event(&self) -> &CommentEdited {
         &self.event
+    }
+}
+
+impl ReprocessDeferredEventsResult {
+    pub fn summary(&self) -> &DeferredReprocessingSummary {
+        &self.summary
     }
 }
 
@@ -380,6 +394,40 @@ pub fn edit_comment(
     )?;
 
     Ok(EditCommentResult { comment, event })
+}
+
+pub fn reprocess_deferred_events(
+    store: &Store,
+    _command: ReprocessDeferredEventsCommand,
+) -> Result<ReprocessDeferredEventsResult, AppCoreError> {
+    let report = SyncEngine::new(store).reprocess_deferred()?;
+
+    let mut applied = 0;
+    let mut replayed = 0;
+    let mut unauthorized = 0;
+    let mut invalid = 0;
+    let mut still_deferred = 0;
+
+    for outcome in report.outcomes() {
+        match outcome {
+            SyncMessageOutcome::Applied { .. } => applied += 1,
+            SyncMessageOutcome::Replay { .. } => replayed += 1,
+            SyncMessageOutcome::Unauthorized { .. } => unauthorized += 1,
+            SyncMessageOutcome::Invalid { .. } => invalid += 1,
+            SyncMessageOutcome::Deferred { .. } => still_deferred += 1,
+            SyncMessageOutcome::Duplicate { .. } | SyncMessageOutcome::Malformed { .. } => {}
+        }
+    }
+
+    Ok(ReprocessDeferredEventsResult {
+        summary: DeferredReprocessingSummary::new(
+            applied,
+            replayed,
+            unauthorized,
+            invalid,
+            still_deferred,
+        ),
+    })
 }
 
 fn encode_visibility(visibility: Visibility) -> String {

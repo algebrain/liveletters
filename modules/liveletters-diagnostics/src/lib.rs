@@ -4,7 +4,7 @@ mod reader;
 
 pub use dto::{
     DeferredEventDiagnostic, DiagnosticsSnapshot, HealthStatus, OutboxDiagnostic,
-    RawMessageDiagnostic, SyncHealth,
+    RawEventDiagnostic, RawMessageDiagnostic, SyncHealth,
 };
 pub use errors::DiagnosticsError;
 pub use reader::DiagnosticsReader;

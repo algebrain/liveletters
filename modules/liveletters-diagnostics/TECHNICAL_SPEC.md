@@ -42,6 +42,32 @@
 - чтение состояния фоновых jobs;
 - безопасные представления ошибок для UI.
 
+## Текущее минимальное состояние реализации
+
+Сейчас модуль уже включает:
+
+- `DiagnosticsSnapshot` как стабильный диагностический срез;
+- `SyncHealth` с richer counters для:
+  - `applied`
+  - `duplicate`
+  - `replay`
+  - `unauthorized`
+  - `invalid`
+  - `malformed`
+  - `deferred`
+  - `pending_outbox`
+- diagnostics DTO для:
+  - `raw_messages`
+  - `raw_events`
+  - `deferred_events`
+  - `outbox_entries`
+- sanitization preview-полей с маскировкой email-адресов.
+
+Текущий health policy пока intentionally conservative:
+
+- `Degraded` выставляется, если есть хотя бы один `malformed`, `unauthorized`, `invalid` или `deferred` case;
+- `replay` и `duplicate` считаются важными техническими сигналами, но сами по себе не переводят health в `Degraded`.
+
 ## Требования к структуре каталога
 
 - `src/logs`;
@@ -76,6 +102,18 @@
 - чувствительные поля маскируются;
 - формат diagnostic data стабилен;
 - тесты покрывают health и error aggregation.
+
+Для текущего этапа второго прохода practically уже покрыты:
+
+- richer sync health summary;
+- raw event failures как отдельный diagnostics contour;
+- stable DTO для backend diagnostic boundary.
+
+Но модуль еще не считается завершенным:
+
+- нет более тонкой health taxonomy beyond `Healthy` / `Degraded`;
+- нет richer aggregation по outbox/inbox/deferred подсистемам;
+- sanitization policy пока остается минимальной.
 
 ## Связанные документы
 

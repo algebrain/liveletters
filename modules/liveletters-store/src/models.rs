@@ -42,6 +42,8 @@ pub struct RawEventRecord {
     pub event_type: String,
     pub resource_id: String,
     pub payload_json: String,
+    pub apply_status: String,
+    pub failure_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

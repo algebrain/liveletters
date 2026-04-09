@@ -84,6 +84,7 @@ dependencies = [
  "liveletters-domain",
  "liveletters-protocol",
  "liveletters-store",
+ "liveletters-sync",
 ]
 
 [[package]]
@@ -96,6 +97,13 @@ dependencies = [
 [[package]]
 name = "liveletters-domain"
 version = "0.1.0"
+
+[[package]]
+name = "liveletters-mail"
+version = "0.1.0"
+dependencies = [
+ "liveletters-protocol",
+]
 
 [[package]]
 name = "liveletters-protocol"
@@ -119,6 +127,16 @@ name = "liveletters-store"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+]
+
+[[package]]
+name = "liveletters-sync"
+version = "0.1.0"
+dependencies = [
+ "liveletters-mail",
+ "liveletters-protocol",
+ "liveletters-store",
+ "serde_json",
 ]
 
 [[package]]

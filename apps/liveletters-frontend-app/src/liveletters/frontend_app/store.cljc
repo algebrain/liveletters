@@ -19,6 +19,9 @@
 (defn refresh-incoming-failures! [adapter store]
   (swap! store assoc :incoming-failures (or (frontend-api/list-incoming-failures adapter) [])))
 
+(defn refresh-event-failures! [adapter store]
+  (swap! store assoc :event-failures (or (frontend-api/list-event-failures adapter) [])))
+
 (defn load-post-thread! [adapter store post-id]
   (swap! store assoc
          :thread (frontend-api/get-post-thread adapter {:post-id post-id})
@@ -37,4 +40,5 @@
   (refresh-home-feed! adapter store)
   (refresh-sync-status! adapter store)
   (refresh-incoming-failures! adapter store)
+  (refresh-event-failures! adapter store)
   store)

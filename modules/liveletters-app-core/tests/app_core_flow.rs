@@ -1,9 +1,12 @@
 use liveletters_app_core::{
     AppCore, CommentSummary, CreateCommentCommand, CreatePostCommand, GetHomeFeedQuery,
-    GetPendingOutboxQuery, GetPostThreadQuery, PostSummary,
+    GetPendingOutboxQuery, GetPostThreadQuery, PostSummary, ReprocessDeferredEventsCommand,
 };
+use liveletters_mail::{ReceivedEmail, build_protocol_email};
 use liveletters_protocol::{DomainEventPayload, decode_message};
+use liveletters_protocol::{MessageEnvelope, ProtocolMessage};
 use liveletters_store::Store;
+use liveletters_sync::SyncEngine;
 
 #[test]
 fn creates_post_and_exposes_it_in_home_feed() {
@@ -228,4 +231,61 @@ fn edits_comment_and_returns_updated_thread() {
         decoded.payload(),
         DomainEventPayload::CommentEdited { body, .. } if body == "Edited comment"
     ));
+}
+
+#[test]
+fn reprocesses_deferred_events_through_app_core_orchestration() {
+    let store = Store::open_in_memory().expect("store should open");
+    let sync = SyncEngine::new(&store);
+
+    let deferred_message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "comment_created", "blog-1", "event-comment-1").unwrap(),
+        "Комментарий раньше поста",
+        DomainEventPayload::CommentCreated {
+            comment_id: "comment-1".into(),
+            post_id: "post-1".into(),
+            parent_comment_id: None,
+            resource_id: "blog-1".into(),
+            actor_id: "alice".into(),
+            created_at: 2,
+            visibility: "public".into(),
+        },
+    )
+    .unwrap();
+    let deferred_email = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Deferred comment",
+        &deferred_message,
+    )
+    .unwrap();
+
+    sync.ingest_batch(vec![ReceivedEmail {
+        message_id: "message-comment-1".into(),
+        raw_message: deferred_email.raw_message,
+    }])
+    .expect("deferred message should ingest");
+
+    let app = AppCore::new(&store);
+    app.create_post(CreatePostCommand {
+        post_id: "post-1",
+        resource_id: "blog-1",
+        author_id: "alice",
+        created_at: 1,
+        body: "First post",
+    })
+    .expect("post should be created");
+
+    let result = app
+        .reprocess_deferred_events(ReprocessDeferredEventsCommand)
+        .expect("reprocessing should succeed");
+
+    assert_eq!(result.summary().applied, 1);
+    assert_eq!(result.summary().still_deferred, 0);
+
+    let thread = app
+        .get_post_thread(GetPostThreadQuery { post_id: "post-1" })
+        .expect("thread should load");
+    assert_eq!(thread.comments().len(), 1);
+    assert_eq!(thread.comments()[0].comment_id, "comment-1");
 }

@@ -2,6 +2,7 @@
 pub enum SyncError {
     Store(liveletters_store::StoreError),
     SerializePayload(serde_json::Error),
+    DeserializePayload(serde_json::Error),
 }
 
 impl From<liveletters_store::StoreError> for SyncError {

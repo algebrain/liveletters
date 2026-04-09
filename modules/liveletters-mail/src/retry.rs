@@ -11,7 +11,10 @@ impl MailRetryPolicy {
     }
 
     pub fn should_retry(&self, error: &TransportError) -> bool {
-        matches!(error, TransportError::Network(_))
+        matches!(
+            error,
+            TransportError::Network(_) | TransportError::UnexpectedResponse(_)
+        )
     }
 
     pub fn allows_attempt(&self, attempt_number: usize) -> bool {

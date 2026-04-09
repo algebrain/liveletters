@@ -52,6 +52,36 @@
 - schedule deferred processing;
 - report sync outcome.
 
+## Текущее минимальное состояние реализации
+
+Сейчас модуль уже включает:
+
+- ingest batch для входящих писем;
+- parsing через `liveletters-mail`;
+- decode `ProtocolMessage`;
+- базовую валидацию envelope/payload consistency;
+- разделение исходов:
+  - `Applied`
+  - `Duplicate`
+  - `Replay`
+  - `Unauthorized`
+  - `Invalid`
+  - `Deferred`
+  - `Malformed`
+- запись `raw_messages` и `raw_events` в `liveletters-store`;
+- apply-status и failure reason для `raw_events`;
+- переобработку `deferred_events` после появления зависимостей.
+
+Текущая authorization policy пока минимальна и intentionally conservative:
+
+- `PostHidden` разрешается только автору исходного поста;
+- `CommentEdited` разрешается только автору исходного комментария.
+
+Текущая anti-replay policy тоже минимальна:
+
+- duplicate определяется по уже известному `event_id`;
+- replay определяется по повторному воспроизведению уже материализованного состояния с новым `event_id`.
+
 ## Требования к структуре каталога
 
 - `src/ingest`;
@@ -95,6 +125,19 @@
 - out-of-order и duplicate cases покрыты тестами;
 - pipeline документирован;
 - sync logic отделен от transport и UI.
+
+Для текущего этапа второго прохода practically считаются уже закрытыми:
+
+- `duplicate` vs `replay` как разные исходы;
+- `unauthorized` и `invalid` как отдельные исходы;
+- deferred reprocessing;
+- richer sync outcome для следующего слоя.
+
+Но модуль еще не считается окончательно завершенным:
+
+- authorization policy пока минимальна;
+- apply-status хранится в простой строковой форме;
+- ingest pipeline еще не связан с более богатым diagnostics и backend boundary.
 
 ## Связанные документы
 

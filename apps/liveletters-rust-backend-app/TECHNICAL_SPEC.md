@@ -55,6 +55,35 @@
 - `get_sync_status`;
 - `list_incoming_failures`.
 
+## Текущее минимальное состояние реализации
+
+Сейчас модуль уже включает:
+
+- `BackendApp` как thin integration container;
+- явный wiring поверх:
+  - `liveletters-store`
+  - `liveletters-app-core`
+  - `liveletters-diagnostics`
+- backend boundary для:
+  - `create_post`
+  - `get_home_feed`
+  - `get_post_thread`
+  - `get_sync_status`
+  - `list_incoming_failures`
+  - `list_event_failures`
+
+Текущий `get_sync_status` уже отражает richer diagnostics contour:
+
+- `duplicate`;
+- `replay`;
+- `unauthorized`;
+- `invalid`;
+- `malformed`;
+- `deferred`;
+- `pending_outbox`.
+
+Текущий backend app все еще остается runtime-neutral integration layer, а не настоящим Tauri bootstrap.
+
 ## Требования к структуре каталога
 
 - `src/main.rs` или `src/lib.rs` как точка входа;
@@ -95,6 +124,18 @@
 - бизнес-логика остается в библиотеках;
 - smoke и integration tests проходят;
 - документация покрывает запуск и расширение модуля.
+
+Для текущего этапа второго прохода practically уже покрыты:
+
+- thin backend wiring поверх app-core и diagnostics;
+- richer diagnostic/status boundary;
+- event failure boundary для следующего frontend integration слоя.
+
+Но модуль еще не считается завершенным:
+
+- нет Tauri-specific command layer;
+- нет runtime bridge и backend events для frontend;
+- нет отдельного bootstrap/container split beyond текущий минимальный integration слой.
 
 ## Связанные документы
 

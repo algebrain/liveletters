@@ -65,6 +65,31 @@
 - подписка на app-level backend events;
 - пользовательские intents, превращаемые в вызовы frontend API.
 
+## Текущее минимальное состояние реализации
+
+Сейчас модуль уже включает:
+
+- единый `app-state`;
+- route switching между:
+  - feed
+  - post thread
+  - sync
+  - diagnostics
+- store-level intents и refresh functions для:
+  - feed
+  - sync status
+  - incoming failures
+  - event failures
+- diagnostics page, которая уже показывает:
+  - incoming failures;
+  - event failures.
+
+Текущий frontend app уже согласован с richer backend contour второго прохода:
+
+- `sync-status` хранится в expanded форме;
+- diagnostics state разделен на `incoming-failures` и `event-failures`;
+- UI по-прежнему остается thin относительно `frontend-api` и `ui-model`.
+
 ## Требования к структуре каталога
 
 - `src/app` для bootstrap и app shell;
@@ -135,6 +160,18 @@
 - UI не зависит напрямую от деталей протокола и базы данных;
 - тесты проходят;
 - документация описывает ключевые сценарии.
+
+Для текущего этапа второго прохода practically уже покрыты:
+
+- app-state orchestration для richer diagnostics contour;
+- diagnostics page под новый backend/frontend boundary;
+- init path, который загружает feed, sync status, incoming failures и event failures.
+
+Но модуль еще не считается завершенным:
+
+- нет runtime bridge к реальному Tauri слою;
+- нет richer event subscription contour;
+- diagnostics UI пока остается минимальным и техническим.
 
 ## Связанные документы
 
