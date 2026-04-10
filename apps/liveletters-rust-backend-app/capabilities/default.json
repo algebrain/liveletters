@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
+  "identifier": "main-capability",
   "description": "Default desktop capability for the LiveLetters window.",
+  "local": true,
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "default"
+    "app-default"
   ]
 }

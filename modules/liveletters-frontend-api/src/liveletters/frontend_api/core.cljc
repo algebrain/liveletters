@@ -76,8 +76,8 @@
      :details (:details backend-error)}
 
     {:type :unknown
-     :message "unexpected backend error"
-     :details nil}))
+     :message (or (:message backend-error) "unexpected backend error")
+     :details (or (:details backend-error) (:code backend-error))}))
 
 (defn invoke-command! [adapter command payload on-success on-error]
   ((:invoke-command adapter) command payload on-success on-error))

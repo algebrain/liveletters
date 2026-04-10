@@ -12,7 +12,23 @@ use crate::{
 pub fn build() -> Result<Builder<tauri::Wry>, BackendError> {
     // In constrained dev/sandbox environments, default HOME-backed storage may be unavailable.
     // Fall back to in-memory store to keep the runtime bridge bootable.
-    let backend = BackendApp::open_default().or_else(|_error| BackendApp::open_in_memory())?;
+    let backend = match BackendApp::open_default() {
+        Ok(backend) => backend,
+        Err(error) => {
+            let line = runtime_log_line(
+                "backend-bootstrap.open-default-failed",
+                &format!("{error:?}"),
+                None,
+                None,
+                None,
+            );
+            let _ = append_runtime_log("backend-startup.log", &line);
+            eprintln!(
+                "liveletters-rust-backend-app: open_default failed, falling back to in-memory store: {error:?}"
+            );
+            BackendApp::open_in_memory()?
+        }
+    };
     let state = BackendState::new(backend);
 
     Ok(tauri::Builder::default()

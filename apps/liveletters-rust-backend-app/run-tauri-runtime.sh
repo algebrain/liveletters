@@ -42,6 +42,8 @@ echo "Runtime logs:"
 echo "  stdout: ${STDOUT_LOG}"
 echo "  stderr: ${STDERR_LOG}"
 echo "  frontend: ${LOG_DIR}/frontend-errors.log"
+echo "  commands: ${LOG_DIR}/command-errors.log"
+echo "  startup: ${LOG_DIR}/backend-startup.log"
 
 cargo run --features tauri-runtime "$@" \
   > >(tee -a "${STDOUT_LOG}") \

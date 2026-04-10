@@ -18,6 +18,35 @@
 (defn- decode-payload [payload]
   (js->clj payload :keywordize-keys true))
 
+(defn normalize-invoke-error [error]
+  (let [decoded (cond
+                  (string? error)
+                  {:code "invoke_error"
+                   :message error
+                   :details nil}
+
+                  (instance? js/Error error)
+                  {:code "invoke_error"
+                   :message (or (.-message error) (str error))
+                   :details (some-> error .-stack str)}
+
+                  :else
+                  (let [value (decode-payload error)]
+                    (cond
+                      (map? value)
+                      (merge {:code "invoke_error"} value)
+
+                      (string? value)
+                      {:code "invoke_error"
+                       :message value
+                       :details nil}
+
+                      :else
+                      {:code "invoke_error"
+                       :message (str error)
+                       :details nil})))]
+    (core/normalize-error decoded)))
+
 (defn tauri-adapter []
   {:invoke-command
    (fn [command payload on-success on-error]
@@ -25,7 +54,7 @@
          (.then (fn [response]
                   (on-success (decode-payload response))))
          (.catch (fn [error]
-                   (on-error (core/normalize-error (decode-payload error)))))))
+                   (on-error (normalize-invoke-error error))))))
    :emit-event
    (fn [event-name payload]
      (emit event-name (clj->js (encode-payload payload))))

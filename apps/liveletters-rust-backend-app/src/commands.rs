@@ -4,10 +4,26 @@ use tauri::{AppHandle, State};
 
 use crate::{
     runtime::{append_runtime_log, emit_frontend_event, runtime_log_line, BackendState},
-    BootstrapStateDto, CommandErrorDto, CreatePostCommandRequest, CreatePostRequest,
+    BackendError, BootstrapStateDto, CommandErrorDto, CreatePostCommandRequest, CreatePostRequest,
     EventFailureDto, FrontendErrorLogRequest, FrontendEvent, HomeFeedDto, IncomingFailureDto,
     PostThreadDto, SaveSettingsCommandRequest, SaveSettingsRequest, SettingsDto, SyncStatusDto,
 };
+
+fn append_command_error_log(command: &str, error: &CommandErrorDto) {
+    let line = format!(
+        "[command={command}] [code={}] [message={}] [details={}]\n",
+        error.code,
+        error.message.replace('\n', " "),
+        error.details.clone().unwrap_or_default().replace('\n', " ")
+    );
+    let _ = append_runtime_log("command-errors.log", &line);
+}
+
+fn map_command_error(command: &str, error: BackendError) -> CommandErrorDto {
+    let dto = CommandErrorDto::from(error);
+    append_command_error_log(command, &dto);
+    dto
+}
 
 #[tauri::command]
 pub fn create_post(
@@ -25,7 +41,7 @@ pub fn create_post(
                 body: &request.body,
             })
         })
-        .map_err(CommandErrorDto::from)?;
+        .map_err(|error| map_command_error("create_post", error))?;
 
     emit_frontend_event(&app, FrontendEvent::feed_updated())?;
     emit_frontend_event(&app, FrontendEvent::sync_status_changed())?;
@@ -38,7 +54,7 @@ pub fn get_home_feed(state: State<'_, BackendState>) -> Result<HomeFeedDto, Comm
     state
         .with_backend(|backend| backend.get_home_feed())
         .map(HomeFeedDto::from)
-        .map_err(CommandErrorDto::from)
+        .map_err(|error| map_command_error("get_home_feed", error))
 }
 
 #[tauri::command]
@@ -47,14 +63,14 @@ pub fn get_bootstrap_state(
 ) -> Result<BootstrapStateDto, CommandErrorDto> {
     state
         .with_backend(|backend| backend.get_bootstrap_state())
-        .map_err(CommandErrorDto::from)
+        .map_err(|error| map_command_error("get_bootstrap_state", error))
 }
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, BackendState>) -> Result<SettingsDto, CommandErrorDto> {
     state
         .with_backend(|backend| backend.get_settings())
-        .map_err(CommandErrorDto::from)
+        .map_err(|error| map_command_error("get_settings", error))
 }
 
 #[tauri::command]
@@ -80,7 +96,7 @@ pub fn save_settings(
                 imap_mailbox: &request.imap_mailbox,
             })
         })
-        .map_err(CommandErrorDto::from)
+        .map_err(|error| map_command_error("save_settings", error))
 }
 
 #[tauri::command]
@@ -91,14 +107,14 @@ pub fn get_post_thread(
     state
         .with_backend(|backend| backend.get_post_thread(&post_id))
         .map(PostThreadDto::from)
-        .map_err(CommandErrorDto::from)
+        .map_err(|error| map_command_error("get_post_thread", error))
 }
 
 #[tauri::command]
 pub fn get_sync_status(state: State<'_, BackendState>) -> Result<SyncStatusDto, CommandErrorDto> {
     state
         .with_backend(|backend| backend.get_sync_status())
-        .map_err(CommandErrorDto::from)
+        .map_err(|error| map_command_error("get_sync_status", error))
 }
 
 #[tauri::command]
@@ -107,7 +123,7 @@ pub fn list_incoming_failures(
 ) -> Result<Vec<IncomingFailureDto>, CommandErrorDto> {
     state
         .with_backend(|backend| backend.list_incoming_failures())
-        .map_err(CommandErrorDto::from)
+        .map_err(|error| map_command_error("list_incoming_failures", error))
 }
 
 #[tauri::command]
@@ -116,7 +132,7 @@ pub fn list_event_failures(
 ) -> Result<Vec<EventFailureDto>, CommandErrorDto> {
     state
         .with_backend(|backend| backend.list_event_failures())
-        .map_err(CommandErrorDto::from)
+        .map_err(|error| map_command_error("list_event_failures", error))
 }
 
 #[tauri::command]
@@ -129,5 +145,8 @@ pub fn log_frontend_error(request: FrontendErrorLogRequest) -> Result<(), Comman
         request.location.as_deref(),
     );
 
-    append_runtime_log("frontend-errors.log", &line)
+    append_runtime_log("frontend-errors.log", &line).map_err(|error| {
+        append_command_error_log("log_frontend_error", &error);
+        error
+    })
 }

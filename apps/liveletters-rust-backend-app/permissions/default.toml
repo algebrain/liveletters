@@ -1,10 +1,13 @@
 [[permission]]
-identifier = "default"
+identifier = "app-default"
 description = "Allows the frontend to use the minimal LiveLetters backend commands."
 commands.allow = [
   "create_post",
+  "get_bootstrap_state",
+  "get_settings",
   "get_home_feed",
   "get_post_thread",
+  "save_settings",
   "get_sync_status",
   "list_incoming_failures",
   "list_event_failures",
