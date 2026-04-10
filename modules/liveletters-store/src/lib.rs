@@ -1,6 +1,7 @@
 mod error;
 mod models;
 mod paths;
+mod secret_protection;
 mod store;
 
 pub use error::StoreError;

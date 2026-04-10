@@ -199,3 +199,55 @@ fn backend_can_open_for_explicit_home_dir() {
 
     let _ = std::fs::remove_dir_all(home_dir);
 }
+
+#[test]
+fn backend_reports_error_when_password_key_file_is_missing() {
+    let home_dir = std::env::temp_dir().join(format!(
+        "liveletters-backend-secret-home-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+
+    let backend = BackendApp::open_for_home_dir(&home_dir).expect("backend should open");
+    backend
+        .save_settings(SaveSettingsRequest {
+            nickname: "alice",
+            email_address: "alice@example.com",
+            avatar_url: None,
+            smtp_host: "smtp.example.com",
+            smtp_port: 587,
+            smtp_security: "starttls",
+            smtp_username: "alice",
+            smtp_password: "secret",
+            smtp_hello_domain: "example.com",
+            imap_host: "imap.example.com",
+            imap_port: 143,
+            imap_security: "starttls",
+            imap_username: "alice",
+            imap_password: "secret",
+            imap_mailbox: "INBOX",
+        })
+        .expect("settings should save");
+
+    std::fs::remove_file(
+        home_dir
+            .join(".liveletters")
+            .join("mail-password-obfuscation.key"),
+    )
+    .unwrap();
+
+    let error = backend.get_settings().unwrap_err();
+
+    assert!(matches!(
+        error,
+        liveletters_rust_backend_app::BackendError::AppCore(
+            liveletters_app_core::AppCoreError::Store(
+                liveletters_store::StoreError::ProtectedSecretUnavailable { .. }
+            )
+        )
+    ));
+
+    let _ = std::fs::remove_dir_all(home_dir);
+}

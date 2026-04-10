@@ -34,6 +34,30 @@ impl From<liveletters_store::StoreError> for BackendError {
 
 impl From<BackendError> for CommandErrorDto {
     fn from(value: BackendError) -> Self {
+        fn from_store_error(error: liveletters_store::StoreError) -> CommandErrorDto {
+            match error {
+                liveletters_store::StoreError::ProtectedSecretUnavailable { message } => {
+                    CommandErrorDto {
+                        code: "protected_secret_unavailable".into(),
+                        message,
+                        details: None,
+                    }
+                }
+                liveletters_store::StoreError::InvalidProtectedSecretFormat { message } => {
+                    CommandErrorDto {
+                        code: "invalid_protected_secret".into(),
+                        message,
+                        details: None,
+                    }
+                }
+                other => CommandErrorDto {
+                    code: "store_error".into(),
+                    message: format!("{other:?}"),
+                    details: None,
+                },
+            }
+        }
+
         match value {
             BackendError::AppCore(liveletters_app_core::AppCoreError::PostNotFound { post_id }) => {
                 Self {
@@ -61,6 +85,9 @@ impl From<BackendError> for CommandErrorDto {
                 message,
                 details: Some(field),
             },
+            BackendError::AppCore(liveletters_app_core::AppCoreError::Store(error)) => {
+                from_store_error(error)
+            }
             BackendError::AppCore(error) => Self {
                 code: "app_core_error".into(),
                 message: format!("{error:?}"),
@@ -71,11 +98,7 @@ impl From<BackendError> for CommandErrorDto {
                 message: format!("{error:?}"),
                 details: None,
             },
-            BackendError::Store(error) => Self {
-                code: "store_error".into(),
-                message: format!("{error:?}"),
-                details: None,
-            },
+            BackendError::Store(error) => from_store_error(error),
         }
     }
 }

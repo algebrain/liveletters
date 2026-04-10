@@ -8,4 +8,6 @@ license = "MIT"
 path = "src/lib.rs"
 
 [dependencies]
+base64 = "0.22"
+chacha20poly1305 = { version = "0.10", features = ["std"] }
 rusqlite = { version = "0.37", features = ["bundled"] }

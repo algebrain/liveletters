@@ -8,6 +8,7 @@ use liveletters_store::{
     CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxRecord, PostRecord,
     RawEventRecord, RawMessageRecord, Store, StorePaths, UserSettingsRecord,
 };
+use rusqlite::Connection;
 
 fn temp_home_dir() -> PathBuf {
     let unique = SystemTime::now()
@@ -17,6 +18,21 @@ fn temp_home_dir() -> PathBuf {
     let path = std::env::temp_dir().join(format!("liveletters-home-{unique}"));
     fs::create_dir_all(&path).unwrap();
     path
+}
+
+fn load_raw_mail_passwords(database_path: &std::path::Path) -> (String, String) {
+    let connection = Connection::open(database_path).unwrap();
+    connection
+        .query_row(
+            r#"
+            SELECT smtp_password, imap_password
+            FROM mail_settings
+            WHERE profile_id = 'default'
+            "#,
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap()
 }
 
 #[test]
@@ -351,6 +367,175 @@ fn file_store_persists_user_and_mail_settings_under_temp_home() {
     assert!(user.setup_completed);
     assert_eq!(mail.smtp_username, "alice");
     assert_eq!(mail.imap_security, "starttls");
+
+    fs::remove_dir_all(home_dir).unwrap();
+}
+
+#[test]
+fn file_store_obfuscates_passwords_before_persisting_to_sqlite() {
+    let home_dir = temp_home_dir();
+    let paths = StorePaths::for_home_dir(&home_dir);
+
+    {
+        let store = Store::open_for_home_dir(&home_dir).unwrap();
+        store
+            .save_mail_settings_record(&MailSettingsRecord {
+                profile_id: "default".into(),
+                smtp_host: "smtp.example.com".into(),
+                smtp_port: 587,
+                smtp_security: "starttls".into(),
+                smtp_username: "alice".into(),
+                smtp_password: "secret".into(),
+                smtp_hello_domain: "example.com".into(),
+                imap_host: "imap.example.com".into(),
+                imap_port: 143,
+                imap_security: "starttls".into(),
+                imap_username: "alice".into(),
+                imap_password: "secret".into(),
+                imap_mailbox: "INBOX".into(),
+            })
+            .unwrap();
+    }
+
+    let (smtp_password, imap_password) = load_raw_mail_passwords(paths.database_path());
+
+    assert_ne!(smtp_password, "secret");
+    assert_ne!(imap_password, "secret");
+    assert!(smtp_password.starts_with("obf:v1:"));
+    assert!(imap_password.starts_with("obf:v1:"));
+    assert!(paths.password_obfuscation_key_path().exists());
+
+    fs::remove_dir_all(home_dir).unwrap();
+}
+
+#[test]
+fn file_store_keeps_empty_passwords_empty_without_creating_key_file() {
+    let home_dir = temp_home_dir();
+    let paths = StorePaths::for_home_dir(&home_dir);
+
+    {
+        let store = Store::open_for_home_dir(&home_dir).unwrap();
+        store
+            .save_mail_settings_record(&MailSettingsRecord {
+                profile_id: "default".into(),
+                smtp_host: "smtp.example.com".into(),
+                smtp_port: 587,
+                smtp_security: "starttls".into(),
+                smtp_username: "alice".into(),
+                smtp_password: "".into(),
+                smtp_hello_domain: "example.com".into(),
+                imap_host: "imap.example.com".into(),
+                imap_port: 143,
+                imap_security: "starttls".into(),
+                imap_username: "alice".into(),
+                imap_password: "".into(),
+                imap_mailbox: "INBOX".into(),
+            })
+            .unwrap();
+    }
+
+    let (smtp_password, imap_password) = load_raw_mail_passwords(paths.database_path());
+    let store = Store::open_for_home_dir(&home_dir).unwrap();
+    let mail = store.get_mail_settings_record("default").unwrap().unwrap();
+
+    assert_eq!(smtp_password, "");
+    assert_eq!(imap_password, "");
+    assert_eq!(mail.smtp_password, "");
+    assert_eq!(mail.imap_password, "");
+    assert!(!paths.password_obfuscation_key_path().exists());
+
+    fs::remove_dir_all(home_dir).unwrap();
+}
+
+#[test]
+fn file_store_lazily_migrates_plaintext_passwords_on_read() {
+    let home_dir = temp_home_dir();
+    let paths = StorePaths::for_home_dir(&home_dir);
+
+    {
+        let store = Store::open_for_home_dir(&home_dir).unwrap();
+        store
+            .save_mail_settings_record(&MailSettingsRecord {
+                profile_id: "default".into(),
+                smtp_host: "smtp.example.com".into(),
+                smtp_port: 587,
+                smtp_security: "starttls".into(),
+                smtp_username: "alice".into(),
+                smtp_password: "secret".into(),
+                smtp_hello_domain: "example.com".into(),
+                imap_host: "imap.example.com".into(),
+                imap_port: 143,
+                imap_security: "starttls".into(),
+                imap_username: "alice".into(),
+                imap_password: "secret".into(),
+                imap_mailbox: "INBOX".into(),
+            })
+            .unwrap();
+    }
+
+    {
+        let connection = Connection::open(paths.database_path()).unwrap();
+        connection
+            .execute(
+                r#"
+                UPDATE mail_settings
+                SET smtp_password = 'legacy-secret',
+                    imap_password = 'legacy-secret'
+                WHERE profile_id = 'default'
+                "#,
+                [],
+            )
+            .unwrap();
+    }
+
+    let store = Store::open_for_home_dir(&home_dir).unwrap();
+    let mail = store.get_mail_settings_record("default").unwrap().unwrap();
+    let (smtp_password, imap_password) = load_raw_mail_passwords(paths.database_path());
+
+    assert_eq!(mail.smtp_password, "legacy-secret");
+    assert_eq!(mail.imap_password, "legacy-secret");
+    assert!(smtp_password.starts_with("obf:v1:"));
+    assert!(imap_password.starts_with("obf:v1:"));
+    assert!(paths.password_obfuscation_key_path().exists());
+
+    fs::remove_dir_all(home_dir).unwrap();
+}
+
+#[test]
+fn file_store_reports_error_when_obfuscated_password_cannot_be_recovered() {
+    let home_dir = temp_home_dir();
+    let paths = StorePaths::for_home_dir(&home_dir);
+
+    {
+        let store = Store::open_for_home_dir(&home_dir).unwrap();
+        store
+            .save_mail_settings_record(&MailSettingsRecord {
+                profile_id: "default".into(),
+                smtp_host: "smtp.example.com".into(),
+                smtp_port: 587,
+                smtp_security: "starttls".into(),
+                smtp_username: "alice".into(),
+                smtp_password: "secret".into(),
+                smtp_hello_domain: "example.com".into(),
+                imap_host: "imap.example.com".into(),
+                imap_port: 143,
+                imap_security: "starttls".into(),
+                imap_username: "alice".into(),
+                imap_password: "secret".into(),
+                imap_mailbox: "INBOX".into(),
+            })
+            .unwrap();
+    }
+
+    fs::remove_file(paths.password_obfuscation_key_path()).unwrap();
+
+    let store = Store::open_for_home_dir(&home_dir).unwrap();
+    let error = store.get_mail_settings_record("default").unwrap_err();
+
+    assert!(matches!(
+        error,
+        liveletters_store::StoreError::ProtectedSecretUnavailable { .. }
+    ));
 
     fs::remove_dir_all(home_dir).unwrap();
 }

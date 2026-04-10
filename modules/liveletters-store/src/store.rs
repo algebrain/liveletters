@@ -6,10 +6,17 @@ use rusqlite::Error as SqliteError;
 use crate::{
     CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxRecord, PostRecord,
     RawEventRecord, RawMessageRecord, StoreError, StorePaths, UserSettingsRecord,
+    secret_protection::PasswordObfuscator,
 };
 
 pub struct Store {
     connection: Connection,
+    storage_mode: StoreStorageMode,
+}
+
+enum StoreStorageMode {
+    InMemory,
+    FileBacked { data_dir: std::path::PathBuf },
 }
 
 impl Store {
@@ -25,7 +32,10 @@ impl Store {
 
     pub fn open_in_memory() -> Result<Self, StoreError> {
         let connection = Connection::open_in_memory()?;
-        let store = Self { connection };
+        let store = Self {
+            connection,
+            storage_mode: StoreStorageMode::InMemory,
+        };
         store.initialize_schema()?;
         Ok(store)
     }
@@ -37,7 +47,15 @@ impl Store {
         }
 
         let connection = Connection::open(path)?;
-        let store = Self { connection };
+        let data_dir = path
+            .parent()
+            .ok_or_else(|| StoreError::Io(std::io::Error::other("database path has no parent")))?;
+        let store = Self {
+            connection,
+            storage_mode: StoreStorageMode::FileBacked {
+                data_dir: data_dir.to_path_buf(),
+            },
+        };
         store.initialize_schema()?;
         Ok(store)
     }
@@ -555,6 +573,9 @@ impl Store {
         &self,
         record: &MailSettingsRecord,
     ) -> Result<(), StoreError> {
+        let smtp_password = self.obfuscate_secret_if_needed(&record.smtp_password)?;
+        let imap_password = self.obfuscate_secret_if_needed(&record.imap_password)?;
+
         self.connection.execute(
             r#"
             INSERT OR REPLACE INTO mail_settings
@@ -582,13 +603,13 @@ impl Store {
                 record.smtp_port as i64,
                 record.smtp_security,
                 record.smtp_username,
-                record.smtp_password,
+                smtp_password,
                 record.smtp_hello_domain,
                 record.imap_host,
                 record.imap_port as i64,
                 record.imap_security,
                 record.imap_username,
-                record.imap_password,
+                imap_password,
                 record.imap_mailbox,
             ],
         )?;
@@ -626,20 +647,96 @@ impl Store {
             return Ok(None);
         };
 
+        let smtp_password: String = row.get(5)?;
+        let imap_password: String = row.get(11)?;
+
+        let smtp_password = self.reveal_secret_with_lazy_migration(
+            profile_id,
+            "smtp_password",
+            &smtp_password,
+        )?;
+        let imap_password = self.reveal_secret_with_lazy_migration(
+            profile_id,
+            "imap_password",
+            &imap_password,
+        )?;
+
         Ok(Some(MailSettingsRecord {
             profile_id: row.get(0)?,
             smtp_host: row.get(1)?,
             smtp_port: row.get::<_, i64>(2)? as u16,
             smtp_security: row.get(3)?,
             smtp_username: row.get(4)?,
-            smtp_password: row.get(5)?,
+            smtp_password,
             smtp_hello_domain: row.get(6)?,
             imap_host: row.get(7)?,
             imap_port: row.get::<_, i64>(8)? as u16,
             imap_security: row.get(9)?,
             imap_username: row.get(10)?,
-            imap_password: row.get(11)?,
+            imap_password,
             imap_mailbox: row.get(12)?,
         }))
+    }
+
+    fn obfuscate_secret_if_needed(&self, secret: &str) -> Result<String, StoreError> {
+        if secret.is_empty() {
+            return Ok(String::new());
+        }
+
+        if PasswordObfuscator::is_obfuscated(secret) {
+            return Ok(secret.to_owned());
+        }
+
+        let Some(obfuscator) = self.password_obfuscator(true)? else {
+            return Ok(secret.to_owned());
+        };
+
+        obfuscator.obfuscate(secret)
+    }
+
+    fn reveal_secret_with_lazy_migration(
+        &self,
+        profile_id: &str,
+        column: &str,
+        stored: &str,
+    ) -> Result<String, StoreError> {
+        if stored.is_empty() {
+            return Ok(String::new());
+        }
+
+        if PasswordObfuscator::is_obfuscated(stored) {
+            let Some(obfuscator) = self.password_obfuscator(false)? else {
+                return Err(StoreError::ProtectedSecretUnavailable {
+                    message: "in-memory store cannot reveal protected secrets".into(),
+                });
+            };
+
+            return obfuscator.reveal(stored);
+        }
+
+        let plaintext = stored.to_owned();
+        let Some(obfuscator) = self.password_obfuscator(true)? else {
+            return Ok(plaintext);
+        };
+        let obfuscated = obfuscator.obfuscate(&plaintext)?;
+        self.connection.execute(
+            &format!("UPDATE mail_settings SET {column} = ?1 WHERE profile_id = ?2"),
+            params![obfuscated, profile_id],
+        )?;
+
+        Ok(plaintext)
+    }
+
+    fn password_obfuscator(&self, create_if_missing: bool) -> Result<Option<PasswordObfuscator>, StoreError> {
+        match &self.storage_mode {
+            StoreStorageMode::InMemory => Ok(None),
+            StoreStorageMode::FileBacked { data_dir } => {
+                if create_if_missing {
+                    PasswordObfuscator::load_or_create(data_dir).map(Some)
+                } else {
+                    PasswordObfuscator::load(data_dir).map(Some)
+                }
+            }
+        }
     }
 }

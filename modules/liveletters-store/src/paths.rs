@@ -10,6 +10,7 @@ pub struct StorePaths {
     data_dir: PathBuf,
     database_path: PathBuf,
     runtime_log_dir: PathBuf,
+    password_obfuscation_key_path: PathBuf,
 }
 
 impl StorePaths {
@@ -17,11 +18,13 @@ impl StorePaths {
         let data_dir = home_dir.as_ref().join(".liveletters");
         let database_path = data_dir.join("liveletters.sqlite3");
         let runtime_log_dir = data_dir.join("runtime-logs");
+        let password_obfuscation_key_path = data_dir.join("mail-password-obfuscation.key");
 
         Self {
             data_dir,
             database_path,
             runtime_log_dir,
+            password_obfuscation_key_path,
         }
     }
 
@@ -44,5 +47,9 @@ impl StorePaths {
 
     pub fn runtime_log_dir(&self) -> &Path {
         &self.runtime_log_dir
+    }
+
+    pub fn password_obfuscation_key_path(&self) -> &Path {
+        &self.password_obfuscation_key_path
     }
 }

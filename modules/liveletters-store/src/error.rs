@@ -3,6 +3,8 @@ pub enum StoreError {
     Sqlite(rusqlite::Error),
     Io(std::io::Error),
     MissingHomeDirectory,
+    ProtectedSecretUnavailable { message: String },
+    InvalidProtectedSecretFormat { message: String },
 }
 
 impl From<rusqlite::Error> for StoreError {
