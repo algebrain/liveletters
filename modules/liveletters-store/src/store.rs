@@ -18,6 +18,11 @@ impl Store {
         Self::open_at(paths.database_path())
     }
 
+    pub fn open_for_home_dir(home_dir: impl AsRef<Path>) -> Result<Self, StoreError> {
+        let paths = StorePaths::for_home_dir(home_dir);
+        Self::open_at(paths.database_path())
+    }
+
     pub fn open_in_memory() -> Result<Self, StoreError> {
         let connection = Connection::open_in_memory()?;
         let store = Self { connection };

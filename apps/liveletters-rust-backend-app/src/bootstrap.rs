@@ -5,11 +5,13 @@ use tauri::{Builder, Emitter, Listener};
 use crate::{
     commands,
     events::{FrontendEvent, FRONTEND_ERROR_EVENT},
-    runtime::{append_runtime_log, runtime_log_line, BackendState},
+    runtime::{append_runtime_log, prepare_runtime_logs, runtime_log_line, BackendState},
     FrontendErrorLogRequest, BackendApp, BackendError,
 };
 
 pub fn build() -> Result<Builder<tauri::Wry>, BackendError> {
+    let _ = prepare_runtime_logs();
+
     // In constrained dev/sandbox environments, default HOME-backed storage may be unavailable.
     // Fall back to in-memory store to keep the runtime bridge bootable.
     let backend = match BackendApp::open_default() {

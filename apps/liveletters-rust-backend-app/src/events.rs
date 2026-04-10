@@ -2,6 +2,7 @@ use serde::Serialize;
 
 pub const FEED_UPDATED_EVENT: &str = "feed-updated";
 pub const SYNC_STATUS_CHANGED_EVENT: &str = "sync-status-changed";
+#[cfg(feature = "tauri-runtime")]
 pub const FRONTEND_ERROR_EVENT: &str = "frontend-error";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

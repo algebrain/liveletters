@@ -104,6 +104,45 @@ fn store_paths_use_home_scoped_liveletters_directory() {
         paths.database_path(),
         home_dir.join(".liveletters").join("liveletters.sqlite3")
     );
+    assert_eq!(
+        paths.runtime_log_dir(),
+        home_dir.join(".liveletters").join("runtime-logs")
+    );
+
+    fs::remove_dir_all(home_dir).unwrap();
+}
+
+#[test]
+fn file_store_can_open_for_home_dir_and_create_missing_home_tree() {
+    let home_dir = std::env::temp_dir().join(format!(
+        "liveletters-missing-home-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+
+    assert!(!home_dir.exists());
+
+    {
+        let store = Store::open_for_home_dir(&home_dir).unwrap();
+        store
+            .save_post_record(&PostRecord {
+                post_id: "post-1".into(),
+                resource_id: "blog-1".into(),
+                author_id: "alice".into(),
+                created_at: 1_710_000_000,
+                body: "Первая запись".into(),
+                visibility: "public".into(),
+                hidden: false,
+            })
+            .unwrap();
+    }
+
+    let paths = StorePaths::for_home_dir(&home_dir);
+    assert!(home_dir.exists());
+    assert!(paths.data_dir().exists());
+    assert!(paths.database_path().exists());
 
     fs::remove_dir_all(home_dir).unwrap();
 }

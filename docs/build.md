@@ -96,13 +96,83 @@ cd apps/liveletters-rust-backend-app
 
 Что делает script:
 
-- архивирует предыдущие runtime logs;
-- выставляет `LIVELETTERS_RUNTIME_LOG_DIR`;
-- запускает `cargo run --features tauri-runtime`.
+- включает временный debug logging через `LIVELETTERS_DEBUG_LOGS=1`;
+- запускает `cargo run --features tauri-runtime -- ...`;
+- при необходимости принимает:
+  - `--home-dir=/some/path`
 
-Логи runtime складываются в:
+Если debug logging включен, runtime logs складываются в:
 
-- `.docs/runtime-logs/`
+- `<effective-home>/.liveletters/runtime-logs/`
+
+где `effective-home` это:
+
+- обычный `HOME` пользователя;
+- или каталог из `--home-dir=...`, если он передан.
+
+Важно:
+
+- runtime logs считаются временным диагностическим контуром;
+- это не обязательная часть обычного будущего release-запуска;
+- без debug logging runtime log dir не создается.
+
+### 3. Режимы запуска runtime
+
+#### Debug launcher
+
+Для расследования дефектов и временных runtime logs:
+
+```bash
+cd apps/liveletters-rust-backend-app
+./run-tauri-runtime.sh
+```
+
+Этот script:
+
+- включает `LIVELETTERS_DEBUG_LOGS=1`;
+- пишет временные debug logs в `<effective-home>/.liveletters/runtime-logs/`;
+- принимает `--home-dir=...`.
+
+#### Release-like запуск без runtime logs
+
+Для запуска без временного диагностического контура:
+
+```bash
+cd apps/liveletters-rust-backend-app
+cargo run --features tauri-runtime --
+```
+
+Если нужен отдельный home-каталог и при этом не нужны runtime logs:
+
+```bash
+cd apps/liveletters-rust-backend-app
+cargo run --features tauri-runtime -- --home-dir=/tmp/liveletters-a
+```
+
+В таком режиме:
+
+- `LIVELETTERS_DEBUG_LOGS` не включается;
+- `runtime-logs/` не создается;
+- приложение использует только обычный data-home и SQLite-базу.
+
+#### Локальный запуск двух экземпляров
+
+Для локальной отладки двух независимых экземпляров можно использовать локальный script:
+
+```bash
+cd apps/liveletters-rust-backend-app
+./two.local.sh
+```
+
+Он использует уже подготовленные каталоги:
+
+- `data.local/home-a`
+- `data.local/home-b`
+
+и запускает два экземпляра с:
+
+- `--home-dir=<repo>/data.local/home-a`
+- `--home-dir=<repo>/data.local/home-b`
 
 ## Минимальный проверенный порядок
 
@@ -119,6 +189,20 @@ cargo test -q
 ./run-tauri-runtime.sh
 ```
 
+Если нужен отдельный home-каталог для этого запуска:
+
+```bash
+cd apps/liveletters-rust-backend-app
+./run-tauri-runtime.sh --home-dir=/tmp/liveletters-a
+```
+
+Если нужен release-like запуск без debug logs:
+
+```bash
+cd apps/liveletters-rust-backend-app
+cargo run --features tauri-runtime -- --home-dir=/tmp/liveletters-a
+```
+
 ## Что важно помнить
 
 - frontend app не использует runtime styling engine для `Ornament`;
@@ -126,6 +210,9 @@ cargo test -q
 - `clojure -M:app` сам обновляет generated CSS через build hook, но ручной `clojure -M:css` полезен как отдельная явная проверка;
 - если менялись только Rust-модули, frontend build не всегда нужен;
 - если менялись frontend styles или ornament theme, `clojure -M:css` и `clojure -M:app` нужно прогонять обязательно.
+- `--home-dir=...` ведет себя как подмена `HOME` для приложения;
+- `run-tauri-runtime.sh` это debug launcher, а не обещание постоянного runtime logging в будущих release-сценариях.
+- release-like запуск должен идти без `LIVELETTERS_DEBUG_LOGS`, чтобы не создавать временные runtime logs без необходимости.
 
 ## Связанные документы
 

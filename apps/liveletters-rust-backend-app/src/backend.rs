@@ -3,6 +3,8 @@ use liveletters_app_core::{
     GetSettingsQuery, HomeFeed, PostThread, SaveSettingsCommand,
 };
 use liveletters_diagnostics::{DiagnosticsReader, HealthStatus};
+use std::path::Path;
+
 use liveletters_store::Store;
 
 use crate::{
@@ -25,6 +27,10 @@ impl BackendApp {
 
     pub fn open_default() -> Result<Self, BackendError> {
         Ok(Self::from_store(Store::open_default()?))
+    }
+
+    pub fn open_for_home_dir(home_dir: impl AsRef<Path>) -> Result<Self, BackendError> {
+        Ok(Self::from_store(Store::open_for_home_dir(home_dir)?))
     }
 
     pub fn create_post(&self, request: CreatePostRequest<'_>) -> Result<(), BackendError> {

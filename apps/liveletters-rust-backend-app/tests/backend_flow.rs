@@ -2,6 +2,7 @@ use liveletters_rust_backend_app::{
     BackendApp, CreatePostRequest, SaveSettingsRequest,
 };
 use liveletters_store::{RawEventRecord, RawMessageRecord, Store};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn backend_wires_app_core_and_exposes_feed() {
@@ -176,4 +177,25 @@ fn backend_can_save_settings_without_explicit_smtp_hello_domain() {
         .expect("settings should save with inferred hello domain");
 
     assert_eq!(settings.smtp_hello_domain, "example.com");
+}
+
+#[test]
+fn backend_can_open_for_explicit_home_dir() {
+    let home_dir = std::env::temp_dir().join(format!(
+        "liveletters-backend-home-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+
+    let backend = BackendApp::open_for_home_dir(&home_dir).expect("backend should open");
+    let bootstrap = backend
+        .get_bootstrap_state()
+        .expect("bootstrap state should load");
+
+    assert!(!bootstrap.setup_completed);
+    assert!(home_dir.join(".liveletters").join("liveletters.sqlite3").exists());
+
+    let _ = std::fs::remove_dir_all(home_dir);
 }
