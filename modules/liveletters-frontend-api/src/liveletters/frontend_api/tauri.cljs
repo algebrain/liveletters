@@ -8,12 +8,29 @@
 (defn- kebab->snake-key [value]
   (-> value name (str/replace "-" "_")))
 
-(defn- encode-payload [payload]
+(declare encode-payload)
+
+(defn- encode-value [value]
+  (cond
+    (map? value) (encode-payload value)
+    (vector? value) (mapv encode-value value)
+    (seq? value) (mapv encode-value value)
+    :else value))
+
+(defn encode-payload [payload]
   (when payload
     (into {}
           (map (fn [[key value]]
-                 [(kebab->snake-key key) value]))
+                 [(kebab->snake-key key) (encode-value value)]))
           payload)))
+
+(def request-command-names
+  #{"create_post" "save_settings" "log_frontend_error"})
+
+(defn command-args [command payload]
+  (if (contains? request-command-names command)
+    {:request payload}
+    payload))
 
 (defn- decode-payload [payload]
   (js->clj payload :keywordize-keys true))
@@ -50,7 +67,7 @@
 (defn tauri-adapter []
   {:invoke-command
    (fn [command payload on-success on-error]
-     (-> (invoke command (clj->js (encode-payload payload)))
+     (-> (invoke command (clj->js (encode-payload (command-args command payload))))
          (.then (fn [response]
                   (on-success (decode-payload response))))
          (.catch (fn [error]

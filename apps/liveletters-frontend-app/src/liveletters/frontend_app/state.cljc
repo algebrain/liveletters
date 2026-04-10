@@ -14,11 +14,13 @@
                    :avatar-url ""
                    :smtp-host ""
                    :smtp-port 587
+                   :smtp-security "starttls"
                    :smtp-username ""
                    :smtp-password ""
                    :smtp-hello-domain ""
                    :imap-host ""
                    :imap-port 143
+                   :imap-security "starttls"
                    :imap-username ""
                    :imap-password ""
                    :imap-mailbox "INBOX"}

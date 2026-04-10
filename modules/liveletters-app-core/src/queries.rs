@@ -88,11 +88,13 @@ pub fn get_settings(
     if let Some(mail) = mail {
         settings.smtp_host = mail.smtp_host;
         settings.smtp_port = mail.smtp_port;
+        settings.smtp_security = mail.smtp_security;
         settings.smtp_username = mail.smtp_username;
         settings.smtp_password = mail.smtp_password;
         settings.smtp_hello_domain = mail.smtp_hello_domain;
         settings.imap_host = mail.imap_host;
         settings.imap_port = mail.imap_port;
+        settings.imap_security = mail.imap_security;
         settings.imap_username = mail.imap_username;
         settings.imap_password = mail.imap_password;
         settings.imap_mailbox = mail.imap_mailbox;

@@ -1,4 +1,5 @@
-(ns liveletters.ui-model.core)
+(ns liveletters.ui-model.core
+  (:require [clojure.string]))
 
 (defn module-info []
   {:module :liveletters-ui-model
@@ -66,12 +67,57 @@
    :avatar-url (or (:avatar-url settings) "")
    :smtp-host (or (:smtp-host settings) "")
    :smtp-port (or (:smtp-port settings) 587)
+   :smtp-security (or (:smtp-security settings) "starttls")
    :smtp-username (or (:smtp-username settings) "")
    :smtp-password (or (:smtp-password settings) "")
    :smtp-hello-domain (or (:smtp-hello-domain settings) "")
    :imap-host (or (:imap-host settings) "")
    :imap-port (or (:imap-port settings) 143)
+    :imap-security (or (:imap-security settings) "starttls")
    :imap-username (or (:imap-username settings) "")
    :imap-password (or (:imap-password settings) "")
    :imap-mailbox (or (:imap-mailbox settings) "INBOX")
    :setup-completed? (boolean (:setup-completed? settings))})
+
+(defn- valid-security? [value]
+  (#{"none" "starttls" "tls"} (clojure.string/trim (str (or value "")))))
+
+(defn- non-blank? [value]
+  (not (empty? (clojure.string/trim (str (or value ""))))))
+
+(defn- valid-email? [value]
+  (let [trimmed (clojure.string/trim (str (or value "")))]
+    (and (not (empty? trimmed))
+         (not= (.indexOf trimmed "@") -1)
+         (not= (.indexOf trimmed ".") -1))))
+
+(defn- integer-port [value]
+  (cond
+    (number? value) value
+    (string? value)
+    #?(:cljs (js/parseInt value 10)
+       :clj (try
+              (Integer/parseInt value)
+              (catch Exception _ nil)))
+    :else nil))
+
+(defn- valid-port? [value]
+  (let [port (integer-port value)]
+    (and (number? port)
+         (<= 1 port 65535))))
+
+(defn settings-form-status [form]
+  (let [ready? (and (non-blank? (:nickname form))
+                    (valid-email? (:email-address form))
+                    (non-blank? (:smtp-host form))
+                    (valid-port? (:smtp-port form))
+                    (valid-security? (:smtp-security form))
+                    (non-blank? (:smtp-username form))
+                    (non-blank? (:smtp-password form))
+                    (non-blank? (:imap-host form))
+                    (valid-port? (:imap-port form))
+                    (valid-security? (:imap-security form))
+                    (non-blank? (:imap-username form))
+                    (non-blank? (:imap-password form))
+                    (non-blank? (:imap-mailbox form)))]
+    {:submittable? ready?}))

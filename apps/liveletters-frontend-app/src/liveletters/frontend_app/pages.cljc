@@ -4,6 +4,11 @@
             [liveletters.ui-kit.core :as ui-kit]
             [liveletters.ui-model.core :as ui-model]))
 
+(def security-options
+  [{:value "starttls" :label "STARTTLS"}
+   {:value "tls" :label "TLS / SSL"}
+   {:value "none" :label "None"}])
+
 (defn- settings-fields [store form]
   [[theme/settings-layout {:class "ll-settings-form"}
     [theme/settings-grid
@@ -43,6 +48,12 @@
                            :on-change #(app-store/update-settings-form!
                                         store
                                         {:smtp-port (.. % -target -value)})}]
+       [ui-kit/select-input {:label "SMTP security"
+                             :value (:smtp-security form)
+                             :options security-options
+                             :on-change #(app-store/update-settings-form!
+                                          store
+                                          {:smtp-security (.. % -target -value)})}]
        [ui-kit/text-input {:label "SMTP username"
                            :value (:smtp-username form)
                            :placeholder "alice"
@@ -75,6 +86,12 @@
                            :on-change #(app-store/update-settings-form!
                                         store
                                         {:imap-port (.. % -target -value)})}]
+       [ui-kit/select-input {:label "IMAP security"
+                             :value (:imap-security form)
+                             :options security-options
+                             :on-change #(app-store/update-settings-form!
+                                          store
+                                          {:imap-security (.. % -target -value)})}]
        [ui-kit/text-input {:label "IMAP username"
                            :value (:imap-username form)
                            :placeholder "alice"
@@ -95,6 +112,7 @@
 
 (defn initial-setup-page [store state]
   (let [form (ui-model/settings-form-view-model (:settings-form state))
+        form-status (ui-model/settings-form-status form)
         adapter (get-in state [:runtime :adapter])
         error-message (get-in state [:ui :error :message])]
     [ui-kit/section
@@ -105,7 +123,8 @@
          "Set your local profile and mail connection settings before the first sync. The same form becomes your permanent settings page later."]
         [theme/actions-row {}
          [ui-kit/button {:label "Save and continue"
-                         :disabled? (nil? adapter)
+                         :disabled? (or (nil? adapter)
+                                        (not (:submittable? form-status)))
                          :on-click #(app-store/submit-settings! adapter store)}]]]
        (concat
         (when error-message
@@ -114,6 +133,7 @@
 
 (defn settings-page [store state]
   (let [form (ui-model/settings-form-view-model (:settings-form state))
+        form-status (ui-model/settings-form-status form)
         adapter (get-in state [:runtime :adapter])
         error-message (get-in state [:ui :error :message])]
     [ui-kit/section
@@ -124,7 +144,8 @@
          "Update your public profile and the local mail transport that powers sync and delivery."]
         [theme/actions-row {}
          [ui-kit/button {:label "Save settings"
-                         :disabled? (nil? adapter)
+                         :disabled? (or (nil? adapter)
+                                        (not (:submittable? form-status)))
                          :on-click #(app-store/submit-settings! adapter store)}]]]
        (concat
         (when error-message

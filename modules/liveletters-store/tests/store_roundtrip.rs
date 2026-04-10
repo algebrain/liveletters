@@ -243,11 +243,13 @@ fn user_and_mail_settings_can_be_saved_and_read_back() {
             profile_id: "default".into(),
             smtp_host: "smtp.example.com".into(),
             smtp_port: 587,
+            smtp_security: "starttls".into(),
             smtp_username: "alice".into(),
             smtp_password: "secret".into(),
             smtp_hello_domain: "example.com".into(),
             imap_host: "imap.example.com".into(),
             imap_port: 143,
+            imap_security: "tls".into(),
             imap_username: "alice".into(),
             imap_password: "secret".into(),
             imap_mailbox: "INBOX".into(),
@@ -262,7 +264,9 @@ fn user_and_mail_settings_can_be_saved_and_read_back() {
     assert!(user.setup_completed);
     assert_eq!(mail.smtp_host, "smtp.example.com");
     assert_eq!(mail.smtp_port, 587);
+    assert_eq!(mail.smtp_security, "starttls");
     assert_eq!(mail.imap_mailbox, "INBOX");
+    assert_eq!(mail.imap_security, "tls");
 }
 
 #[test]
@@ -286,11 +290,13 @@ fn file_store_persists_user_and_mail_settings_under_temp_home() {
                 profile_id: "default".into(),
                 smtp_host: "smtp.example.com".into(),
                 smtp_port: 587,
+                smtp_security: "starttls".into(),
                 smtp_username: "alice".into(),
                 smtp_password: "secret".into(),
                 smtp_hello_domain: "example.com".into(),
                 imap_host: "imap.example.com".into(),
                 imap_port: 143,
+                imap_security: "starttls".into(),
                 imap_username: "alice".into(),
                 imap_password: "secret".into(),
                 imap_mailbox: "INBOX".into(),
@@ -305,6 +311,7 @@ fn file_store_persists_user_and_mail_settings_under_temp_home() {
     assert_eq!(user.nickname, "alice");
     assert!(user.setup_completed);
     assert_eq!(mail.smtp_username, "alice");
+    assert_eq!(mail.imap_security, "starttls");
 
     fs::remove_dir_all(home_dir).unwrap();
 }

@@ -9,3 +9,4 @@ path = "src/lib.rs"
 
 [dependencies]
 liveletters-protocol = { path = "../liveletters-protocol" }
+native-tls = "0.2"

@@ -109,6 +109,7 @@ fn backend_exposes_bootstrap_state_and_settings_boundary() {
     assert!(!bootstrap.setup_completed);
     assert_eq!(settings.nickname, "");
     assert_eq!(settings.smtp_port, 587);
+    assert_eq!(settings.smtp_security, "starttls");
     assert_eq!(settings.imap_mailbox, "INBOX");
 }
 
@@ -123,11 +124,13 @@ fn backend_can_save_settings_through_app_core_boundary() {
             avatar_url: Some("https://example.com/avatar.png"),
             smtp_host: "smtp.example.com",
             smtp_port: 587,
+            smtp_security: "starttls",
             smtp_username: "alice",
             smtp_password: "secret",
             smtp_hello_domain: "example.com",
             imap_host: "imap.example.com",
             imap_port: 143,
+            imap_security: "starttls",
             imap_username: "alice",
             imap_password: "secret",
             imap_mailbox: "INBOX",
@@ -145,4 +148,32 @@ fn backend_can_save_settings_through_app_core_boundary() {
     assert!(bootstrap.setup_completed);
     assert_eq!(loaded.email_address, "alice@example.com");
     assert_eq!(loaded.smtp_host, "smtp.example.com");
+    assert_eq!(loaded.imap_security, "starttls");
+}
+
+#[test]
+fn backend_can_save_settings_without_explicit_smtp_hello_domain() {
+    let backend = BackendApp::open_in_memory().expect("backend should open");
+
+    let settings = backend
+        .save_settings(SaveSettingsRequest {
+            nickname: "alice",
+            email_address: "alice@example.com",
+            avatar_url: None,
+            smtp_host: "smtp.example.com",
+            smtp_port: 587,
+            smtp_security: "starttls",
+            smtp_username: "alice",
+            smtp_password: "secret",
+            smtp_hello_domain: "",
+            imap_host: "imap.example.com",
+            imap_port: 143,
+            imap_security: "starttls",
+            imap_username: "alice",
+            imap_password: "secret",
+            imap_mailbox: "INBOX",
+        })
+        .expect("settings should save with inferred hello domain");
+
+    assert_eq!(settings.smtp_hello_domain, "example.com");
 }

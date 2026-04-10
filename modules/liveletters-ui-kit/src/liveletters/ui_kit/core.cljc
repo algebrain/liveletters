@@ -38,6 +38,19 @@
              on-change (assoc :on-change on-change)
              (nil? on-change) (assoc :read-only true))]])
 
+(defn select-input [{:keys [label value options on-change]
+                     :or {value ""
+                          options []}}]
+  [:label {:class "ll-field"}
+   [:span {:class "ll-field__label"} label]
+   [:select (cond-> {:value value
+                     :class "ll-input"}
+              on-change (assoc :on-change on-change)
+              (nil? on-change) (assoc :disabled true))
+    (for [{:keys [value label]} options]
+      ^{:key value}
+      [:option {:value value} label])]])
+
 (defn section [{:keys [title children]
                 :or {children []}}]
   [:section {:class "ll-section"}

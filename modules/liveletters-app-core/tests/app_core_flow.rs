@@ -319,11 +319,13 @@ fn save_settings_persists_profile_and_mail_configuration() {
             avatar_url: Some("https://example.com/avatar.png"),
             smtp_host: "smtp.example.com",
             smtp_port: 587,
+            smtp_security: "starttls",
             smtp_username: "alice",
             smtp_password: "secret",
             smtp_hello_domain: "example.com",
             imap_host: "imap.example.com",
             imap_port: 143,
+            imap_security: "starttls",
             imap_username: "alice",
             imap_password: "secret",
             imap_mailbox: "INBOX",
@@ -343,6 +345,7 @@ fn save_settings_persists_profile_and_mail_configuration() {
     assert!(bootstrap.setup_completed);
     assert_eq!(settings.nickname, "alice");
     assert_eq!(settings.smtp_host, "smtp.example.com");
+    assert_eq!(settings.smtp_security, "starttls");
     assert_eq!(settings.imap_mailbox, "INBOX");
 }
 
@@ -358,11 +361,13 @@ fn save_settings_rejects_blank_required_fields() {
             avatar_url: None,
             smtp_host: "smtp.example.com",
             smtp_port: 587,
+            smtp_security: "starttls",
             smtp_username: "alice",
             smtp_password: "secret",
             smtp_hello_domain: "example.com",
             imap_host: "imap.example.com",
             imap_port: 143,
+            imap_security: "starttls",
             imap_username: "alice",
             imap_password: "secret",
             imap_mailbox: "INBOX",
@@ -374,4 +379,32 @@ fn save_settings_rejects_blank_required_fields() {
         liveletters_app_core::AppCoreError::SettingsValidation { field, .. }
         if field == "nickname"
     ));
+}
+
+#[test]
+fn save_settings_can_infer_smtp_hello_domain_when_blank() {
+    let store = Store::open_in_memory().expect("store should open");
+    let app = AppCore::new(&store);
+
+    let saved = app
+        .save_settings(SaveSettingsCommand {
+            nickname: "alice",
+            email_address: "alice@example.com",
+            avatar_url: None,
+            smtp_host: "smtp.example.com",
+            smtp_port: 587,
+            smtp_security: "starttls",
+            smtp_username: "alice",
+            smtp_password: "secret",
+            smtp_hello_domain: "",
+            imap_host: "imap.example.com",
+            imap_port: 143,
+            imap_security: "starttls",
+            imap_username: "alice",
+            imap_password: "secret",
+            imap_mailbox: "INBOX",
+        })
+        .expect("settings should save with inferred hello domain");
+
+    assert_eq!(saved.settings().smtp_hello_domain, "example.com");
 }

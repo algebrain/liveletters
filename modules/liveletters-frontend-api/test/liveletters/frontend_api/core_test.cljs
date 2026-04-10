@@ -40,11 +40,13 @@
                                      :avatar_url "https://example.com/avatar.png"
                                      :smtp_host "smtp.example.com"
                                      :smtp_port 587
+                                     :smtp_security "starttls"
                                      :smtp_username "alice"
                                      :smtp_password "secret"
                                      :smtp_hello_domain "example.com"
                                      :imap_host "imap.example.com"
                                      :imap_port 143
+                                     :imap_security "tls"
                                      :imap_username "alice"
                                      :imap_password "secret"
                                      :imap_mailbox "INBOX"
@@ -59,11 +61,13 @@
                                      :avatar_url (:avatar-url payload)
                                      :smtp_host (:smtp-host payload)
                                      :smtp_port (:smtp-port payload)
+                                     :smtp_security (:smtp-security payload)
                                      :smtp_username (:smtp-username payload)
                                      :smtp_password (:smtp-password payload)
                                      :smtp_hello_domain (:smtp-hello-domain payload)
                                      :imap_host (:imap-host payload)
                                      :imap_port (:imap-port payload)
+                                     :imap_security (:imap-security payload)
                                      :imap_username (:imap-username payload)
                                      :imap_password (:imap-password payload)
                                      :imap_mailbox (:imap-mailbox payload)
@@ -73,11 +77,13 @@
       :avatar-url nil
       :smtp-host "smtp.example.com"
       :smtp-port 587
+      :smtp-security "starttls"
       :smtp-username "alice"
       :smtp-password "secret"
       :smtp-hello-domain "example.com"
       :imap-host "imap.example.com"
       :imap-port 143
+      :imap-security "tls"
       :imap-username "alice"
       :imap-password "secret"
       :imap-mailbox "INBOX"}
@@ -93,11 +99,13 @@
                               :avatar-url nil
                               :smtp-host "smtp.example.com"
                               :smtp-port 587
+                              :smtp-security "starttls"
                               :smtp-username "alice"
                               :smtp-password "secret"
                               :smtp-hello-domain "example.com"
                               :imap-host "imap.example.com"
                               :imap-port 143
+                              :imap-security "tls"
                               :imap-username "alice"
                               :imap-password "secret"
                               :imap-mailbox "INBOX"}]]
@@ -185,11 +193,13 @@
           :avatar-url nil
           :smtp-host "smtp.example.com"
           :smtp-port 587
+          :smtp-security "starttls"
           :smtp-username "alice"
           :smtp-password "secret"
           :smtp-hello-domain "example.com"
           :imap-host "imap.example.com"
           :imap-port 143
+          :imap-security "tls"
           :imap-username "alice"
           :imap-password "secret"
           :imap-mailbox "INBOX"
@@ -199,11 +209,13 @@
                              :avatar_url nil
                              :smtp_host "smtp.example.com"
                              :smtp_port 587
+                             :smtp_security "starttls"
                              :smtp_username "alice"
                              :smtp_password "secret"
                              :smtp_hello_domain "example.com"
                              :imap_host "imap.example.com"
                              :imap_port 143
+                             :imap_security "tls"
                              :imap_username "alice"
                              :imap_password "secret"
                              :imap_mailbox "INBOX"
@@ -213,11 +225,13 @@
           :avatar-url nil
           :smtp-host "smtp.example.com"
           :smtp-port 587
+          :smtp-security "starttls"
           :smtp-username "alice"
           :smtp-password "secret"
           :smtp-hello-domain "example.com"
           :imap-host "imap.example.com"
           :imap-port 143
+          :imap-security "tls"
           :imap-username "alice"
           :imap-password "secret"
           :imap-mailbox "INBOX"}
@@ -226,11 +240,13 @@
                                       :avatar-url nil
                                       :smtp-host "smtp.example.com"
                                       :smtp-port 587
+                                      :smtp-security "starttls"
                                       :smtp-username "alice"
                                       :smtp-password "secret"
                                       :smtp-hello-domain "example.com"
                                       :imap-host "imap.example.com"
                                       :imap-port 143
+                                      :imap-security "tls"
                                       :imap-username "alice"
                                       :imap-password "secret"
                                       :imap-mailbox "INBOX"})))

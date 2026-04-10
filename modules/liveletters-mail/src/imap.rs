@@ -1,8 +1,11 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 
+use native_tls::{TlsConnector, TlsStream};
+
 use crate::{
-    FetchBatch, ImapMailboxConfig, MailAuth, MailboxCursor, ReceivedEmail, TransportError,
+    FetchBatch, ImapMailboxConfig, MailAuth, MailSecurity, MailboxCursor, ReceivedEmail,
+    TransportError,
 };
 
 #[derive(Debug, Default)]
@@ -59,14 +62,24 @@ impl ConfiguredImapMailbox {
         let address = format!("{}:{}", self.config.server(), self.config.port());
         let stream = TcpStream::connect(&address)
             .map_err(|error| TransportError::Network(error.to_string()))?;
-        let mut reader = BufReader::new(stream);
+        let mut reader = match self.config.security() {
+            MailSecurity::Tls => BufReader::new(ImapStream::Tls(connect_tls(stream, self.config.server())?)),
+            MailSecurity::None | MailSecurity::StartTls => BufReader::new(ImapStream::Plain(stream)),
+        };
 
         let greeting = read_line(&mut reader)?;
         if !greeting.starts_with("* OK") {
             return Err(TransportError::UnexpectedResponse(greeting.trim().to_owned()));
         }
 
-        let login_tag = "a001";
+        let command_offset = if self.config.security() == MailSecurity::StartTls {
+            send_command(&mut reader, "a001", "STARTTLS")?;
+            upgrade_imap_stream_to_tls(&mut reader, self.config.server())?;
+            1
+        } else {
+            0
+        };
+        let login_tag = tag_at(command_offset);
         match self.config.auth() {
             MailAuth::None => {
                 send_command(&mut reader, login_tag, "NOOP")?;
@@ -82,20 +95,26 @@ impl ConfiguredImapMailbox {
 
         send_command(
             &mut reader,
-            "a002",
+            tag_at(command_offset + 1),
             &format!("SELECT {}", self.config.mailbox()),
         )?;
 
         let start_uid = cursor.last_seen_uid().map(|uid| uid + 1).unwrap_or(1);
-        let search_lines =
-            send_command_collecting(&mut reader, "a003", &format!("UID SEARCH UID {}:*", start_uid))?;
+        let search_lines = send_command_collecting(
+            &mut reader,
+            tag_at(command_offset + 2),
+            &format!("UID SEARCH UID {}:*", start_uid),
+        )?;
         let uids = extract_search_uids(&search_lines);
 
         let mut emails = Vec::new();
         let mut next_cursor = cursor.clone();
         for uid in uids {
-            let fetch_lines =
-                send_command_collecting(&mut reader, "a004", &format!("UID FETCH {uid} BODY.PEEK[]"))?;
+            let fetch_lines = send_command_collecting(
+                &mut reader,
+                tag_at(command_offset + 3),
+                &format!("UID FETCH {uid} BODY.PEEK[]"),
+            )?;
             let raw_message = extract_fetch_body(&fetch_lines)?;
             emails.push(ReceivedEmail {
                 message_id: format!("imap-uid-{uid}"),
@@ -104,13 +123,67 @@ impl ConfiguredImapMailbox {
             next_cursor = next_cursor.advance_to(uid);
         }
 
-        send_command(&mut reader, "a005", "LOGOUT")?;
+        send_command(&mut reader, tag_at(command_offset + 4), "LOGOUT")?;
 
         Ok(FetchBatch::new(emails, next_cursor))
     }
 }
 
-fn send_command(reader: &mut BufReader<TcpStream>, tag: &str, command: &str) -> Result<(), TransportError> {
+enum ImapStream {
+    Plain(TcpStream),
+    Tls(TlsStream<TcpStream>),
+}
+
+impl Read for ImapStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(stream) => stream.read(buf),
+            Self::Tls(stream) => stream.read(buf),
+        }
+    }
+}
+
+impl Write for ImapStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(stream) => stream.write(buf),
+            Self::Tls(stream) => stream.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Plain(stream) => stream.flush(),
+            Self::Tls(stream) => stream.flush(),
+        }
+    }
+}
+
+fn connect_tls(stream: TcpStream, server_name: &str) -> Result<TlsStream<TcpStream>, TransportError> {
+    let connector = TlsConnector::new().map_err(|error| TransportError::Network(error.to_string()))?;
+    connector
+        .connect(server_name, stream)
+        .map_err(|error| TransportError::Network(error.to_string()))
+}
+
+fn upgrade_imap_stream_to_tls(
+    reader: &mut BufReader<ImapStream>,
+    server_name: &str,
+) -> Result<(), TransportError> {
+    let plain_stream = match reader.get_mut() {
+        ImapStream::Plain(stream) => stream.try_clone().map_err(|error| TransportError::Network(error.to_string()))?,
+        ImapStream::Tls(_) => return Ok(()),
+    };
+    *reader.get_mut() = ImapStream::Tls(connect_tls(plain_stream, server_name)?);
+    Ok(())
+}
+
+fn tag_at(offset: usize) -> &'static str {
+    const TAGS: [&str; 6] = ["a001", "a002", "a003", "a004", "a005", "a006"];
+    TAGS.get(offset).copied().unwrap_or("a999")
+}
+
+fn send_command(reader: &mut BufReader<ImapStream>, tag: &str, command: &str) -> Result<(), TransportError> {
     let response_lines = send_command_collecting(reader, tag, command)?;
     let status_line = response_lines
         .last()
@@ -126,7 +199,7 @@ fn send_command(reader: &mut BufReader<TcpStream>, tag: &str, command: &str) -> 
 }
 
 fn send_command_collecting(
-    reader: &mut BufReader<TcpStream>,
+    reader: &mut BufReader<ImapStream>,
     tag: &str,
     command: &str,
 ) -> Result<Vec<String>, TransportError> {
@@ -151,7 +224,7 @@ fn send_command_collecting(
     }
 }
 
-fn read_line(reader: &mut BufReader<TcpStream>) -> Result<String, TransportError> {
+fn read_line(reader: &mut BufReader<ImapStream>) -> Result<String, TransportError> {
     let mut line = String::new();
     reader
         .read_line(&mut line)

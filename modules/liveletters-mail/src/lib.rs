@@ -10,7 +10,7 @@ mod status;
 
 use liveletters_protocol::{ProtocolMessage, ProtocolError, decode_message, encode_message};
 
-pub use config::{ImapMailboxConfig, MailAuth, SmtpTransportConfig};
+pub use config::{ImapMailboxConfig, MailAuth, MailSecurity, SmtpTransportConfig};
 pub use errors::TransportError;
 pub use imap::{ConfiguredImapMailbox, InMemoryImapMailbox};
 pub use message::{ExtractedMailParts, OutgoingEmail, ParsedEmail, ReceivedEmail};

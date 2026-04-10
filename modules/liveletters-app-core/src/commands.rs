@@ -50,11 +50,13 @@ pub struct SaveSettingsCommand<'a> {
     pub avatar_url: Option<&'a str>,
     pub smtp_host: &'a str,
     pub smtp_port: u16,
+    pub smtp_security: &'a str,
     pub smtp_username: &'a str,
     pub smtp_password: &'a str,
     pub smtp_hello_domain: &'a str,
     pub imap_host: &'a str,
     pub imap_port: u16,
+    pub imap_security: &'a str,
     pub imap_username: &'a str,
     pub imap_password: &'a str,
     pub imap_mailbox: &'a str,
@@ -467,14 +469,20 @@ pub fn save_settings(
     validate_email(command.email_address)?;
     validate_non_blank("smtp_host", command.smtp_host)?;
     validate_port("smtp_port", command.smtp_port)?;
+    validate_mail_security("smtp_security", command.smtp_security)?;
     validate_non_blank("smtp_username", command.smtp_username)?;
     validate_non_blank("smtp_password", command.smtp_password)?;
-    validate_non_blank("smtp_hello_domain", command.smtp_hello_domain)?;
     validate_non_blank("imap_host", command.imap_host)?;
     validate_port("imap_port", command.imap_port)?;
+    validate_mail_security("imap_security", command.imap_security)?;
     validate_non_blank("imap_username", command.imap_username)?;
     validate_non_blank("imap_password", command.imap_password)?;
     validate_non_blank("imap_mailbox", command.imap_mailbox)?;
+    let smtp_hello_domain = infer_smtp_hello_domain(
+        command.smtp_hello_domain,
+        command.email_address,
+        command.smtp_host,
+    );
 
     let settings = AppSettings {
         nickname: command.nickname.trim().to_owned(),
@@ -486,11 +494,13 @@ pub fn save_settings(
             .map(str::to_owned),
         smtp_host: command.smtp_host.trim().to_owned(),
         smtp_port: command.smtp_port,
+        smtp_security: command.smtp_security.trim().to_owned(),
         smtp_username: command.smtp_username.trim().to_owned(),
         smtp_password: command.smtp_password.to_owned(),
-        smtp_hello_domain: command.smtp_hello_domain.trim().to_owned(),
+        smtp_hello_domain,
         imap_host: command.imap_host.trim().to_owned(),
         imap_port: command.imap_port,
+        imap_security: command.imap_security.trim().to_owned(),
         imap_username: command.imap_username.trim().to_owned(),
         imap_password: command.imap_password.to_owned(),
         imap_mailbox: command.imap_mailbox.trim().to_owned(),
@@ -508,11 +518,13 @@ pub fn save_settings(
         profile_id: default_profile_id().to_owned(),
         smtp_host: settings.smtp_host.clone(),
         smtp_port: settings.smtp_port,
+        smtp_security: settings.smtp_security.clone(),
         smtp_username: settings.smtp_username.clone(),
         smtp_password: settings.smtp_password.clone(),
         smtp_hello_domain: settings.smtp_hello_domain.clone(),
         imap_host: settings.imap_host.clone(),
         imap_port: settings.imap_port,
+        imap_security: settings.imap_security.clone(),
         imap_username: settings.imap_username.clone(),
         imap_password: settings.imap_password.clone(),
         imap_mailbox: settings.imap_mailbox.clone(),
@@ -573,6 +585,32 @@ fn validate_email(value: &str) -> Result<(), AppCoreError> {
     }
 
     Ok(())
+}
+
+fn infer_smtp_hello_domain(hello_domain: &str, email_address: &str, smtp_host: &str) -> String {
+    let trimmed = hello_domain.trim();
+    if !trimmed.is_empty() {
+        return trimmed.to_owned();
+    }
+
+    if let Some((_, domain)) = email_address.trim().split_once('@') {
+        let domain = domain.trim();
+        if !domain.is_empty() {
+            return domain.to_owned();
+        }
+    }
+
+    smtp_host.trim().to_owned()
+}
+
+fn validate_mail_security(field: &str, value: &str) -> Result<(), AppCoreError> {
+    match value.trim() {
+        "none" | "starttls" | "tls" => Ok(()),
+        _ => Err(AppCoreError::SettingsValidation {
+            field: field.to_owned(),
+            message: "must be one of: none, starttls, tls".to_owned(),
+        }),
+    }
 }
 
 fn validate_port(field: &str, value: u16) -> Result<(), AppCoreError> {

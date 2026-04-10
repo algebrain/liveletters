@@ -1,5 +1,5 @@
 (ns liveletters.frontend-app.core-test
-  (:require [cljs.test :refer-macros [deftest is]]
+  (:require [cljs.test :refer-macros [async deftest is]]
             [liveletters.frontend-app.core :as core]))
 
 (deftest exposes-module-info
@@ -15,17 +15,19 @@
                                      "get_bootstrap_state" (on-success {:setup_completed true})
                                      "get_settings" (on-success {:nickname "alice"
                                                                  :email_address "alice@example.com"
-                                                                 :avatar_url nil
-                                                                 :smtp_host "smtp.example.com"
-                                                                 :smtp_port 587
-                                                                 :smtp_username "alice"
-                                                                 :smtp_password "secret"
-                                                                 :smtp_hello_domain "example.com"
-                                                                 :imap_host "imap.example.com"
-                                                                 :imap_port 143
-                                                                 :imap_username "alice"
-                                                                 :imap_password "secret"
-                                                                 :imap_mailbox "INBOX"
+                                     :avatar_url nil
+                                     :smtp_host "smtp.example.com"
+                                     :smtp_port 587
+                                     :smtp_security "starttls"
+                                     :smtp_username "alice"
+                                     :smtp_password "secret"
+                                     :smtp_hello_domain "example.com"
+                                     :imap_host "imap.example.com"
+                                     :imap_port 143
+                                     :imap_security "starttls"
+                                     :imap_username "alice"
+                                     :imap_password "secret"
+                                     :imap_mailbox "INBOX"
                                                                  :setup_completed true})
                                      "get_home_feed" (on-success {:posts [{:post_id "post-1"
                                                                            :resource_id "blog-1"
@@ -69,17 +71,19 @@
                                      "get_bootstrap_state" (on-success {:setup_completed false})
                                      "get_settings" (on-success {:nickname ""
                                                                  :email_address ""
-                                                                 :avatar_url nil
-                                                                 :smtp_host ""
-                                                                 :smtp_port 587
-                                                                 :smtp_username ""
-                                                                 :smtp_password ""
-                                                                 :smtp_hello_domain ""
-                                                                 :imap_host ""
-                                                                 :imap_port 143
-                                                                 :imap_username ""
-                                                                 :imap_password ""
-                                                                 :imap_mailbox "INBOX"
+                                     :avatar_url nil
+                                     :smtp_host ""
+                                     :smtp_port 587
+                                     :smtp_security "starttls"
+                                     :smtp_username ""
+                                     :smtp_password ""
+                                     :smtp_hello_domain ""
+                                     :imap_host ""
+                                     :imap_port 143
+                                     :imap_security "starttls"
+                                     :imap_username ""
+                                     :imap_password ""
+                                     :imap_mailbox "INBOX"
                                                                  :setup_completed false})
                                      nil))
                  :subscribe-event (fn [_event-name _handler] :subscription-token)}
@@ -188,11 +192,13 @@
                                                                  :avatar_url nil
                                                                  :smtp_host "smtp.example.com"
                                                                  :smtp_port 587
+                                                                 :smtp_security "starttls"
                                                                  :smtp_username "alice"
                                                                  :smtp_password "secret"
                                                                  :smtp_hello_domain "example.com"
                                                                  :imap_host "imap.example.com"
                                                                  :imap_port 143
+                                                                 :imap_security "starttls"
                                                                  :imap_username "alice"
                                                                  :imap_password "secret"
                                                                  :imap_mailbox "INBOX"
@@ -265,22 +271,51 @@
            :runtime {:adapter adapter}
            :settings-form {:nickname "alice"
                            :email-address "alice@example.com"
-                           :avatar-url ""
-                           :smtp-host "smtp.example.com"
-                           :smtp-port 587
-                           :smtp-username "alice"
-                           :smtp-password "secret"
-                           :smtp-hello-domain "example.com"
-                           :imap-host "imap.example.com"
-                           :imap-port 143
-                           :imap-username "alice"
-                           :imap-password "secret"
-                           :imap-mailbox "INBOX"})
+                                                                 :avatar-url ""
+                                                                 :smtp-host "smtp.example.com"
+                                                                 :smtp-port 587
+                                                                 :smtp-security "starttls"
+                                                                 :smtp-username "alice"
+                                                                 :smtp-password "secret"
+                                                                 :smtp-hello-domain "example.com"
+                                                                 :imap-host "imap.example.com"
+                                                                 :imap-port 143
+                                                                 :imap-security "starttls"
+                                                                 :imap-username "alice"
+                                                                 :imap-password "secret"
+                                                                 :imap-mailbox "INBOX"})
     (core/submit-settings! adapter app-state)
     (is (= {:checked? true :setup-completed? true} (:bootstrap @app-state)))
     (is (= {:page :feed} (:route @app-state)))
     (is (= "alice" (get-in @app-state [:settings-form :nickname])))
     (is (= "save_settings" (ffirst @calls)))))
+
+(deftest smtp-username-autofills-imap-username-after-delay
+  (async done
+    (let [app-state (core/create-app-state)]
+      (core/update-settings-form! app-state {:smtp-username "alice@example.com"})
+      (js/setTimeout
+       (fn []
+         (is (= "alice@example.com"
+                (get-in @app-state [:settings-form :smtp-username])))
+         (is (= "alice@example.com"
+                (get-in @app-state [:settings-form :imap-username])))
+         (done))
+       1100))))
+
+(deftest imap-username-autofill-does-not-overwrite-existing-smtp-username
+  (async done
+    (let [app-state (core/create-app-state)]
+      (swap! app-state assoc-in [:settings-form :smtp-username] "smtp-user")
+      (core/update-settings-form! app-state {:imap-username "imap-user"})
+      (js/setTimeout
+       (fn []
+         (is (= "smtp-user"
+                (get-in @app-state [:settings-form :smtp-username])))
+         (is (= "imap-user"
+                (get-in @app-state [:settings-form :imap-username])))
+         (done))
+       1100))))
 
 (deftest root-view-renders-current-page-shell
   (let [app-state (core/create-app-state)]

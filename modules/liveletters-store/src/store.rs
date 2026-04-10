@@ -1,6 +1,7 @@
 use std::{fs, path::Path};
 
 use rusqlite::{params, Connection};
+use rusqlite::Error as SqliteError;
 
 use crate::{
     CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxRecord, PostRecord,
@@ -101,11 +102,13 @@ impl Store {
                 profile_id TEXT PRIMARY KEY,
                 smtp_host TEXT NOT NULL,
                 smtp_port INTEGER NOT NULL,
+                smtp_security TEXT NOT NULL DEFAULT 'starttls',
                 smtp_username TEXT NOT NULL,
                 smtp_password TEXT NOT NULL,
                 smtp_hello_domain TEXT NOT NULL,
                 imap_host TEXT NOT NULL,
                 imap_port INTEGER NOT NULL,
+                imap_security TEXT NOT NULL DEFAULT 'starttls',
                 imap_username TEXT NOT NULL,
                 imap_password TEXT NOT NULL,
                 imap_mailbox TEXT NOT NULL
@@ -113,7 +116,31 @@ impl Store {
             "#,
         )?;
 
+        self.ensure_mail_settings_security_columns()?;
+
         Ok(())
+    }
+
+    fn ensure_mail_settings_security_columns(&self) -> Result<(), StoreError> {
+        self.add_column_if_missing(
+            "ALTER TABLE mail_settings ADD COLUMN smtp_security TEXT NOT NULL DEFAULT 'starttls'",
+        )?;
+        self.add_column_if_missing(
+            "ALTER TABLE mail_settings ADD COLUMN imap_security TEXT NOT NULL DEFAULT 'starttls'",
+        )?;
+        Ok(())
+    }
+
+    fn add_column_if_missing(&self, sql: &str) -> Result<(), StoreError> {
+        match self.connection.execute(sql, []) {
+            Ok(_) => Ok(()),
+            Err(SqliteError::SqliteFailure(_, Some(message)))
+                if message.contains("duplicate column name") =>
+            {
+                Ok(())
+            }
+            Err(error) => Err(error.into()),
+        }
     }
 
     pub fn save_post_record(&self, post: &PostRecord) -> Result<(), StoreError> {
@@ -530,27 +557,31 @@ impl Store {
                     profile_id,
                     smtp_host,
                     smtp_port,
+                    smtp_security,
                     smtp_username,
                     smtp_password,
                     smtp_hello_domain,
                     imap_host,
                     imap_port,
+                    imap_security,
                     imap_username,
                     imap_password,
                     imap_mailbox
                 )
             VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
             "#,
             params![
                 record.profile_id,
                 record.smtp_host,
                 record.smtp_port as i64,
+                record.smtp_security,
                 record.smtp_username,
                 record.smtp_password,
                 record.smtp_hello_domain,
                 record.imap_host,
                 record.imap_port as i64,
+                record.imap_security,
                 record.imap_username,
                 record.imap_password,
                 record.imap_mailbox,
@@ -570,11 +601,13 @@ impl Store {
                 profile_id,
                 smtp_host,
                 smtp_port,
+                smtp_security,
                 smtp_username,
                 smtp_password,
                 smtp_hello_domain,
                 imap_host,
                 imap_port,
+                imap_security,
                 imap_username,
                 imap_password,
                 imap_mailbox
@@ -592,14 +625,16 @@ impl Store {
             profile_id: row.get(0)?,
             smtp_host: row.get(1)?,
             smtp_port: row.get::<_, i64>(2)? as u16,
-            smtp_username: row.get(3)?,
-            smtp_password: row.get(4)?,
-            smtp_hello_domain: row.get(5)?,
-            imap_host: row.get(6)?,
-            imap_port: row.get::<_, i64>(7)? as u16,
-            imap_username: row.get(8)?,
-            imap_password: row.get(9)?,
-            imap_mailbox: row.get(10)?,
+            smtp_security: row.get(3)?,
+            smtp_username: row.get(4)?,
+            smtp_password: row.get(5)?,
+            smtp_hello_domain: row.get(6)?,
+            imap_host: row.get(7)?,
+            imap_port: row.get::<_, i64>(8)? as u16,
+            imap_security: row.get(9)?,
+            imap_username: row.get(10)?,
+            imap_password: row.get(11)?,
+            imap_mailbox: row.get(12)?,
         }))
     }
 }

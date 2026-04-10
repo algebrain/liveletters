@@ -2,6 +2,22 @@
   (:require [cljs.test :refer-macros [deftest is]]
             [liveletters.frontend-api.tauri :as tauri]))
 
+(deftest command-args-wraps-request-commands-under-request-key
+  (is (= {:request {:smtp-security "starttls"
+                    :imap-security "tls"}}
+         (tauri/command-args "save_settings"
+                             {:smtp-security "starttls"
+                              :imap-security "tls"})))
+  (is (= {:post-id "post-1"}
+         (tauri/command-args "get_post_thread" {:post-id "post-1"}))))
+
+(deftest encode-payload-recursively-snake-cases-nested-request-maps
+  (is (= {"request" {"smtp_security" "starttls"
+                     "imap_security" "tls"}}
+         (tauri/encode-payload
+          {:request {:smtp-security "starttls"
+                     :imap-security "tls"}}))))
+
 (deftest normalize-invoke-error-preserves-backend-message-from-map
   (is (= {:type :validation
           :message "nickname must not be blank"

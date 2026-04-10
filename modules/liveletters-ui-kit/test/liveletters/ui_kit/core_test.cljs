@@ -64,6 +64,22 @@
                                  :value "secret"
                                  :on-change handler})))))
 
+(deftest select-input-renders-options-and-handler
+  (let [handler (fn [_event] nil)]
+    (is (= [:label {:class "ll-field"}
+            [:span {:class "ll-field__label"} "SMTP security"]
+            [:select {:value "starttls"
+                      :class "ll-input"
+                      :on-change handler}
+             (list
+              ^{:key "starttls"} [:option {:value "starttls"} "STARTTLS"]
+              ^{:key "tls"} [:option {:value "tls"} "TLS / SSL"])]]
+           (core/select-input {:label "SMTP security"
+                               :value "starttls"
+                               :options [{:value "starttls" :label "STARTTLS"}
+                                         {:value "tls" :label "TLS / SSL"}]
+                               :on-change handler})))))
+
 (deftest section-wraps-title-and-children
   (is (= [:section {:class "ll-section"}
           [:h2 {:class "ll-section__title"} "Feed"]

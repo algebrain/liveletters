@@ -1,7 +1,9 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 
-use crate::{MailAuth, OutgoingEmail, SendStatus, SmtpTransportConfig, TransportError};
+use native_tls::{TlsConnector, TlsStream};
+
+use crate::{MailAuth, MailSecurity, OutgoingEmail, SendStatus, SmtpTransportConfig, TransportError};
 
 #[derive(Debug, Default)]
 pub struct InMemorySmtpTransport {
@@ -41,10 +43,21 @@ impl ConfiguredSmtpTransport {
         let address = format!("{}:{}", self.config.server(), self.config.port());
         let stream = TcpStream::connect(&address)
             .map_err(|error| TransportError::Network(error.to_string()))?;
-        let mut reader = BufReader::new(stream);
+        let mut reader = match self.config.security() {
+            MailSecurity::Tls => BufReader::new(SmtpStream::Tls(connect_tls(stream, self.config.server())?)),
+            MailSecurity::None | MailSecurity::StartTls => {
+                BufReader::new(SmtpStream::Plain(stream))
+            }
+        };
 
         read_response(&mut reader, 220)?;
         send_command(&mut reader, &format!("EHLO {}\r\n", self.config.hello_domain()), 250)?;
+
+        if self.config.security() == MailSecurity::StartTls {
+            send_command(&mut reader, "STARTTLS\r\n", 220)?;
+            upgrade_smtp_stream_to_tls(&mut reader, self.config.server())?;
+            send_command(&mut reader, &format!("EHLO {}\r\n", self.config.hello_domain()), 250)?;
+        }
 
         match self.config.auth() {
             MailAuth::None => {}
@@ -79,8 +92,57 @@ impl ConfiguredSmtpTransport {
     }
 }
 
+enum SmtpStream {
+    Plain(TcpStream),
+    Tls(TlsStream<TcpStream>),
+}
+
+impl Read for SmtpStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(stream) => stream.read(buf),
+            Self::Tls(stream) => stream.read(buf),
+        }
+    }
+}
+
+impl Write for SmtpStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(stream) => stream.write(buf),
+            Self::Tls(stream) => stream.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Plain(stream) => stream.flush(),
+            Self::Tls(stream) => stream.flush(),
+        }
+    }
+}
+
+fn connect_tls(stream: TcpStream, server_name: &str) -> Result<TlsStream<TcpStream>, TransportError> {
+    let connector = TlsConnector::new().map_err(|error| TransportError::Network(error.to_string()))?;
+    connector
+        .connect(server_name, stream)
+        .map_err(|error| TransportError::Network(error.to_string()))
+}
+
+fn upgrade_smtp_stream_to_tls(
+    reader: &mut BufReader<SmtpStream>,
+    server_name: &str,
+) -> Result<(), TransportError> {
+    let plain_stream = match reader.get_mut() {
+        SmtpStream::Plain(stream) => stream.try_clone().map_err(|error| TransportError::Network(error.to_string()))?,
+        SmtpStream::Tls(_) => return Ok(()),
+    };
+    *reader.get_mut() = SmtpStream::Tls(connect_tls(plain_stream, server_name)?);
+    Ok(())
+}
+
 fn send_command(
-    reader: &mut BufReader<TcpStream>,
+    reader: &mut BufReader<SmtpStream>,
     command: &str,
     expected_code: u16,
 ) -> Result<String, TransportError> {
@@ -95,7 +157,7 @@ fn send_command(
     read_response(reader, expected_code)
 }
 
-fn read_response(reader: &mut BufReader<TcpStream>, expected_code: u16) -> Result<String, TransportError> {
+fn read_response(reader: &mut BufReader<SmtpStream>, expected_code: u16) -> Result<String, TransportError> {
     let mut response = String::new();
     loop {
         let mut line = String::new();

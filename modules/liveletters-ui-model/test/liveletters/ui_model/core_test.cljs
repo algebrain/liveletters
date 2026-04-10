@@ -110,11 +110,13 @@
           :avatar-url ""
           :smtp-host "smtp.example.com"
           :smtp-port 587
+          :smtp-security "starttls"
           :smtp-username "alice"
           :smtp-password "secret"
           :smtp-hello-domain "example.com"
           :imap-host "imap.example.com"
           :imap-port 143
+          :imap-security "tls"
           :imap-username "alice"
           :imap-password "secret"
           :imap-mailbox "INBOX"
@@ -125,12 +127,61 @@
            :avatar-url nil
            :smtp-host "smtp.example.com"
            :smtp-port 587
+           :smtp-security "starttls"
            :smtp-username "alice"
            :smtp-password "secret"
            :smtp-hello-domain "example.com"
            :imap-host "imap.example.com"
            :imap-port 143
+           :imap-security "tls"
            :imap-username "alice"
            :imap-password "secret"
            :imap-mailbox "INBOX"
            :setup-completed? true}))))
+
+(deftest settings-form-status-requires-valid-required-fields
+  (is (= {:submittable? false}
+         (core/settings-form-status
+          {:nickname ""
+           :email-address ""
+           :smtp-host ""
+           :smtp-port 587
+           :smtp-security "starttls"
+           :smtp-username ""
+           :smtp-password ""
+           :imap-host ""
+           :imap-port 143
+           :imap-security "starttls"
+           :imap-username ""
+           :imap-password ""
+           :imap-mailbox ""})))
+  (is (= {:submittable? false}
+         (core/settings-form-status
+          {:nickname "alice"
+           :email-address "alice-at-example"
+           :smtp-host "smtp.example.com"
+           :smtp-port 587
+           :smtp-security "starttls"
+           :smtp-username "alice"
+           :smtp-password "secret"
+           :imap-host "imap.example.com"
+           :imap-port 143
+           :imap-security "starttls"
+           :imap-username "alice"
+           :imap-password "secret"
+           :imap-mailbox "INBOX"})))
+  (is (= {:submittable? true}
+         (core/settings-form-status
+          {:nickname "alice"
+           :email-address "alice@example.com"
+           :smtp-host "smtp.example.com"
+           :smtp-port 587
+           :smtp-security "starttls"
+           :smtp-username "alice"
+           :smtp-password "secret"
+           :imap-host "imap.example.com"
+           :imap-port 143
+           :imap-security "tls"
+           :imap-username "alice"
+           :imap-password "secret"
+           :imap-mailbox "INBOX"}))))

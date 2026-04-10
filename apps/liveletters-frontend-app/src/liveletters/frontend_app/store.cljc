@@ -1,8 +1,14 @@
 (ns liveletters.frontend-app.store
   #?(:cljs (:require [reagent.core :as r]))
   (:require [liveletters.frontend-api.core :as frontend-api]
+            [clojure.string :as str]
             [liveletters.frontend-app.routes :as routes]
             [liveletters.frontend-app.state :as state]))
+
+#?(:cljs
+   (defonce settings-autofill-timers* (atom {})))
+
+(def ^:private username-autofill-delay-ms 1000)
 
 (defn create-store []
   (#?(:cljs r/atom :clj atom) (state/initial-state)))
@@ -79,8 +85,55 @@
 (defn update-create-post-form! [store values]
   (swap! store update :create-post merge values))
 
+(defn- blank-string? [value]
+  (str/blank? (or value "")))
+
+(defn- apply-linked-username-autofill! [store source-key target-key expected-value]
+  (swap! store
+         (fn [state]
+           (let [current-source (get-in state [:settings-form source-key])
+                 current-target (get-in state [:settings-form target-key])]
+             (if (and (= current-source expected-value)
+                      (not (blank-string? expected-value))
+                      (blank-string? current-target))
+               (assoc-in state [:settings-form target-key] expected-value)
+               state)))))
+
+#?(:cljs
+   (defn- schedule-linked-username-autofill! [store source-key target-key source-value]
+     (when-let [timer-id (get @settings-autofill-timers* source-key)]
+       (js/clearTimeout timer-id))
+     (swap! settings-autofill-timers* dissoc source-key)
+     (when-not (blank-string? source-value)
+       (let [timer-id (js/setTimeout
+                       (fn []
+                         (swap! settings-autofill-timers* dissoc source-key)
+                         (apply-linked-username-autofill! store
+                                                          source-key
+                                                          target-key
+                                                          source-value))
+                       username-autofill-delay-ms)]
+         (swap! settings-autofill-timers* assoc source-key timer-id)))))
+
+#?(:clj
+   (defn- schedule-linked-username-autofill! [_store _source-key _target-key _source-value]
+     nil))
+
+(defn- schedule-settings-autofill! [store values]
+  (when (contains? values :smtp-username)
+    (schedule-linked-username-autofill! store
+                                        :smtp-username
+                                        :imap-username
+                                        (:smtp-username values)))
+  (when (contains? values :imap-username)
+    (schedule-linked-username-autofill! store
+                                        :imap-username
+                                        :smtp-username
+                                        (:imap-username values))))
+
 (defn update-settings-form! [store values]
-  (swap! store update :settings-form merge values))
+  (swap! store update :settings-form merge values)
+  (schedule-settings-autofill! store values))
 
 (defn- normalize-create-post-form [form]
   (let [created-at (or (not-empty (str (:created-at form))) "0")
@@ -117,6 +170,7 @@
       (update :smtp-port #(if (string? %)
                             (js/parseInt % 10)
                             %))
+      (update :smtp-security #(or % "starttls"))
       (update :smtp-username #(or % ""))
       (update :smtp-password #(or % ""))
       (update :smtp-hello-domain #(or % ""))
@@ -124,6 +178,7 @@
       (update :imap-port #(if (string? %)
                             (js/parseInt % 10)
                             %))
+      (update :imap-security #(or % "starttls"))
       (update :imap-username #(or % ""))
       (update :imap-password #(or % ""))
       (update :imap-mailbox #(or % "INBOX"))

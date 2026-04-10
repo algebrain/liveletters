@@ -4,7 +4,8 @@ use std::thread;
 
 use liveletters_mail::{
     ConfiguredImapMailbox, ConfiguredSmtpTransport, FetchStatus, ImapMailboxConfig,
-    InMemoryImapMailbox, InMemorySmtpTransport, MailAuth, MailRetryPolicy, MailboxCursor,
+    InMemoryImapMailbox, InMemorySmtpTransport, MailAuth, MailRetryPolicy, MailSecurity,
+    MailboxCursor,
     SendStatus, SmtpTransportConfig, TransportError, build_protocol_email,
     decode_protocol_message, extract_liveletters_parts, parse_email,
 };
@@ -182,6 +183,7 @@ fn configured_smtp_transport_sends_message_over_tcp() {
         "127.0.0.1",
         address.port(),
         "local.test",
+        MailSecurity::None,
         MailAuth::Password {
             username: "alice".into(),
             password: "secret".into(),
@@ -270,6 +272,7 @@ fn configured_imap_mailbox_fetches_messages_with_cursor() {
         "127.0.0.1",
         address.port(),
         "INBOX",
+        MailSecurity::None,
         MailAuth::Password {
             username: "alice".into(),
             password: "secret".into(),
