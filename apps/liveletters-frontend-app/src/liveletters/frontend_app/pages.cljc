@@ -1,86 +1,97 @@
 (ns liveletters.frontend-app.pages
   (:require [liveletters.frontend-app.store :as app-store]
+            [liveletters.frontend-app.theme :as theme]
             [liveletters.ui-kit.core :as ui-kit]
             [liveletters.ui-model.core :as ui-model]))
 
 (defn- settings-fields [store form]
-  [[:div {:class "ll-settings-form"}
-    [ui-kit/text-input {:label "Nickname"
-                        :value (:nickname form)
-                        :placeholder "alice"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:nickname (.. % -target -value)})}]
-    [ui-kit/text-input {:label "Email"
-                        :value (:email-address form)
-                        :placeholder "alice@example.com"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:email-address (.. % -target -value)})}]
-    [ui-kit/text-input {:label "Avatar URL"
-                        :value (:avatar-url form)
-                        :placeholder "https://example.com/avatar.png"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:avatar-url (.. % -target -value)})}]
-    [ui-kit/text-input {:label "SMTP host"
-                        :value (:smtp-host form)
-                        :placeholder "smtp.example.com"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:smtp-host (.. % -target -value)})}]
-    [ui-kit/text-input {:label "SMTP port"
-                        :value (str (:smtp-port form))
-                        :placeholder "587"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:smtp-port (.. % -target -value)})}]
-    [ui-kit/text-input {:label "SMTP username"
-                        :value (:smtp-username form)
-                        :placeholder "alice"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:smtp-username (.. % -target -value)})}]
-    [ui-kit/password-input {:label "SMTP password"
-                            :value (:smtp-password form)
-                            :on-change #(app-store/update-settings-form!
-                                         store
-                                         {:smtp-password (.. % -target -value)})}]
-    [ui-kit/text-input {:label "SMTP hello domain"
-                        :value (:smtp-hello-domain form)
-                        :placeholder "example.com"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:smtp-hello-domain (.. % -target -value)})}]
-    [ui-kit/text-input {:label "IMAP host"
-                        :value (:imap-host form)
-                        :placeholder "imap.example.com"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:imap-host (.. % -target -value)})}]
-    [ui-kit/text-input {:label "IMAP port"
-                        :value (str (:imap-port form))
-                        :placeholder "143"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:imap-port (.. % -target -value)})}]
-    [ui-kit/text-input {:label "IMAP username"
-                        :value (:imap-username form)
-                        :placeholder "alice"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:imap-username (.. % -target -value)})}]
-    [ui-kit/password-input {:label "IMAP password"
-                            :value (:imap-password form)
-                            :on-change #(app-store/update-settings-form!
-                                         store
-                                         {:imap-password (.. % -target -value)})}]
-    [ui-kit/text-input {:label "IMAP mailbox"
-                        :value (:imap-mailbox form)
-                        :placeholder "INBOX"
-                        :on-change #(app-store/update-settings-form!
-                                     store
-                                     {:imap-mailbox (.. % -target -value)})}]]])
+  [[theme/settings-layout {:class "ll-settings-form"}
+    [theme/settings-grid
+     [theme/settings-card
+      [:h3 {} "Profile"]
+      [theme/settings-column
+       [ui-kit/text-input {:label "Nickname"
+                           :value (:nickname form)
+                           :placeholder "alice"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:nickname (.. % -target -value)})}]
+       [ui-kit/text-input {:label "Email"
+                           :value (:email-address form)
+                           :placeholder "alice@example.com"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:email-address (.. % -target -value)})}]
+       [ui-kit/text-input {:label "Avatar URL"
+                           :value (:avatar-url form)
+                           :placeholder "https://example.com/avatar.png"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:avatar-url (.. % -target -value)})}]]]
+     [theme/settings-card
+      [:h3 {} "SMTP delivery"]
+      [theme/settings-column
+       [ui-kit/text-input {:label "SMTP host"
+                           :value (:smtp-host form)
+                           :placeholder "smtp.example.com"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:smtp-host (.. % -target -value)})}]
+       [ui-kit/text-input {:label "SMTP port"
+                           :value (str (:smtp-port form))
+                           :placeholder "587"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:smtp-port (.. % -target -value)})}]
+       [ui-kit/text-input {:label "SMTP username"
+                           :value (:smtp-username form)
+                           :placeholder "alice"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:smtp-username (.. % -target -value)})}]
+       [ui-kit/password-input {:label "SMTP password"
+                               :value (:smtp-password form)
+                               :on-change #(app-store/update-settings-form!
+                                            store
+                                            {:smtp-password (.. % -target -value)})}]
+       [ui-kit/text-input {:label "SMTP hello domain"
+                           :value (:smtp-hello-domain form)
+                           :placeholder "example.com"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:smtp-hello-domain (.. % -target -value)})}]]]
+     [theme/settings-card
+      [:h3 {} "IMAP inbox"]
+      [theme/settings-column
+       [ui-kit/text-input {:label "IMAP host"
+                           :value (:imap-host form)
+                           :placeholder "imap.example.com"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:imap-host (.. % -target -value)})}]
+       [ui-kit/text-input {:label "IMAP port"
+                           :value (str (:imap-port form))
+                           :placeholder "143"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:imap-port (.. % -target -value)})}]
+       [ui-kit/text-input {:label "IMAP username"
+                           :value (:imap-username form)
+                           :placeholder "alice"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:imap-username (.. % -target -value)})}]
+       [ui-kit/password-input {:label "IMAP password"
+                               :value (:imap-password form)
+                               :on-change #(app-store/update-settings-form!
+                                            store
+                                            {:imap-password (.. % -target -value)})}]
+       [ui-kit/text-input {:label "IMAP mailbox"
+                           :value (:imap-mailbox form)
+                           :placeholder "INBOX"
+                           :on-change #(app-store/update-settings-form!
+                                        store
+                                        {:imap-mailbox (.. % -target -value)})}]]]]]])
 
 (defn initial-setup-page [store state]
   (let [form (ui-model/settings-form-view-model (:settings-form state))
@@ -90,10 +101,12 @@
      {:title "Initial setup"
       :children
       (into
-       [[:p {} "Set your local profile and mail connection settings."]
-        [ui-kit/button {:label "Save and continue"
-                        :disabled? (nil? adapter)
-                        :on-click #(app-store/submit-settings! adapter store)}]]
+       [[theme/page-copy {}
+         "Set your local profile and mail connection settings before the first sync. The same form becomes your permanent settings page later."]
+        [theme/actions-row {}
+         [ui-kit/button {:label "Save and continue"
+                         :disabled? (nil? adapter)
+                         :on-click #(app-store/submit-settings! adapter store)}]]]
        (concat
         (when error-message
           [[ui-kit/error-state {:message error-message}]])
@@ -107,9 +120,12 @@
      {:title "Settings"
       :children
       (into
-       [[ui-kit/button {:label "Save settings"
-                        :disabled? (nil? adapter)
-                        :on-click #(app-store/submit-settings! adapter store)}]]
+       [[theme/page-copy {}
+         "Update your public profile and the local mail transport that powers sync and delivery."]
+        [theme/actions-row {}
+         [ui-kit/button {:label "Save settings"
+                         :disabled? (nil? adapter)
+                         :on-click #(app-store/submit-settings! adapter store)}]]]
        (concat
         (when error-message
           [[ui-kit/error-state {:message error-message}]])

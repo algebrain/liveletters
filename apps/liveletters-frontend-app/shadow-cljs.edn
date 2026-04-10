@@ -6,11 +6,13 @@
                 "../../modules/liveletters-ui-model/test"
                 "../../modules/liveletters-frontend-api/src"
                 "../../modules/liveletters-frontend-api/test"]
+ :cache-blockers #{lambdaisland.ornament}
  :builds
  {:app
   {:target :browser
    :output-dir "resources/js"
    :asset-path "./js"
+   :build-hooks [(liveletters.frontend-app.styles/write-styles-hook)]
    :modules {:main {:entries [liveletters.frontend-app.runtime]
                     :init-fn liveletters.frontend-app.runtime/init!}}
    :devtools {:watch-dir "resources"}}

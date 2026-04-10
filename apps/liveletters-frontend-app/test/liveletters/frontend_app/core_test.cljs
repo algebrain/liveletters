@@ -304,6 +304,6 @@
                        :create-post {}
                        :runtime {:adapter nil}
                        :ui {}})
-    (is (= :main (first (core/root-view app-state))))
+    (is (vector? (core/root-view app-state)))
     (is (= "Sync"
-           (get-in (core/root-view app-state) [3 1 :title])))))
+           (get-in (core/root-view app-state) [2 3 1 :title])))))

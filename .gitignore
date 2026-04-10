@@ -1,6 +1,8 @@
 .plans
 .docs
 .codex
+*.local
+*.local.*
 
 # Rust
 target
@@ -15,6 +17,7 @@ apps/liveletters-rust-backend-app/gen/
 
 # Frontend build output
 apps/liveletters-frontend-app/resources/js/
+apps/liveletters-frontend-app/resources/ornament.css
 
 # Node / frontend tooling
 node_modules
