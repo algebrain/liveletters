@@ -1,0 +1,25 @@
+{
+  "name": "liveletters-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test --reporter=list",
+    "test:ui": "playwright test --ui",
+    "test:diagnostic": "playwright test --reporter=line --timeout=120000",
+    "lint": "eslint 'tests/**/*.ts' 'helpers/**/*.ts' --no-error-on-unmatched-pattern",
+    "format": "prettier --write 'tests/**/*.ts' 'helpers/**/*.ts' 'playwright.config.ts' --no-error-on-unmatched-pattern",
+    "check": "pnpm run lint && pnpm run test && pnpm run format -- --check",
+    "install:browsers": "playwright install webkit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/parser": "^8.58.1",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.58.1"
+  }
+}

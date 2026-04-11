@@ -1,6 +1,7 @@
 .plans
 .docs
 .codex
+.qwen
 *.local
 *.local.*
 
