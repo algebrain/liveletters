@@ -20,12 +20,38 @@ const TAURI_MOCK_SCRIPT = `
     console.log('[tauri-mock] invoke:', command, args);
 
     switch (command) {
+      case 'plugin:event|listen':
+        // Mock для подписки на события — регистрируем handler
+        return Promise.resolve(args?.handler ?? 0);
+
+      case 'plugin:event|emit':
+        // Mock для эмита событий
+        return Promise.resolve(null);
+
       case 'get_bootstrap_state':
         return { setup_completed: setupCompleted };
 
       case 'get_settings':
         if (!storedSettings) {
-          throw new Error('Settings not found');
+          // Возвращаем пустые настройки вместо ошибки — форма будет пустой
+          return {
+            nickname: '',
+            email_address: '',
+            avatar_url: null,
+            smtp_host: '',
+            smtp_port: 587,
+            smtp_security: 'STARTTLS',
+            smtp_username: '',
+            smtp_password: '',
+            smtp_hello_domain: '',
+            imap_host: '',
+            imap_port: 143,
+            imap_security: 'STARTTLS',
+            imap_username: '',
+            imap_password: '',
+            imap_mailbox: 'INBOX',
+            setup_completed: false,
+          };
         }
         return storedSettings;
 

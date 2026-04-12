@@ -1,6 +1,6 @@
 (ns liveletters.frontend-app.pages
   (:require [liveletters.frontend-app.store :as app-store]
-            [liveletters.frontend-app.theme :as theme]
+            [liveletters.frontend-app.theme.core :as theme]
             [liveletters.ui-kit.core :as ui-kit]
             [liveletters.ui-model.core :as ui-model]))
 
