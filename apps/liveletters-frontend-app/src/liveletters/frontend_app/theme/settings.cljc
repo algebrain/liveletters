@@ -3,25 +3,26 @@
 
 (o/defstyled settings-layout :div
   {:display "grid"
-   :gap "22px"})
+   :gap "18px"})
 
 (o/defstyled settings-grid :div
   {:display "grid"
    :grid-template-columns "repeat(auto-fit, minmax(260px, 1fr))"
-   :gap "18px"})
+   :gap "14px"})
 
 (o/defstyled settings-card :section
-  {:padding "20px"
+  {:padding "16px"
    :display "grid"
-   :gap "16px"
-   :border-radius "22px"
-   :background "var(--bg-tertiary)"
-   :border "1px solid rgba(255, 255, 255, 0.06)"}
+   :gap "14px"
+   :border-radius "12px"
+   :background "rgba(30,42,54,0.82)"
+   :border "1px solid rgba(255, 255, 255, 0.04)"}
   [:h3
    {:margin 0
-    :font-size "1.15rem"
-    :letter-spacing "-0.02em"}])
+    :font-size "1rem"
+    :font-weight 600
+    :letter-spacing "-0.01em"}])
 
 (o/defstyled settings-column :div
   {:display "grid"
-   :gap "14px"})
+   :gap "12px"})

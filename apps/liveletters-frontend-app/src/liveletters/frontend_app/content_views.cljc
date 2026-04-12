@@ -16,7 +16,6 @@
 
 (defn feed-page []
   [feed/feed-container {}
-   [feed/feed-header {} "Home feed"]
    [fake-post "alice@example.com" "2 часа назад"
     "Первый тестовый пост. Здесь будет текст записи, который показывается в ленте подписок."]
    [fake-post "bob@dev.local" "5 часов назад"
@@ -66,27 +65,35 @@
 
 (defn editor-page []
   [editor/editor-container {}
-   [editor/editor-header {} "Новый пост"]
    [editor/editor-layout {}
-    ;; Левая панель — редактор
     [editor/editor-pane {}
-     [editor/editor-pane-label {} "Редактор"]
-     [editor/editor-textarea {:placeholder "Введите текст поста в формате Markdown..."}]]
-    ;; Правая панель — предпросмотр
+     [editor/editor-textarea
+      {:default-value (str "## Короткое объявление\n\n"
+                           "Пробую более спокойный экран редактора.\n\n"
+                           "Здесь должно быть меньше обвязки и меньше тяжёлых панелей, "
+                           "чтобы внимание оставалось на тексте.\n\n"
+                           "- простой черновик\n"
+                           "- компактный preview\n"
+                           "- публикация сразу видна внизу\n\n"
+                           "Если направление верное, следующим шагом можно уже подключать "
+                           "реальную форму создания поста.")
+       :placeholder "Введите текст поста в формате Markdown..."}]]
     [editor/editor-pane {}
-     [editor/editor-pane-label {} "Предпросмотр"]
      [editor/preview-pane {}
-      [:div {:style {:color "var(--text-secondary)" :font-style "italic"}}
-       "Здесь будет предпросмотр Markdown..."]]]]
-   ;; Кнопки
+      [editor/preview-title {} "Короткое объявление"]
+      [editor/preview-meta {} "alice@example.com · несколько секунд назад · public"]
+      [editor/preview-body {}
+       [:p {:style {:margin 0}}
+        "Пробую более спокойный экран редактора."]
+       [:p {:style {:margin 0}}
+        "В этом варианте меньше декоративной вложенности и меньше поверхностей, которые спорят с текстом."]
+       [:ul {:style {:margin 0 :padding-left "18px" :color "var(--text-secondary)"}}
+        [:li {} "черновик слева"]
+        [:li {} "preview справа"]
+        [:li {} "кнопки сразу видны внизу"]]]
+      [editor/preview-note {}
+       "Markdown-рендеринг и реальные backend-связи можно подключить следующим этапом, не раздувая экран дополнительными панелями."]]]]
    [editor/editor-actions {}
-    [:button {:type "button"
-              :style {:padding "10px 18px"
-                      :border-radius "10px"
-                      :background "transparent"
-                      :color "var(--text-secondary)"
-                      :border "1px solid rgba(255,255,255,0.08)"
-                      :font-size "14px"
-                      :cursor "pointer"}}
+    [editor/secondary-button {:type "button"}
      "Отмена"]
     [editor/publish-button {} "Опубликовать"]]])

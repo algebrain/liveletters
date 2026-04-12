@@ -1,5 +1,31 @@
 import { test, expect } from "../helpers/fixtures.js";
 
+async function waitForShellLayout(page: Parameters<typeof test>[0]["page"]) {
+  await page.waitForFunction(() => {
+    const topNav = document.querySelector(".ll-top-nav");
+    const sidebar = document.querySelector(".ll-sidebar");
+    const main = document.querySelector(".ll-main");
+
+    if (!topNav || !sidebar || !main) {
+      return false;
+    }
+
+    const topNavRect = topNav.getBoundingClientRect();
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const mainRect = main.getBoundingClientRect();
+    const topNavStyle = window.getComputedStyle(topNav);
+    const mainStyle = window.getComputedStyle(main);
+
+    return (
+      topNavRect.height >= 44 &&
+      sidebarRect.width >= 260 &&
+      mainRect.left > sidebarRect.right - 4 &&
+      topNavStyle.display === "flex" &&
+      mainStyle.overflowY === "auto"
+    );
+  });
+}
+
 test.describe("Setup pending (initial setup)", () => {
   // setupCompleted: false — по умолчанию
   test("shows initial setup form", async ({ page }) => {
@@ -36,7 +62,7 @@ test.describe("Setup completed", () => {
 
   test("shows three-panel layout with sidebar", async ({ page }) => {
     await page.goto("/");
-    await page.waitForTimeout(1500);
+    await waitForShellLayout(page);
 
     // Проверяем sidebar (используем role button чтобы избежать совпадений с заголовками)
     await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
@@ -49,13 +75,17 @@ test.describe("Setup completed", () => {
     await expect(page.getByTitle("Настройки")).toBeVisible();
 
     // Проверяем контент — лента с фейковыми постами
-    await expect(page.getByRole("heading", { name: "Home feed" })).toBeVisible();
     await expect(page.getByText("Первый тестовый пост")).toBeVisible();
+
+    await page.screenshot({
+      path: "screenshots/telegram-layout.png",
+      fullPage: true,
+    });
   });
 
   test("feed page screenshot", async ({ page }) => {
     await page.goto("/");
-    await page.waitForTimeout(1500);
+    await waitForShellLayout(page);
     await page.screenshot({ path: "screenshots/feed-page.png", fullPage: true });
   });
 });

@@ -16,27 +16,29 @@
             :style {:display "flex"
                     :align-items "center"
                     :justify-content "center"
-                    :padding "8px"
-                    :min-width "36px"
-                    :border-radius "8px"
-                    :background (if accent? "var(--accent)" "transparent")
-                    :border (if accent? "none" "1px solid rgba(255,255,255,0.08)")
+                    :padding (if accent? "8px 12px" "8px")
+                    :min-width (if accent? "44px" "34px")
+                    :height "34px"
+                    :border-radius (if accent? "12px" "10px")
+                    :background (if accent? "var(--accent)" "rgba(255,255,255,0.02)")
+                    :border (if accent? "none" "1px solid var(--border-soft)")
                     :color (if accent? "#fff" "var(--text-secondary)")
                     :cursor "pointer"
-                    :transition "background 120ms, color 120ms"}
+                    :box-shadow (if accent? "0 10px 24px rgba(58,115,168,0.22)" "none")
+                    :transition "background 120ms, color 120ms, border-color 120ms"}
             :on-click on-click}
    icon])
 
 (defn- top-nav-bar [store]
   [layout/top-nav {:class "ll-top-nav"}
    ;; Левая группа: навигация
-   [:div {:style {:display "flex" :align-items "center" :gap "4px"}}
+   [:div {:style {:display "flex" :align-items "center" :gap "6px"}}
     [nav-icon-button (icons/icon-back) "Назад"
      #(swap! store assoc :route {:page :feed})]
     [nav-icon-button (icons/icon-forward) "Вперёд"
      #(swap! store assoc :route {:page :feed})]]
    ;; Правая группа: действия
-   [:div {:style {:display "flex" :align-items "center" :gap "6px"}}
+   [:div {:style {:display "flex" :align-items "center" :gap "8px"}}
     [nav-icon-button (icons/icon-pen) "Написать пост"
      #(swap! store assoc :route {:page :editor})
      {:accent? true}]
@@ -81,10 +83,10 @@
      (if setup-done?
        ;; Основной layout: sidebar + main content
        [:div {:style {:display "grid"
-                      :grid-template-rows "48px 1fr"
-                      :grid-template-columns "280px 1fr"
+                      :grid-template-rows "46px 1fr"
+                      :grid-template-columns "286px 1fr"
                       :height "100vh"
-                      :background "var(--bg-primary)"}}
+                      :background "var(--bg-app)"}}
         ;; Top nav bar (на всю ширину)
         [:div {:style {:grid-row "1" :grid-column "1 / span 2"}}
          [top-nav-bar store]]

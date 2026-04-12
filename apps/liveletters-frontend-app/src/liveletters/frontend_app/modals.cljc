@@ -22,7 +22,6 @@
 
 (defn- settings-modal-header [closeable? on-close]
   [modal/modal-header {}
-   [modal/modal-title {} "Settings"]
    (when closeable?
      [modal/modal-close {:type "button" :on-click on-close}
       (close-icon)])])
@@ -149,16 +148,12 @@
   [modal/modal-overlay {:class "ll-modal-overlay"}
    [modal/modal-content {:class "ll-modal-content" :style {:maxWidth "420px"}}
     [modal/modal-header {}
-     [modal/modal-title {} "Add Subscription"]
      [modal/modal-close {:type "button" :on-click on-close}
       (close-icon)]]
     [modal/modal-body {}
-     [:div {:style {:display "grid" :gap "16px"}}
-      [:div {:style {:display "grid" :gap "8px"}}
-       [:label {:style {:fontSize "12px" :fontWeight 600 :textTransform "uppercase"
-                        :letterSpacing "0.08em" :color "var(--text-secondary)"}}
-        "Email Address"]
-       [modal/add-sub-input {:type "email"
-                             :placeholder "user@example.com"}]]
+     [:div {:style {:display "grid" :gap "14px"}}
+      [modal/add-sub-input {:type "email"
+                            :aria-label "Subscription email"
+                            :placeholder "user@example.com"}]
       [:div {:style {:display "flex" :justifyContent "flex-end"}}
        [modal/add-sub-button {} "Subscribe"]]]]]])
