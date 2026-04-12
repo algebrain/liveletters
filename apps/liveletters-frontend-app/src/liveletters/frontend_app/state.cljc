@@ -31,4 +31,5 @@
                  :body ""}
    :runtime {:adapter nil}
    :ui {:loading? false
-        :error nil}})
+        :error nil}
+   :modal nil}) ; nil | :settings | :add-subscription

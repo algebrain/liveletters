@@ -338,10 +338,13 @@
                        :settings-form {}
                        :create-post {}
                        :runtime {:adapter nil}
-                       :ui {}})
+                       :ui {}
+                       :modal nil})
     (is (vector? (core/root-view app-state)))
-    ;; Новая структура: grid layout с sidebar и main-content
-    ;; Проверяем что root-view возвращает валидную структуру
+    ;; root-view теперь возвращает [:<> layout modal], проверяем структуру
     (let [view (core/root-view app-state)]
-      (is (= :div (first view)))
-      (is (map? (second view))))))
+      (is (= :<> (first view)))
+      ;; Второй элемент — layout grid
+      (let [layout (second view)]
+        (is (vector? layout))
+        (is (= :div (first layout)))))))
