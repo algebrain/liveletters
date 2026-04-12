@@ -31,7 +31,7 @@ export default defineConfig({
   forbidOnly: false,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: process.env.WDIO_DIAGNOSTIC ? "line" : "list",
+  reporter: process.env.E2E_DIAGNOSTIC ? "line" : "list",
   timeout: 30000,
 
   use: {

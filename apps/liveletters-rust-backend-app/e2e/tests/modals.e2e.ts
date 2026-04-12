@@ -11,6 +11,13 @@ test.describe("Modals (setup completed)", () => {
     await page.getByTitle("Настройки").click();
     await page.waitForTimeout(500);
 
+    // Прокручиваем модалку вниз чтобы показать IMAP настройки
+    const modalContent = page.locator(".ll-modal-content");
+    await modalContent.evaluate((el) => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+    });
+    await page.waitForTimeout(500);
+
     await page.screenshot({
       path: "screenshots/settings-modal.png",
       fullPage: true,

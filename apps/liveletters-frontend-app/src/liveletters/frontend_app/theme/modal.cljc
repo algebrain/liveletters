@@ -17,8 +17,8 @@
 (o/defstyled modal-content :div
   {:background "var(--bg-secondary)"
    :border-radius "14px"
-   :width "min(600px, 90vw)"
-   :max-height "85vh"
+   :width "min(900px, 95vw)"
+   :max-height "95vh"
    :overflow-y "auto"
    :box-shadow "0 16px 48px rgba(0,0,0,0.4)"
    :border "1px solid rgba(255,255,255,0.08)"})

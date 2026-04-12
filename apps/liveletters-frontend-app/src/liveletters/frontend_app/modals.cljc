@@ -6,6 +6,11 @@
             [liveletters.ui-kit.core :as ui-kit]
             [liveletters.ui-model.core :as ui-model]))
 
+(def security-options
+  [{:value "starttls" :label "STARTTLS"}
+   {:value "tls" :label "TLS / SSL"}
+   {:value "none" :label "None"}])
+
 (defn- close-icon []
   [:svg {:width "18" :height "18" :viewBox "0 0 24 24"
          :fill "none" :stroke "currentColor" :stroke-width "2"
@@ -22,22 +27,9 @@
      [modal/modal-close {:type "button" :on-click on-close}
       (close-icon)])])
 
-(defn settings-modal [store state closeable? on-close]
-  (let [form (ui-model/settings-form-view-model (:settings-form state))
-        adapter (get-in state [:runtime :adapter])
-        error-message (get-in state [:ui :error :message])]
-    [modal/modal-overlay {:class "ll-modal-overlay"}
-     [modal/modal-content {:class "ll-modal-content"}
-      [settings-modal-header closeable? on-close]
-      [modal/modal-body {}
-       (when error-message
-         [ui-kit/error-state {:message error-message}])
-       (settings-form store form)]]]))
-
-;; Reuse the existing settings-fields from pages
-(defn- settings-form [store form]
+(defn- settings-form [store form adapter]
   [settings/settings-layout {:class "ll-settings-form"}
-   [settings/settings-grid
+   [settings/settings-grid {:style {:grid-template-columns "repeat(3, minmax(0, 1fr))"}}
     [settings/settings-card {}
      [:h3 {} "Profile"]
      [settings/settings-column
@@ -76,9 +68,7 @@
                                        {:smtp-port (.. % -target -value)})}]
       [ui-kit/select-input {:label "SMTP security"
                             :value (:smtp-security form)
-                            :options [{:value "starttls" :label "STARTTLS"}
-                                      {:value "tls" :label "TLS / SSL"}
-                                      {:value "none" :label "None"}]
+                            :options security-options
                             :on-change #(app-store/update-settings-form!
                                          store
                                          {:smtp-security (.. % -target -value)})}]
@@ -116,9 +106,7 @@
                                        {:imap-port (.. % -target -value)})}]
       [ui-kit/select-input {:label "IMAP security"
                             :value (:imap-security form)
-                            :options [{:value "starttls" :label "STARTTLS"}
-                                      {:value "tls" :label "TLS / SSL"}
-                                      {:value "none" :label "None"}]
+                            :options security-options
                             :on-change #(app-store/update-settings-form!
                                          store
                                          {:imap-security (.. % -target -value)})}]
@@ -139,10 +127,21 @@
                           :on-change #(app-store/update-settings-form!
                                        store
                                        {:imap-mailbox (.. % -target -value)})}]]]]
-   ;; Save button
-   [:div {:style {:display "flex" :justify-content "flex-end" :marginTop "20px" :gap "10px"}}
+   [:div {:style {:display "flex" :justify-content "flex-end" :gap "10px"}}
     [ui-kit/button {:label "Save settings"
                     :on-click #(app-store/submit-settings! adapter store)}]]])
+
+(defn settings-modal [store state closeable? on-close]
+  (let [form (ui-model/settings-form-view-model (:settings-form state))
+        adapter (get-in state [:runtime :adapter])
+        error-message (get-in state [:ui :error :message])]
+    [modal/modal-overlay {:class "ll-modal-overlay"}
+     [modal/modal-content {:class "ll-modal-content"}
+      [settings-modal-header closeable? on-close]
+      [modal/modal-body {}
+       (when error-message
+         [ui-kit/error-state {:message error-message}])
+       [settings-form store form adapter]]]]))
 
 ;; ---------- Add Subscription Modal ----------
 
