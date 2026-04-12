@@ -5,6 +5,7 @@
             [liveletters.frontend-app.theme.core :as theme]
             [liveletters.frontend-app.theme.layout :as layout]
             [liveletters.frontend-app.sidebar :as sidebar]
+            [liveletters.frontend-app.content-views :as content]
             [liveletters.ui-kit.icons :as icons]))
 
 (defn- nav-icon-button [icon title on-click & [{:keys [accent?]}]]
@@ -44,14 +45,21 @@
      #(swap! store assoc :route (routes/settings-route))]]])
 
 (defn- main-content-area [store state]
-  [:div {:style {:padding "24px"}}
-   (case (selectors/current-page state)
-     :initial-setup (pages/initial-setup-page store state)
-     :post (pages/post-page store state)
-     :sync (pages/sync-page store state)
-     :diagnostics (pages/diagnostics-page store state)
-     :settings (pages/settings-page store state)
-     (pages/feed-page store state))])
+  (let [current-page (selectors/current-page state)]
+    (case current-page
+      ;; Новые стили
+      :feed [content/feed-page]
+      :home [content/feed-page]
+      :post-thread [content/post-thread-page]
+      :editor [content/editor-page]
+      ;; Старые страницы (сохранены для совместимости)
+      :initial-setup (pages/initial-setup-page store state)
+      :post (pages/post-page store state)
+      :sync (pages/sync-page store state)
+      :diagnostics (pages/diagnostics-page store state)
+      :settings (pages/settings-page store state)
+      ;; По умолчанию — лента
+      [content/feed-page])))
 
 (defn root-view [store]
   (let [state @store
@@ -69,8 +77,8 @@
         [top-nav-bar store]]
        ;; Sidebar
        [sidebar/sidebar-view {:active-page current-page
-                              :on-home #(swap! store assoc :route (routes/feed-route))
-                              :on-feed #(swap! store assoc :route (routes/feed-route))
+                              :on-home #(swap! store assoc :route {:page :home})
+                              :on-feed #(swap! store assoc :route {:page :feed})
                               :on-settings #(swap! store assoc :route (routes/settings-route))}]
        ;; Main content
        [layout/main-content {:class "ll-main"}
