@@ -1,0 +1,14 @@
+[package]
+name = "liveletters-diagnostics"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+liveletters-store = { path = "../liveletters-store" }
+
+[dev-dependencies]
+tempfile = { workspace = true }

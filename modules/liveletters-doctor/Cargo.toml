@@ -1,0 +1,18 @@
+[package]
+name = "liveletters-doctor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+liveletters-diagnostics = { path = "../liveletters-diagnostics" }
+liveletters-output = { path = "../liveletters-output" }
+liveletters-store = { path = "../liveletters-store" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

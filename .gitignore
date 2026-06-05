@@ -1,0 +1,6 @@
+target/
+.plans/
+.answers/
+.docs/
+*.local
+*.local.*

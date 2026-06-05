@@ -1,0 +1,26 @@
+[package]
+name = "liveletters-lltt-sync"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+network = ["dep:liveletters-mail", "liveletters-mail/network"]
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+liveletters-mail = { path = "../liveletters-mail", optional = true }
+liveletters-mime = { path = "../liveletters-mime" }
+liveletters-output = { path = "../liveletters-output" }
+liveletters-protocol = { path = "../liveletters-protocol" }
+liveletters-store = { path = "../liveletters-store" }
+liveletters-sync = { path = "../liveletters-sync" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+liveletters-protocol = { path = "../liveletters-protocol" }

@@ -1,0 +1,48 @@
+[workspace]
+resolver = "2"
+members = [
+    "modules/liveletters-domain",
+    "modules/liveletters-protocol",
+    "modules/liveletters-store",
+    "modules/liveletters-mail",
+    "modules/liveletters-sync",
+    "modules/liveletters-app-core",
+    "modules/liveletters-diagnostics",
+    "modules/liveletters-secret-box",
+    "modules/liveletters-mime",
+    "modules/liveletters-config",
+    "modules/liveletters-output",
+    "modules/liveletters-init",
+    "modules/liveletters-cu",
+    "modules/liveletters-sub",
+    "modules/liveletters-feed",
+    "modules/liveletters-inbox",
+    "modules/liveletters-post",
+    "modules/liveletters-comment",
+    "modules/liveletters-outbox",
+    "modules/liveletters-thread",
+    "modules/liveletters-status",
+    "modules/liveletters-doctor",
+    "modules/liveletters-settings",
+    "modules/liveletters-lltt-sync",
+    "apps/lltt",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+version = "0.1.0"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+thiserror = "1"
+tempfile = "3"
+base64 = "0.22"
+chacha20poly1305 = { version = "0.10", features = ["std"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+native-tls = "0.2"
+clap = { version = "4", features = ["derive"] }
+console = "0.15"

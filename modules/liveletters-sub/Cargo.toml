@@ -1,0 +1,21 @@
+[package]
+name = "liveletters-sub"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+liveletters-app-core = { path = "../liveletters-app-core" }
+liveletters-config = { path = "../liveletters-config" }
+liveletters-domain = { path = "../liveletters-domain" }
+liveletters-output = { path = "../liveletters-output" }
+liveletters-store = { path = "../liveletters-store" }
+clap = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

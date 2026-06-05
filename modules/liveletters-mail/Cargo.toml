@@ -1,0 +1,17 @@
+[package]
+name = "liveletters-mail"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+network = ["dep:native-tls"]
+
+[dependencies]
+liveletters-mime = { path = "../liveletters-mime" }
+liveletters-protocol = { path = "../liveletters-protocol" }
+native-tls = { workspace = true, optional = true }

@@ -1,0 +1,19 @@
+[package]
+name = "liveletters-init"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+liveletters-config = { path = "../liveletters-config" }
+liveletters-output = { path = "../liveletters-output" }
+liveletters-secret-box = { path = "../liveletters-secret-box" }
+liveletters-store = { path = "../liveletters-store" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

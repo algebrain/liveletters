@@ -1,0 +1,18 @@
+[package]
+name = "liveletters-sync"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+liveletters-domain = { path = "../liveletters-domain" }
+liveletters-mail = { path = "../liveletters-mail" }
+liveletters-protocol = { path = "../liveletters-protocol" }
+liveletters-store = { path = "../liveletters-store" }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

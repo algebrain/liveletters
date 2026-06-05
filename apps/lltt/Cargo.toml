@@ -1,0 +1,39 @@
+[package]
+name = "lltt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "lltt"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+liveletters-output = { path = "../../modules/liveletters-output" }
+liveletters-config = { path = "../../modules/liveletters-config" }
+liveletters-store = { path = "../../modules/liveletters-store" }
+liveletters-init = { path = "../../modules/liveletters-init" }
+liveletters-cu = { path = "../../modules/liveletters-cu" }
+liveletters-sub = { path = "../../modules/liveletters-sub" }
+liveletters-feed = { path = "../../modules/liveletters-feed" }
+liveletters-inbox = { path = "../../modules/liveletters-inbox" }
+liveletters-post = { path = "../../modules/liveletters-post" }
+liveletters-comment = { path = "../../modules/liveletters-comment" }
+liveletters-outbox = { path = "../../modules/liveletters-outbox" }
+liveletters-thread = { path = "../../modules/liveletters-thread" }
+liveletters-status = { path = "../../modules/liveletters-status" }
+liveletters-doctor = { path = "../../modules/liveletters-doctor" }
+liveletters-settings = { path = "../../modules/liveletters-settings" }
+liveletters-lltt-sync = { path = "../../modules/liveletters-lltt-sync", features = ["network"] }
+liveletters-mail = { path = "../../modules/liveletters-mail", features = ["network"] }
+
+[dev-dependencies]
+assert_cmd = "2"
+liveletters-mail = { path = "../../modules/liveletters-mail" }
+liveletters-mime = { path = "../../modules/liveletters-mime" }
+liveletters-protocol = { path = "../../modules/liveletters-protocol" }
+liveletters-store = { path = "../../modules/liveletters-store" }
+predicates = "3"
+rusqlite = { workspace = true }
+tempfile = { workspace = true }

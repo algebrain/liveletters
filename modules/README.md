@@ -1,0 +1,179 @@
+# Модули LiveLetters
+
+Рабочее пространство `liveletters2` состоит из 24 крейтов. Десять из них — фундаментальные библиотеки. Четырнадцать — оболочки команд CLI `lltt`, каждая в виде отдельного библиотечного креЙта.
+
+Для каждого крейта ниже приведено краткое описание его назначения (без кода) и ссылки на два документа: `INTERFACE.md` с публичной поверхностью и `TECHNICAL_SPEC.md` с архитектурой и обоснованиями.
+
+## Базовые библиотеки
+
+#### [`liveletters-domain`](./liveletters-domain/)
+
+Описывает ядро предметной области: идентификаторы аккаунтов и ресурсов, посты, комментарии, события. Не зависит от других креЙтов и задаёт только структуру данных, без логики хранения или передачи.
+
+- [INTERFACE.md](./liveletters-domain/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-domain/TECHNICAL_SPEC.md)
+
+#### [`liveletters-store`](./liveletters-store/)
+
+Хранилище данных на SQLite: схема, миграции, операции над записями постов, комментариев, сырых сообщений и отложенных событий. Задаёт также стандартное размещение файлов через `StorePaths` и чистую функцию `resolve_data_dir` для разрешения домашнего каталога.
+
+- [INTERFACE.md](./liveletters-store/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-store/TECHNICAL_SPEC.md)
+
+#### [`liveletters-config`](./liveletters-config/)
+
+Чтение и запись TOML-конфигов: глобального `config.toml` в корне домашнего каталога и отдельных файлов `identities/<имя>.toml` для каждой идентичности. Содержит типы почтовых настроек и подписок.
+
+- [INTERFACE.md](./liveletters-config/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-config/TECHNICAL_SPEC.md)
+
+#### [`liveletters-secret-box`](./liveletters-secret-box/)
+
+Криптографическая обёртка для локальной защиты секретов. Шифрует пароли почтовых учётных записей через XChaCha20-Poly1305 с ключом в отдельном файле, чтобы они не лежали в базе открытым текстом.
+
+- [INTERFACE.md](./liveletters-secret-box/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-secret-box/TECHNICAL_SPEC.md)
+
+#### [`liveletters-mime`](./liveletters-mime/)
+
+Разбор и сборка MIME-сообщений. Используется при обработке входящих протокольных писем и формировании исходящих, включая поддержку составных частей и заголовков.
+
+- [INTERFACE.md](./liveletters-mime/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-mime/TECHNICAL_SPEC.md)
+
+#### [`liveletters-mail`](./liveletters-mail/)
+
+Почтовый транспорт. Содержит реальные SMTP-отправку и IMAP-получение через сетевые сокеты, без подделок в памяти. Сетевые части подключаются по признаку компиляции.
+
+- [INTERFACE.md](./liveletters-mail/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-mail/TECHNICAL_SPEC.md)
+
+#### [`liveletters-protocol`](./liveletters-protocol/)
+
+Описание протокола обмена сообщениями между узлами LiveLetters: схема JSON-сообщений, сериализация событий, валидация конвертов. Не зависит от транспорта.
+
+- [INTERFACE.md](./liveletters-protocol/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-protocol/TECHNICAL_SPEC.md)
+
+#### [`liveletters-sync`](./liveletters-sync/)
+
+Движок синхронизации. Принимает сырые входящие сообщения, устраняет дубликаты, откладывает обработку сложных событий и формирует отчёт `SyncReport` с категориями «применено», «отложено», «отклонено».
+
+- [INTERFACE.md](./liveletters-sync/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-sync/TECHNICAL_SPEC.md)
+
+#### [`liveletters-app-core`](./liveletters-app-core/)
+
+Координатор пользовательских сценариев. Сводит вместе `liveletters-domain`, `liveletters-store` и `liveletters-sync` в одну точку входа, через которую верхние слои вызывают операции чтения и записи.
+
+- [INTERFACE.md](./liveletters-app-core/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-app-core/TECHNICAL_SPEC.md)
+
+#### [`liveletters-diagnostics`](./liveletters-diagnostics/)
+
+Набор проверок состояния системы: целостность базы, наличие ключевого файла, валидность конфигов, доступность почтовых серверов. Используется командой `lltt doctor` для формирования сводного отчёта.
+
+- [INTERFACE.md](./liveletters-diagnostics/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-diagnostics/TECHNICAL_SPEC.md)
+
+## Команды CLI
+
+#### [`liveletters-init`](./liveletters-init/)
+
+Команда `lltt init`. Создаёт домашний каталог со всеми подкаталогами, файл базы, ключ обфускации и дефолтную идентичность. Идемпотентна: повторный запуск требует пустой каталог или флаг `--force`.
+
+- [INTERFACE.md](./liveletters-init/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-init/TECHNICAL_SPEC.md)
+
+#### [`liveletters-cu`](./liveletters-cu/)
+
+Команда `lltt cu`. Управляет текущей идентичностью: переключение, список, просмотр с маскированием пароля, добавление из файла, удаление с подтверждением.
+
+- [INTERFACE.md](./liveletters-cu/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-cu/TECHNICAL_SPEC.md)
+
+#### [`liveletters-sub`](./liveletters-sub/)
+
+Команда `lltt sub`. Управляет подписками текущего пользователя liveletters на блоги других пользователей: `subscribe` (запись в `meta.subscriptions` + таблицу `subscriptions` + событие `subscription_changed` в `outbox`), `list` (таблица текущих подписок) и `rm` (отписка с событием `unsubscribe`).
+
+- [INTERFACE.md](./liveletters-sub/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-sub/TECHNICAL_SPEC.md)
+
+#### [`liveletters-feed`](./liveletters-feed/)
+
+Команда `lltt feed`. Выводит ленту текущего пользователя liveletters в человекочитаемом виде с шапкой `display_name`, счётчиком постов и блоками постов (`visibility`, дата, тело). Поддерживает `--limit <N>`.
+
+- [INTERFACE.md](./liveletters-feed/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-feed/TECHNICAL_SPEC.md)
+
+#### [`liveletters-inbox`](./liveletters-inbox/)
+
+Команда `lltt inbox`. Реализована подкоманда `import <файл…>`: читает `.eml`-файлы, прогоняет через `SyncEngine::ingest_batch` и печатает сводный отчёт по категориям (применено, дубликат, отложено, отфильтровано, отклонено). Подкоманды `list` и `show` запланированы.
+
+- [INTERFACE.md](./liveletters-inbox/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-inbox/TECHNICAL_SPEC.md)
+
+#### [`liveletters-post`](./liveletters-post/)
+
+Команда `lltt post`. Создаёт новую запись в блоге текущего пользователя liveletters. Реализация запланирована.
+
+- [INTERFACE.md](./liveletters-post/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-post/TECHNICAL_SPEC.md)
+
+#### [`liveletters-comment`](./liveletters-comment/)
+
+Команда `lltt comment`. Создаёт комментарий к существующему посту. Реализация запланирована.
+
+- [INTERFACE.md](./liveletters-comment/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-comment/TECHNICAL_SPEC.md)
+
+#### [`liveletters-outbox`](./liveletters-outbox/)
+
+Команда `lltt outbox`. Показывает очередь исходящих сообщений, ожидающих отправки. Реализация запланирована.
+
+- [INTERFACE.md](./liveletters-outbox/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-outbox/TECHNICAL_SPEC.md)
+
+#### [`liveletters-thread`](./liveletters-thread/)
+
+Команда `lltt thread`. Выводит дерево комментариев к указанному посту. Реализация запланирована.
+
+- [INTERFACE.md](./liveletters-thread/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-thread/TECHNICAL_SPEC.md)
+
+#### [`liveletters-status`](./liveletters-status/)
+
+Команда `lltt status`. Краткий отчёт о состоянии системы: имя текущей идентичности, число постов, число непрочитанных входящих сообщений. Реализация запланирована.
+
+- [INTERFACE.md](./liveletters-status/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-status/TECHNICAL_SPEC.md)
+
+#### [`liveletters-doctor`](./liveletters-doctor/)
+
+Команда `lltt doctor`. Запускает полную диагностику через `liveletters-diagnostics` и печатает сводный отчёт по всем проверкам. Реализация запланирована.
+
+- [INTERFACE.md](./liveletters-doctor/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-doctor/TECHNICAL_SPEC.md)
+
+#### [`liveletters-settings`](./liveletters-settings/)
+
+Команда `lltt settings`. Показывает и изменяет пользовательские настройки, такие как адреса для входящих комментариев и параметры отображения. Реализация запланирована.
+
+- [INTERFACE.md](./liveletters-settings/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-settings/TECHNICAL_SPEC.md)
+
+#### [`liveletters-lltt-sync`](./liveletters-lltt-sync/)
+
+Команда `lltt sync`. Запускает сетевую синхронизацию с почтовым сервером. Реализация запланирована. Не путать с библиотекой `liveletters-sync` — это разные крейты: первый — оболочка команды, второй — сам движок.
+
+- [INTERFACE.md](./liveletters-lltt-sync/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-lltt-sync/TECHNICAL_SPEC.md)
+
+## Утилиты вывода
+
+#### [`liveletters-output`](./liveletters-output/)
+
+Общие функции человекочитаемого вывода для команд `lltt`. Содержит единую точку маскирования секретов, печать пар «ключ-значение», таблиц с выравниванием колонок и полной идентичности с разбиением на секции. Не выполняет бизнес-логики и не обращается к базе.
+
+- [INTERFACE.md](./liveletters-output/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-output/TECHNICAL_SPEC.md)

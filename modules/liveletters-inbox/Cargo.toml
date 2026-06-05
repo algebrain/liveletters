@@ -1,0 +1,20 @@
+[package]
+name = "liveletters-inbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+liveletters-mime = { path = "../liveletters-mime" }
+liveletters-output = { path = "../liveletters-output" }
+liveletters-store = { path = "../liveletters-store" }
+liveletters-sync = { path = "../liveletters-sync" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+liveletters-protocol = { path = "../liveletters-protocol" }
+tempfile = { workspace = true }

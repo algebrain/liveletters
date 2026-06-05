@@ -1,0 +1,19 @@
+[package]
+name = "liveletters-app-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+liveletters-domain = { path = "../liveletters-domain" }
+liveletters-protocol = { path = "../liveletters-protocol" }
+liveletters-sync = { path = "../liveletters-sync" }
+liveletters-store = { path = "../liveletters-store" }
+
+[dev-dependencies]
+liveletters-mail = { path = "../liveletters-mail" }
+serde_json = { workspace = true }
+tempfile = { workspace = true }

@@ -1,0 +1,15 @@
+[package]
+name = "liveletters-output"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+liveletters-config = { path = "../liveletters-config" }
+liveletters-domain = { path = "../liveletters-domain" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
