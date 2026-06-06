@@ -7,10 +7,8 @@
 ## Зона ответственности
 
 - идемпотентное создание каталога `home` и его подкаталогов;
-- инициализация SQLite-БД через `liveletters-store::Store::open_for_home_dir`;
+- инициализация корневой служебной SQLite-БД совместимости через `liveletters-store::Store::open_for_home_dir`;
 - создание/открытие файла `mail-password-obfuscation.key` через `liveletters-secret-box`;
-- создание минимальной `identities/default.toml`;
-- запись файла `current-user`.
 
 ## Что команда не делает
 
@@ -18,7 +16,7 @@
 - не создаёт ничего вне `ctx.home`;
 - не модифицирует переменные окружения (это задача команды `home`);
 - не печатает пароли и не логирует секреты;
-- не открывает существующие идентичности, кроме `default`.
+- не создаёт пользователя по умолчанию и не выбирает текущего пользователя.
 
 ## Алгоритм
 
@@ -26,12 +24,10 @@
 fn run_inner(home, force):
     ensure_home_empty(home, force)
     fs::create_dir_all(home)
-    for sub in ["identities", "inbox", "outbox-staged", "logs"]:
+    for sub in ["identities", "drafts", "inbox", "outbox-staged", "logs", "users"]:
         fs::create_dir_all(home/sub)
     Store::open_for_home_dir(home)   # создаёт liveletters.sqlite3
     SecretBox::open_or_create(default_key_path(home))  # mail-password-obfuscation.key
-    save_identity(home, "default", default_identity())
-    fs::write(home/current-user, "default")
 ```
 
 ## Структура файлов
@@ -43,7 +39,7 @@ modules/liveletters-init/
 │   ├── lib.rs
 │   ├── args.rs        # Args { force }
 │   ├── error.rs       # InitError (thiserror)
-│   └── run.rs         # run, run_inner, ensure_home_empty, default_identity
+│   └── run.rs         # run, run_inner, ensure_home_empty
 └── tests/
     ├── common/mod.rs  # init_ctx() helper
     └── init_flow.rs   # 4 unit-теста
@@ -56,29 +52,9 @@ modules/liveletters-init/
 | не существует | `false`/`true` | OK (создаём с нуля) |
 | существует, пуст | `false`/`true` | OK (заполняем) |
 | существует, не пуст | `false` | `Err(InitError::AlreadyExists(home))` |
-| существует, не пуст | `true` | OK (дописываем недостающее; существующие файлы перезаписываются) |
+| существует, не пуст | `true` | OK (создаём недостающее; существующие файлы не удаляются) |
 
 Решение «не пуст» принимается по наличию хотя бы одной записи в `home.read_dir()?.next()`. Скрытые файлы (`.foo`) тоже считаются не-пустотой — это сделано намеренно, чтобы `init` не молча перезаписывал пользовательские `.git`, `.DS_Store` и т.п.
-
-## `default_identity()`
-
-Минимально валидный `IdentityConfig`:
-
-```rust
-IdentityConfig {
-    account_id: "acct_default",
-    display_name: "default",
-    mail: MailSettings {
-        publish: "",
-        receive: [],
-        smtp: None,
-        imap: None,
-    },
-    meta: IdentityMeta::default(),  // resources_owned: [], subscriptions: []
-}
-```
-
-`mail.smtp` и `mail.imap` — `None`, потому что сейчас нет ни одного настроенного почтового сервера. Команда `cu add` заполнит их позже, когда пользователь укажет реальные учётки.
 
 ## `mail-password-obfuscation.key`
 
@@ -93,7 +69,6 @@ IdentityConfig {
 
 | Крейт | Зачем |
 |---|---|
-| `liveletters-config` | сериализация `IdentityConfig` в TOML |
 | `liveletters-output` | `CommandContext` (единая точка прокидывания home/identity) |
 | `liveletters-secret-box` | создание ключа обфускации |
 | `liveletters-store` | инициализация SQLite-БД |
@@ -104,7 +79,7 @@ IdentityConfig {
 
 Юнит-тесты в `modules/liveletters-init/tests/init_flow.rs`:
 
-- `init_creates_expected_layout` — после `init` существуют 4 подкаталога, `liveletters.sqlite3`, `mail-password-obfuscation.key`, `identities/default.toml`, `current-user` со значением `default`;
+- `init_creates_expected_layout` — после `init` существуют служебные подкаталоги, `liveletters.sqlite3` и `mail-password-obfuscation.key`;
 - `init_is_idempotent_when_home_empty` — повторный `init` на пустом каталоге отрабатывает без ошибок;
 - `init_fails_when_home_not_empty_without_force` — каталог с произвольным файлом → `InitError::AlreadyExists`;
 - `init_force_overwrites_existing_files` — с `--force` каталог с посторонним файлом инициализируется, а файл остаётся на диске.

@@ -40,7 +40,7 @@ subscriptions = ["{resource}"]
 }
 
 fn save_post(tmp: &TempDir, post_id: &str, resource_id: &str, author_id: &str, created_at: u64) {
-    let store = Store::open_for_home_dir(tmp.path()).unwrap();
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
     store
         .save_post_record(&PostRecord {
             post_id: post_id.into(),
@@ -71,18 +71,13 @@ fn feed_no_longer_shows_current_users_own_posts() {
     let tmp = TempDir::new().unwrap();
     init_home(&tmp);
 
-    let store = Store::open_for_home_dir(tmp.path()).unwrap();
-    store
-        .save_post_record(&PostRecord {
-            post_id: "own-post".into(),
-            resource_id: "alice@example.org".into(),
-            author_id: "acct_alice".into(),
-            created_at: 1_710_000_000,
-            body: "мой пост".into(),
-            visibility: "public".into(),
-            hidden: false,
-        })
-        .unwrap();
+    save_post(
+        &tmp,
+        "own-post",
+        "alice@example.org",
+        "acct_alice",
+        1_710_000_000,
+    );
 
     let assert = lltt()
         .env("LIVELETTERS_HOME", tmp.path())
@@ -146,6 +141,45 @@ fn feed_shows_subscribed_posts_and_hides_unsubscribed_posts() {
         .stdout(contains("subscribed"))
         .stdout(contains("own").not())
         .stdout(contains("unsubscribed").not());
+}
+
+#[test]
+fn feed_does_not_read_posts_from_shared_home_database() {
+    let tmp = TempDir::new().unwrap();
+    common::init_user(tmp.path(), "algebrain");
+    common::write_identity(tmp.path(), "austin");
+    subscribe_alice_to(&tmp, "algebrain@example.org");
+    std::fs::rename(
+        tmp.path().join("identities/alice.toml"),
+        tmp.path().join("identities/austin.toml"),
+    )
+    .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["cu", "austin"])
+        .assert()
+        .success();
+
+    let shared_store = Store::open_for_home_dir(tmp.path()).unwrap();
+    shared_store
+        .save_post_record(&PostRecord {
+            post_id: "shared-db-post".into(),
+            resource_id: "algebrain@example.org".into(),
+            author_id: "acct_algebrain".into(),
+            created_at: 1_710_000_400,
+            body: "shared-db-post".into(),
+            visibility: "public".into(),
+            hidden: false,
+        })
+        .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("feed")
+        .assert()
+        .success()
+        .stdout(contains("shared-db-post").not());
 }
 
 #[test]

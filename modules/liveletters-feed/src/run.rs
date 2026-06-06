@@ -25,7 +25,7 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), FeedError> {
         .map(String::as_str)
         .collect::<HashSet<_>>();
 
-    let store = Store::open_for_home_dir(&ctx.home)?;
+    let store = Store::open_for_home_dir(&ctx.state_home)?;
     let posts = store
         .list_posts()?
         .into_iter()

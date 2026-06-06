@@ -19,7 +19,7 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), OutboxError> {
 }
 
 fn run_list(ctx: &CommandContext) -> Result<(), OutboxError> {
-    let store = Store::open_for_home_dir(&ctx.home)?;
+    let store = Store::open_for_home_dir(&ctx.state_home)?;
     let pending = get_pending_outbox(&store, GetPendingOutboxQuery)?;
 
     print_summary(&pending);

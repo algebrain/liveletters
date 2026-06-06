@@ -244,7 +244,8 @@ fn sync_without_subcommand_runs_pull_then_push() {
     let (smtp_host, smtp_port) = spawn_fake_smtp(Arc::clone(&rcpts));
     set_split_mail_settings(&tmp, &smtp_host, smtp_port, &imap_host, imap_port);
 
-    let store = liveletters_store::Store::open_for_home_dir(tmp.path()).expect("store");
+    let store =
+        liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).expect("store");
     store
         .save_subscription(&liveletters_store::SubscriptionRecord {
             resource_address: "blog-1".into(),
@@ -307,7 +308,8 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
     let (host, port) = spawn_fake_smtp(Arc::clone(&rcpts));
     set_mail_settings(&tmp, &host, port);
 
-    let store = liveletters_store::Store::open_for_home_dir(tmp.path()).expect("store");
+    let store =
+        liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).expect("store");
     store
         .save_subscription(&liveletters_store::SubscriptionRecord {
             resource_address: "blog-1".into(),

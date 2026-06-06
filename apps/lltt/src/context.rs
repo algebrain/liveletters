@@ -10,6 +10,8 @@ use liveletters_store::resolve_data_dir_from_env;
 /// Имя файла, в котором хранится имя текущего пользователя liveletters.
 const CURRENT_USER_FILE: &str = "current-user";
 
+const USERS_DIR: &str = "users";
+
 /// Разрешает домашний каталог из `LIVELETTERS_HOME` или возвращает
 /// `<user-home>/.liveletters/` (Unix — `$HOME`, Windows — `%USERPROFILE%`).
 pub fn resolve_home() -> PathBuf {
@@ -49,10 +51,20 @@ pub fn build_context(mode: ContextMode) -> Result<CommandContext, ContextError> 
         }
         ContextMode::RequiresCurrent => resolve_current_user_name(&home)?,
     };
+    let state_home = if identity_name.is_empty() {
+        home.clone()
+    } else {
+        user_state_home(&home, &identity_name)
+    };
     Ok(CommandContext {
         home,
+        state_home,
         identity_name,
     })
+}
+
+pub fn user_state_home(home: &Path, identity_name: &str) -> PathBuf {
+    home.join(USERS_DIR).join(identity_name)
 }
 
 #[derive(Debug)]

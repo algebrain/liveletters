@@ -10,6 +10,11 @@ use std::path::PathBuf;
 pub struct CommandContext {
     /// Разрешённый `LIVELETTERS_HOME` (или `~/.liveletters/` по умолчанию).
     pub home: PathBuf,
+    /// Каталог локального состояния текущего пользователя liveletters.
+    ///
+    /// В обычном CLI это `<home>/users/<identity_name>`. В модульных тестах
+    /// может совпадать с `home`, если тест проверяет крейт изолированно.
+    pub state_home: PathBuf,
     /// Результат [`liveletters_config::resolve_identity_name`].
     ///
     /// [`liveletters_config::resolve_identity_name`]: ../../liveletters-config/src/lib.rs

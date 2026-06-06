@@ -11,7 +11,7 @@ use liveletters_sync::{SyncEngine, SyncMessageOutcome, SyncReport};
 use crate::error::SyncError;
 
 pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
-    let store = Store::open_for_home_dir(&ctx.home)?;
+    let store = Store::open_for_home_dir(&ctx.state_home)?;
     let profile_id = default_profile_id(&ctx.identity_name);
     let mail = store
         .get_mail_settings_record(&profile_id)?

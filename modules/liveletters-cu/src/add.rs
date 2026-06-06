@@ -22,7 +22,8 @@ pub fn run(
     let mut cfg: IdentityConfig = toml::from_str(&raw)
         .map_err(|e| CuError::Config(liveletters_config::ConfigError::Toml(e.to_string())))?;
     let mut confirmer = DialoguerPasswordConfirmer;
-    let changed = obfuscate_identity_passwords(&ctx.home, &mut cfg, &mut confirmer)?;
+    let user_state_home = ctx.home.join("users").join(name);
+    let changed = obfuscate_identity_passwords(&user_state_home, &mut cfg, &mut confirmer)?;
     if changed {
         let obfuscated = toml::to_string_pretty(&cfg)
             .map_err(|e| CuError::Config(liveletters_config::ConfigError::Toml(e.to_string())))?;
@@ -43,7 +44,7 @@ fn save_mail_settings_from_identity(
         return Ok(());
     }
 
-    let store = Store::open_for_home_dir(&ctx.home)?;
+    let store = Store::open_for_home_dir(ctx.home.join("users").join(name))?;
     let smtp = cfg.mail.smtp();
     let imap = cfg.mail.imap();
     let record = MailSettingsRecord {

@@ -28,6 +28,7 @@ fn current_action_errors_when_no_current_user_file() {
     let home = common::TestHome::new();
     let ctx = CommandContext {
         home: home.path().to_path_buf(),
+        state_home: home.path().to_path_buf(),
         identity_name: "default".to_owned(),
     };
     let err = run_current(&ctx, &tokens(&[])).unwrap_err();

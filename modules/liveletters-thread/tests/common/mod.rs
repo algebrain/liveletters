@@ -17,6 +17,7 @@ impl TestHome {
     pub fn ctx(&self, identity: &str) -> CommandContext {
         CommandContext {
             home: self.dir.path().to_path_buf(),
+            state_home: self.dir.path().to_path_buf(),
             identity_name: identity.to_owned(),
         }
     }

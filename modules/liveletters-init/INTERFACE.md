@@ -2,7 +2,7 @@
 
 ## Назначение
 
-`liveletters-init` — реализация команды `lltt init`. Подготавливает домашний каталог `lltt`: создаёт подкаталоги, БД, файл ключа обфускации паролей, минимальную идентичность `default` и файл `current-user`. Команда идемпотентна: повторный запуск требует пустой каталог или флаг `--force`.
+`liveletters-init` — реализация команды `lltt init`. Подготавливает домашний каталог `lltt`: создаёт подкаталоги, корневую служебную БД совместимости и файл ключа обфускации паролей. Пользователя по умолчанию не создаёт. Команда идемпотентна: повторный запуск требует пустой каталог или флаг `--force`.
 
 ## Где находится интерфейс
 
@@ -32,7 +32,7 @@ pub struct Args {
 ```
 
 - `force == false` (по умолчанию): `init` отказывается работать, если `home` уже существует и не пуст (ошибка `InitError::AlreadyExists`).
-- `force == true`: перезаписывает содержимое каталога.
+- `force == true`: разрешает инициализацию непустого каталога без удаления существующих файлов.
 
 Никаких других аргументов у команды нет: путь к `home` берётся из `CommandContext.home`, который в свою очередь получается из `LIVELETTERS_HOME` или `~/.liveletters/`.
 
@@ -71,23 +71,20 @@ pub fn run(
 Шаги:
 
 1. `ensure_home_empty(home, args.force)` — отказ, если каталог существует и не пуст без `--force`.
-2. Создаёт `home` и подкаталоги `identities/`, `inbox/`, `outbox-staged/`, `logs/`.
+2. Создаёт `home` и подкаталоги `identities/`, `drafts/`, `inbox/`, `outbox-staged/`, `logs/`, `users/`.
 3. Открывает БД через `Store::open_for_home_dir(home)` (создаёт `liveletters.sqlite3` и инициализирует схему).
 4. Создаёт/открывает файл `mail-password-obfuscation.key` через `SecretBox::open_or_create`.
-5. Записывает минимальную `identities/default.toml` через `liveletters_config::save_identity`.
-6. Записывает файл `current-user` со значением `default`.
-7. Печатает в stdout пять строк отчёта.
+5. Печатает в stdout пять строк отчёта.
 
 ## Поведение и побочные эффекты
 
 - команда **не модифицирует** `home`, если он не пуст и `--force` не передан;
-- при `force == true` команда **создаёт** отсутствующие подкаталоги и перезаписывает существующие файлы (`liveletters.sqlite3`, `mail-password-obfuscation.key`, `identities/default.toml`, `current-user`);
+- при `force == true` команда **создаёт** отсутствующие подкаталоги и служебные файлы, но не удаляет уже существующее содержимое;
 - команда **не трогает** уже существующие идентичности в `identities/`;
-- после успешного `init` база готова к работе всех остальных команд (`feed`, `inbox import`, `post new`, и т. д.).
+- после успешного `init` нужно создать и выбрать пользователя через `lltt user init`, `lltt user add`, `lltt cu <имя>`; рабочая БД пользователя будет создана в `<home>/users/<имя>/`.
 
 ## Зависимости
 
-- `liveletters-config` — `IdentityConfig`, `save_identity`;
 - `liveletters-output` — `CommandContext`;
 - `liveletters-secret-box` — `SecretBox::open_or_create`, `default_key_path`;
 - `liveletters-store` — `Store::open_for_home_dir`;
@@ -101,16 +98,16 @@ use liveletters_init::{run, Args, CommandContext};
 use std::path::PathBuf;
 
 let tmp = tempfile::tempdir()?;
-let ctx = CommandContext { home: tmp.path().to_path_buf(), identity_name: "default".to_owned() };
+let ctx = CommandContext {
+    home: tmp.path().to_path_buf(),
+    state_home: tmp.path().to_path_buf(),
+    identity_name: String::new(),
+};
 let args = Args { force: false };
 run(&ctx, &args)?;
 
 // Проверяем, что всё на месте
-assert!(tmp.path().join("identities/default.toml").exists());
 assert!(tmp.path().join("liveletters.sqlite3").exists());
 assert!(tmp.path().join("mail-password-obfuscation.key").exists());
-assert_eq!(
-    std::fs::read_to_string(tmp.path().join("current-user"))?.trim(),
-    "default"
-);
+assert!(tmp.path().join("users").exists());
 ```

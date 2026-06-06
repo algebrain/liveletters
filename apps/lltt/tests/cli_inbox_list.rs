@@ -56,6 +56,41 @@ fn inbox_list_with_status_filter() {
 }
 
 #[test]
+fn inbox_list_does_not_show_other_users_messages() {
+    let tmp = TempDir::new().expect("tempdir");
+    let home = tmp.path().to_path_buf();
+    common::init_user(&home, "alice");
+    common::write_identity(&home, "bob");
+
+    let eml = common::write_post_eml(&home, "post-1", "Привет, мир");
+    lltt()
+        .env("LIVELETTERS_HOME", &home)
+        .arg("inbox")
+        .arg("import")
+        .arg(&eml)
+        .assert()
+        .success();
+
+    lltt()
+        .env("LIVELETTERS_HOME", &home)
+        .args(["cu", "bob"])
+        .assert()
+        .success();
+
+    let assert = lltt()
+        .env("LIVELETTERS_HOME", &home)
+        .args(["inbox", "list"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(stdout.contains("входящих всего: 0"), "stdout = {stdout}");
+    assert!(
+        !stdout.contains("post-1@example.test"),
+        "message_id чужого пользователя виден: {stdout}"
+    );
+}
+
+#[test]
 fn inbox_list_rejects_unknown_status() {
     let tmp = TempDir::new().expect("tempdir");
     common::init_user(tmp.path(), "alice");

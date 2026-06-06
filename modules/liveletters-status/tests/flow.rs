@@ -32,9 +32,10 @@ fn run_uses_real_store() {
     let tmp = tempfile::tempdir().unwrap();
     let ctx = CommandContext {
         home: tmp.path().to_path_buf(),
+        state_home: tmp.path().to_path_buf(),
         identity_name: "default".to_owned(),
     };
-    let _ = liveletters_store::Store::open_for_home_dir(&ctx.home).unwrap();
+    let _ = liveletters_store::Store::open_for_home_dir(&ctx.state_home).unwrap();
     liveletters_status::run(&ctx, &Args {}).unwrap();
 }
 
@@ -54,6 +55,7 @@ fn run_reports_inserted_posts() {
         .unwrap();
     let ctx = CommandContext {
         home: tmp.path().to_path_buf(),
+        state_home: tmp.path().to_path_buf(),
         identity_name: "default".to_owned(),
     };
     liveletters_status::run(&ctx, &Args {}).unwrap();

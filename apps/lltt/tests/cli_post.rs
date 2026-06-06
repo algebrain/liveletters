@@ -35,7 +35,8 @@ fn post_new_creates_persisted_post() {
         .success()
         .stdout(contains("запись создана:"));
 
-    let db = rusqlite::Connection::open(tmp.path().join("liveletters.sqlite3")).unwrap();
+    let db =
+        rusqlite::Connection::open(tmp.path().join("users/alice/liveletters.sqlite3")).unwrap();
     let count: i64 = db
         .query_row("SELECT COUNT(*) FROM posts", [], |r| r.get::<_, i64>(0))
         .unwrap();
@@ -69,7 +70,8 @@ fn post_new_with_friends_only_visibility() {
         .assert()
         .success();
 
-    let db = rusqlite::Connection::open(tmp.path().join("liveletters.sqlite3")).unwrap();
+    let db =
+        rusqlite::Connection::open(tmp.path().join("users/alice/liveletters.sqlite3")).unwrap();
     let visibility: String = db
         .query_row("SELECT visibility FROM posts LIMIT 1", [], |r| {
             r.get::<_, String>(0)

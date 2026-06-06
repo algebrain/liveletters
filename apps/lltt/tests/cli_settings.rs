@@ -76,8 +76,8 @@ fn settings_set_password_obfuscates_via_binary() {
         .assert()
         .success();
 
-    let db_path = home.join("liveletters.sqlite3");
-    assert!(db_path.exists(), "БД должна быть создана init-ом");
+    let db_path = home.join("users/alice/liveletters.sqlite3");
+    assert!(db_path.exists(), "БД пользователя должна быть создана");
     let conn = Connection::open(&db_path).expect("open sqlite");
     let stored: String = conn
         .query_row("SELECT smtp_password FROM mail_settings LIMIT 1", [], |r| {

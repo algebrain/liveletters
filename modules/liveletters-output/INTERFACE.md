@@ -11,7 +11,7 @@
 
 Наружу экспортируются:
 
-- структура `CommandContext` — минимальный контекст команды (`{ home: PathBuf, identity_name: String }`);
+- структура `CommandContext` — минимальный контекст команды (`{ home: PathBuf, state_home: PathBuf, identity_name: String }`);
 - функция `mask_password(plain: &str, reveal: bool) -> String` — единая точка маскирования секретов в выводе;
 - функция `print_kv(pairs: &[(&str, &str)])` — печать пар «ключ: значение»;
 - функция `print_table(headers: &[&str], rows: &[Vec<String>])` — печать таблицы с выравниванием колонок;
@@ -25,13 +25,15 @@
 ```rust
 pub struct CommandContext {
     pub home: PathBuf,
+    pub state_home: PathBuf,
     pub identity_name: String,
 }
 ```
 
 Контекст передаётся первым аргументом в `pub fn run(&CommandContext, &Args) -> Result<(), Box<dyn Error + Send + Sync>>` каждого командного крейта. Содержит:
 
-- `home` — путь к домашнему каталогу `lltt` (значение переменной `LIVELETTERS_HOME` или `<user-home>/.liveletters/`, см. `liveletters-store::resolve_data_dir_from_env`);
+- `home` — путь к общему домашнему каталогу `lltt` (значение переменной `LIVELETTERS_HOME` или `<user-home>/.liveletters/`, см. `liveletters-store::resolve_data_dir_from_env`). В нём лежат `identities/`, `drafts/` и `current-user`;
+- `state_home` — каталог локального состояния текущего пользователя. В обычном CLI это `<home>/users/<identity_name>`. Именно отсюда команды открывают SQLite-БД, исходящую очередь, входящие письма и курсоры синхронизации;
 - `identity_name` — имя текущего пользователя liveletters (читается из файла `<home>/current-user` через `liveletters_config::read_current_identity`). В коде называется `identity_name` (исторически), в публичной документации — «текущий пользователь liveletters».
 
 ## `mask_password`
@@ -109,7 +111,11 @@ use liveletters_output::{print_identity, CommandContext};
 use std::path::PathBuf;
 
 let home = PathBuf::from("/var/lib/lltt");
-let ctx = CommandContext { home: home.clone(), identity_name: "alice".to_owned() };
+let ctx = CommandContext {
+    home: home.clone(),
+    state_home: home.join("users/alice"),
+    identity_name: "alice".to_owned(),
+};
 let cfg = load_identity(&ctx.home, &ctx.identity_name)?;
 print_identity(&cfg, false); // пароли скрыты
 ```

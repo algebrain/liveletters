@@ -13,7 +13,7 @@ pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send
 }
 
 fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), ThreadError> {
-    let store = Store::open_for_home_dir(&ctx.home)?;
+    let store = Store::open_for_home_dir(&ctx.state_home)?;
     let thread = get_post_thread(
         &store,
         GetPostThreadQuery {

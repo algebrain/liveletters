@@ -104,7 +104,7 @@ mailbox = "INBOX"
     assert!(tmp.path().join("identities/alice.toml").exists());
     assert!(!tmp.path().join("current-user").exists());
 
-    let store = Store::open_for_home_dir(tmp.path()).unwrap();
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
     let mail = store
         .get_mail_settings_record("alice")
         .unwrap()

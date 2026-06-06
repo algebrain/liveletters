@@ -67,7 +67,7 @@ modules/liveletters-cu/src/
 
 1. разбирает токены через `parse_current_action`;
 2. `Current` вызывает `current::run`;
-3. `Switch` вызывает `switch::run`, который проверяет наличие файла идентичности и пишет `current-user`;
+3. `Switch` вызывает `switch::run`, который проверяет наличие файла идентичности, создаёт локальное состояние пользователя и пишет `current-user`;
 4. `ShowCurrent` читает `current-user`, затем вызывает `show::run`.
 5. `Posts` вызывает `liveletters_posts::run` с разобранным `limit`.
 
@@ -102,8 +102,8 @@ modules/liveletters-cu/src/
 4. вызывает `obfuscate_identity_passwords`;
 5. если пароли были скрыты, переписывает исходный TOML уже с `obf:v1:...`;
 6. сохраняет идентичность через `save_identity`;
-7. открывает `Store::open_for_home_dir`;
-8. копирует SMTP/IMAP-настройки из идентичности в `MailSettingsRecord`;
+7. открывает `Store::open_for_home_dir(<home>/users/<name>)`;
+8. копирует SMTP/IMAP-настройки из идентичности в `MailSettingsRecord` этого пользователя;
 9. сохраняет `mail_settings`.
 
 Команда намеренно не пишет `current-user`: выбор текущего пользователя остаётся отдельным явным шагом `lltt cu <имя>`.
@@ -116,7 +116,7 @@ modules/liveletters-cu/src/
 - реализацию для терминала со скрытым вводом и звёздочками;
 - `obfuscate_identity_passwords(home, cfg, confirmer)`.
 
-Алгоритм обрабатывает SMTP и IMAP отдельно. Для каждой секции пароль скрывается только при `pwd_obfuscate = true`, непустом пароле и отсутствии префикса `obf:v1:`. Перед скрытием пользователь должен повторить пароль. Несовпадение даёт `CuError::PasswordConfirmationMismatch`.
+Алгоритм обрабатывает SMTP и IMAP отдельно. Для каждой секции пароль скрывается только при `pwd_obfuscate = true`, непустом пароле и отсутствии префикса `obf:v1:`. Для `user add` ключ скрытия берётся из пользовательского состояния `<home>/users/<name>/`. Перед скрытием пользователь должен повторить пароль. Несовпадение даёт `CuError::PasswordConfirmationMismatch`.
 
 ## Удаление
 

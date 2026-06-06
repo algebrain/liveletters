@@ -11,7 +11,7 @@ pub fn run(ctx: &CommandContext, _args: &Args) -> Result<(), Box<dyn Error + Sen
 }
 
 fn run_inner(ctx: &CommandContext) -> Result<(), StatusError> {
-    let store = Store::open_for_home_dir(&ctx.home)?;
+    let store = Store::open_for_home_dir(&ctx.state_home)?;
     let counts = StatusCounts {
         posts: store.count_posts()?,
         comments: store.count_comments()?,

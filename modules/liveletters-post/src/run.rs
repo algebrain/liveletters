@@ -21,7 +21,7 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), PostError> {
 }
 
 fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), PostError> {
-    let store = Store::open_for_home_dir(&ctx.home)?;
+    let store = Store::open_for_home_dir(&ctx.state_home)?;
     let identity_cfg = load_identity(&ctx.home, &ctx.identity_name)?;
     let identity = identity_from_config(&identity_cfg.mail, &identity_cfg.account_id);
 

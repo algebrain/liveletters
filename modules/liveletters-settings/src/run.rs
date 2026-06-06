@@ -13,8 +13,10 @@ pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send
 fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), SettingsError> {
     let action = parse_action(&args.tokens)?;
     match action {
-        SettingsAction::Show => show::run(&ctx.home, &ctx.identity_name),
-        SettingsAction::Set { key, value } => set::run(&ctx.home, &ctx.identity_name, &key, &value),
+        SettingsAction::Show => show::run(&ctx.state_home, &ctx.identity_name),
+        SettingsAction::Set { key, value } => {
+            set::run(&ctx.state_home, &ctx.identity_name, &key, &value)
+        }
     }
 }
 

@@ -21,7 +21,8 @@ fn create_post(tmp: &TempDir) -> String {
         .args(["post", "new", "--body-file", body_path.to_str().unwrap()])
         .assert()
         .success();
-    let db = rusqlite::Connection::open(tmp.path().join("liveletters.sqlite3")).unwrap();
+    let db =
+        rusqlite::Connection::open(tmp.path().join("users/alice/liveletters.sqlite3")).unwrap();
     db.query_row("SELECT post_id FROM posts LIMIT 1", [], |r| {
         r.get::<_, String>(0)
     })

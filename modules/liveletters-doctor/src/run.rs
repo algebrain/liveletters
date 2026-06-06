@@ -12,7 +12,7 @@ pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send
 }
 
 fn run_inner(ctx: &CommandContext, verbose: bool) -> Result<(), DoctorError> {
-    let store = Store::open_for_home_dir(&ctx.home)?;
+    let store = Store::open_for_home_dir(&ctx.state_home)?;
     let reader = DiagnosticsReader::new(&store);
     let snap = reader.build_snapshot()?;
     if verbose {

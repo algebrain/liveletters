@@ -143,7 +143,7 @@ pub fn ensure_subscription_address_valid(address: &str) -> Result<(), SubError> 
 
 pub fn run(ctx: &liveletters_output::CommandContext, args: &Args) -> Result<(), SubError> {
     let action = parse_action(&args.tokens)?;
-    let store = liveletters_store::Store::open_for_home_dir(&ctx.home)?;
+    let store = liveletters_store::Store::open_for_home_dir(&ctx.state_home)?;
     match action {
         SubAction::Subscribe { resource_address } => subscribe(ctx, &store, &resource_address)?,
         SubAction::Rm { resource_address } => unsubscribe(ctx, &store, &resource_address)?,

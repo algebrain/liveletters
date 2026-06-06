@@ -106,6 +106,7 @@ fn no_init_errors_when_store_missing() {
     // Note: no add_identity, no init
     let ctx = CommandContext {
         home: home.path().to_path_buf(),
+        state_home: home.path().to_path_buf(),
         identity_name: "default".to_owned(),
     };
     let err = run(&ctx, &tokens(&["alice-publish@example.org"])).unwrap_err();

@@ -15,13 +15,13 @@ pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send
 fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), InboxError> {
     match &args.action {
         InboxAction::Import(import_args) => {
-            import::run(&ctx.home, &import_args.files)?;
+            import::run(&ctx.state_home, &import_args.files)?;
         }
         InboxAction::List(list_args) => {
-            list::run(&ctx.home, list_args)?;
+            list::run(&ctx.state_home, list_args)?;
         }
         InboxAction::Show(show_args) => {
-            show::run(&ctx.home, show_args)?;
+            show::run(&ctx.state_home, show_args)?;
         }
     }
     Ok(())

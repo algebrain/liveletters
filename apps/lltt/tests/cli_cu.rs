@@ -244,7 +244,7 @@ fn cu_posts_prints_current_users_posts_newest_first() {
         .assert()
         .success();
 
-    let store = Store::open_for_home_dir(tmp.path()).unwrap();
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
     for (post_id, author_id, created_at) in [
         ("old-alice", "alice", 1_710_000_000),
         ("new-alice", "alice", 1_710_000_100),

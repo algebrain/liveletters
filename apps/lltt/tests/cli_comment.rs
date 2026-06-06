@@ -21,7 +21,8 @@ fn create_post(tmp: &TempDir) -> String {
         .args(["post", "new", "--body-file", body_path.to_str().unwrap()])
         .assert()
         .success();
-    let db = rusqlite::Connection::open(tmp.path().join("liveletters.sqlite3")).unwrap();
+    let db =
+        rusqlite::Connection::open(tmp.path().join("users/alice/liveletters.sqlite3")).unwrap();
     db.query_row("SELECT post_id FROM posts LIMIT 1", [], |r| {
         r.get::<_, String>(0)
     })
@@ -51,7 +52,8 @@ fn comment_new_creates_persisted_comment() {
         .success()
         .stdout(contains("комментарий создан:"));
 
-    let db = rusqlite::Connection::open(tmp.path().join("liveletters.sqlite3")).unwrap();
+    let db =
+        rusqlite::Connection::open(tmp.path().join("users/alice/liveletters.sqlite3")).unwrap();
     let count: i64 = db
         .query_row("SELECT COUNT(*) FROM comments", [], |r| r.get::<_, i64>(0))
         .unwrap();
@@ -79,7 +81,8 @@ fn comment_new_with_parent_creates_reply() {
         .assert()
         .success();
 
-    let db = rusqlite::Connection::open(tmp.path().join("liveletters.sqlite3")).unwrap();
+    let db =
+        rusqlite::Connection::open(tmp.path().join("users/alice/liveletters.sqlite3")).unwrap();
     let root_id: String = db
         .query_row("SELECT comment_id FROM comments LIMIT 1", [], |r| {
             r.get::<_, String>(0)

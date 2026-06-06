@@ -8,6 +8,7 @@ mod common;
 fn ctx_for(tmp: &tempfile::TempDir) -> CommandContext {
     CommandContext {
         home: tmp.path().to_path_buf(),
+        state_home: tmp.path().to_path_buf(),
         identity_name: "default".to_owned(),
     }
 }

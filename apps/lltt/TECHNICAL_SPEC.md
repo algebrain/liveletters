@@ -5,7 +5,7 @@
 `lltt` — основной CLI проекта LiveLetters. Это тонкий диспетчер: он не содержит бизнес-логики, а только
 
 1. разбирает аргументы командной строки через `clap`;
-2. разрешает `CommandContext` (домашний каталог + имя текущего пользователя liveletters, если он нужен команде) из файловой системы;
+2. разрешает `CommandContext` (общий домашний каталог + каталог состояния + имя текущего пользователя liveletters, если он нужен команде) из файловой системы;
 3. проверяет, что домашний каталог существует и что задан текущий пользователь для команд, которым он обязателен;
 4. вызывает `run(...)` нужного крейта из [`modules/`](../../modules).
 
@@ -27,7 +27,7 @@ Clap::parse()         ──►  Cli { command: Command }
                               │
                               ▼  читает LIVELETTERS_HOME
                               │  читает <home>/current-user только в RequiresCurrent
-                     CommandContext { home, identity_name }
+                     CommandContext { home, state_home, identity_name }
                               │
                               ▼
                  need_existing_home = mode != Init
@@ -203,7 +203,12 @@ pub fn build_context(mode: ContextMode) -> Result<CommandContext, ContextError> 
         ContextMode::Init | ContextMode::AllowMissingCurrent => String::new(),
         ContextMode::RequiresCurrent => resolve_current_user_name(&home)?,
     };
-    Ok(CommandContext { home, identity_name })
+    let state_home = if identity_name.is_empty() {
+        home.clone()
+    } else {
+        home.join("users").join(&identity_name)
+    };
+    Ok(CommandContext { home, state_home, identity_name })
 }
 ```
 
@@ -214,13 +219,16 @@ pub fn build_context(mode: ContextMode) -> Result<CommandContext, ContextError> 
 ```rust
 pub struct CommandContext {
     pub home: PathBuf,
+    pub state_home: PathBuf,
     pub identity_name: String,
 }
 ```
 
 `identity_name` — это `String`; в коде используется как «имя текущей идентичности» (current identity), в публичной документации — как «имя текущего пользователя liveletters». Это одно и то же значение, просто в разной терминологии.
 
-Контекст не содержит «пользователя операционной системы», не открывает БД и не делает сетевых вызовов. Это просто два значения, которые командный крейт использует для своих файловых операций. Подробнее — [`liveletters-output::CommandContext`](../../modules/liveletters-output/src/context.rs).
+`home` указывает на общий каталог с `identities/`, `drafts/` и `current-user`. `state_home` указывает на `<home>/users/<identity_name>` и используется командами для SQLite-БД, исходящей очереди, входящих сообщений и курсоров синхронизации.
+
+Контекст не содержит «пользователя операционной системы», не открывает БД и не делает сетевых вызовов. Это просто три значения, которые командный крейт использует для своих файловых операций. Подробнее — [`liveletters-output::CommandContext`](../../modules/liveletters-output/src/context.rs).
 
 ## Обработка ошибок
 
