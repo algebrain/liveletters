@@ -87,10 +87,14 @@ pub fn compute_next_cursor_uid(prev: u64, received: &[liveletters_mail::Received
 }
 
 pub fn parse_security(s: &str) -> Result<MailSecurity, SyncError> {
-    match s {
+    let normalized = s
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', '_', '/', ' '], "");
+    match normalized.as_str() {
         "none" => Ok(MailSecurity::None),
         "starttls" => Ok(MailSecurity::StartTls),
-        "tls" => Ok(MailSecurity::Tls),
+        "tls" | "ssl" | "ssltls" => Ok(MailSecurity::Tls),
         other => Err(SyncError::UnknownMailSecurity(other.to_owned())),
     }
 }

@@ -60,7 +60,7 @@
 
 ## `MailSecurity`: lowercase и forward-compat
 
-`MailSecurity` сериализуется в lowercase через `#[serde(rename_all = "lowercase")]`:
+`MailSecurity` сериализуется в lowercase:
 
 - `MailSecurity::None` ↔ `"none"`;
 - `MailSecurity::StartTls` ↔ `"starttls"`;
@@ -68,7 +68,9 @@
 
 Метод `as_str(&self) -> &'static str` возвращает то же строковое представление, что и serde. Это позволяет конвертировать `MailSecurity` в `String` без serde-стека и без рассинхрона между serde-выводом и обычным `Display`.
 
-При обратной конвертации из строки (`parse_mail_security` в `mapping.rs`) любое неизвестное значение, включая пустую строку, маппится в `MailSecurity::StartTls`. Это сознательный forward-compat: если в `AppSettings` окажется значение вроде `"starttls-v2"` или устаревший `"ssl"`, парсер не уронит конфигурацию, а выберет самый совместимый режим.
+Десериализация принимает дополнительные пользовательские синонимы `"ssl"`, `"SSL"`, `"ssl/tls"` как `MailSecurity::Tls`. Это нужно потому, что документация почтовых серверов часто называет режим TLS на отдельном порту словом SSL.
+
+При обратной конвертации из строки (`parse_mail_security` в `mapping.rs`) `"ssl"` и `"ssl/tls"` маппятся в `MailSecurity::Tls`, а любое другое неизвестное значение, включая пустую строку, маппится в `MailSecurity::StartTls`. Это сознательный forward-compat: если в `AppSettings` окажется новое значение вроде `"starttls-v2"`, парсер не уронит конфигурацию, а выберет самый совместимый режим.
 
 ## Имя текущего пользователя liveletters
 
@@ -125,7 +127,7 @@
 
 - 5 src-файлов: `lib.rs`, `error.rs`, `global.rs`, `identity.rs`, `io.rs`, `mapping.rs`;
 - lib-тест: `crate_name_is_set`;
-- 5 тестов в `tests/parse.rs`: `parses_minimal_identity_toml`, `parses_full_identity_toml_with_subscriptions`, `parse_rejects_missing_required_fields`, `parse_accepts_default_meta_when_omitted`, `pwd_obfuscate_defaults_to_true_when_omitted`;
+- 6 тестов в `tests/parse.rs`: `parses_minimal_identity_toml`, `parses_full_identity_toml_with_subscriptions`, `parses_ssl_security_alias_as_tls`, `parse_rejects_missing_required_fields`, `parse_accepts_default_meta_when_omitted`, `pwd_obfuscate_defaults_to_true_when_omitted`;
 - 6 тестов в `tests/io.rs`: `save_and_load_identity_round_trip`, `list_identities_returns_empty_when_dir_missing`, `list_identities_returns_all_saved_names_sorted`, `load_identity_returns_unknown_when_missing`, `load_global_returns_default_when_file_missing`, `identity_settings_round_trip_via_app_settings`;
 - 1 smoke-тест в `tests/smoke.rs`: `crate_is_wired_into_workspace`;
 - 4 теста в `tests/current_user.rs` (добавлены вместе с `read_current_identity` / `write_current_identity`): `read_current_identity_returns_no_current_user_when_file_missing`, `write_then_read_round_trip`, `write_current_identity_overwrites_previous_value`, `read_trims_trailing_newline_added_by_external_editor`;

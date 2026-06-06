@@ -232,7 +232,7 @@ pub enum MailSecurity {
 }
 ```
 
-Сериализуется в lowercase: `"none"`, `"starttls"`, `"tls"`. `as_str(&self) -> &'static str` возвращает то же строковое представление, что и serde, чтобы можно было конвертировать `MailSecurity` в `String` без `serde_json`.
+Сериализуется в lowercase: `"none"`, `"starttls"`, `"tls"`. При чтении TOML дополнительно принимает `"ssl"`, `"SSL"` и `"ssl/tls"` как синонимы `"tls"`. `as_str(&self) -> &'static str` возвращает каноническое строковое представление, чтобы можно было конвертировать `MailSecurity` в `String` без `serde_json`.
 
 ### `ResourceSubscription`
 
@@ -318,7 +318,7 @@ pub fn current_user_path(home: &Path) -> PathBuf
 
 ### `parse_mail_security(&str) -> MailSecurity`
 
-Внутренний хелпер в `mapping.rs`. Маппит `"none"` → `MailSecurity::None`, `"tls"` → `MailSecurity::Tls`, всё остальное (включая `"starttls"` и пустую строку) → `MailSecurity::StartTls`.
+Внутренний хелпер в `mapping.rs`. Маппит `"none"` → `MailSecurity::None`, `"tls"`/`"ssl"`/`"ssl/tls"` → `MailSecurity::Tls`, всё остальное (включая `"starttls"` и пустую строку) → `MailSecurity::StartTls`.
 
 Это намеренно разрешает forward-compat: если в `AppSettings` окажется строковое значение, которого мы ещё не знаем (например, устаревший формат), оно будет интерпретировано как `StartTls` — самый совместимый режим. Парсер не «роняет» конфигурацию из-за незнакомой строки.
 

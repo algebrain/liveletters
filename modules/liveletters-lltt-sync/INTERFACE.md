@@ -40,6 +40,7 @@
   пересчёт курсора IMAP;
 - `parse_security(&str) -> Result<MailSecurity, SyncError>` —
   разбор строкового значения `smtp.security` / `imap.security`;
+  принимает `ssl`/`SSL` как синоним `tls`;
 - `tally(&SyncReport) -> OutcomeCounts` — подсчёт исходов;
 - `send_to_subscribers(&Store, &ConfiguredSmtpTransport, &str, &OutboxRecord) -> Result<usize, SyncError>` —
   низкоуровневая отправка одной outbox-записи (для `push`);

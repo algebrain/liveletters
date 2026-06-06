@@ -78,9 +78,9 @@ pub fn settings_to_identity(
 }
 
 fn parse_mail_security(value: &str) -> MailSecurity {
-    match value {
+    match value.trim().to_ascii_lowercase().as_str() {
         "none" => MailSecurity::None,
-        "tls" => MailSecurity::Tls,
+        "tls" | "ssl" | "ssl/tls" => MailSecurity::Tls,
         _ => MailSecurity::StartTls,
     }
 }

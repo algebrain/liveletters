@@ -329,7 +329,9 @@ lltt settings set smtp.host          smtp.blog.example.org
 lltt settings set imap.mailbox       Archive
 ```
 
-Допустимые значения параметров `*.security`: `none`, `starttls`, `tls`.
+Допустимые значения параметров `*.security`: `none`, `starttls`, `tls`,
+`ssl`. Значение `ssl` или `SSL` означает то же, что `tls`: защищённое
+соединение сразу при подключении.
 Пароли сохраняются в защищённом виде и при просмотре через
 `lltt settings` маскируются звёздочками.
 

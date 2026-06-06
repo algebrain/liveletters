@@ -1,5 +1,5 @@
 use liveletters_domain::ResourceAddress;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IdentityConfig {
@@ -57,7 +57,7 @@ pub struct ImapSettings {
     pub mailbox: String,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MailSecurity {
     None,
@@ -72,6 +72,31 @@ impl MailSecurity {
             Self::StartTls => "starttls",
             Self::Tls => "tls",
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for MailSecurity {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        parse_mail_security_alias(&value).ok_or_else(|| {
+            de::Error::unknown_variant(&value, &["none", "starttls", "tls", "ssl", "ssl/tls"])
+        })
+    }
+}
+
+fn parse_mail_security_alias(value: &str) -> Option<MailSecurity> {
+    let normalized = value
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', '_', '/', ' '], "");
+    match normalized.as_str() {
+        "none" => Some(MailSecurity::None),
+        "starttls" => Some(MailSecurity::StartTls),
+        "tls" | "ssl" | "ssltls" => Some(MailSecurity::Tls),
+        _ => None,
     }
 }
 

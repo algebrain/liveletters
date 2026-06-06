@@ -96,7 +96,7 @@ CREATE TABLE sync_cursors (
 
 ## Тесты
 
-- `tests/pull.rs` — 5 юнит-тестов: разбор `MailSecurity`,
+- `tests/pull.rs` — 5 юнит-тестов: разбор `MailSecurity` с алиасом `SSL`,
   пересчёт курсора (вперёд/на пустой пачке/с мусорными
   message_id), подсчёт исходов `SyncReport`.
 - `tests/push.rs` — 4 юнит-теста с реальной SMTP-фикстурой

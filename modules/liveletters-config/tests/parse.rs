@@ -123,6 +123,35 @@ password = "secret"
 }
 
 #[test]
+fn parses_ssl_security_alias_as_tls() {
+    let cfg: IdentityConfig = toml::from_str(
+        r#"
+account_id = "acct_alice"
+display_name = "Alice"
+
+[mail]
+publish = "alice@example.org"
+
+[mail.smtp]
+host = "smtp.example.org"
+port = 465
+security = "SSL"
+username = "alice"
+
+[mail.imap]
+host = "imap.example.org"
+port = 993
+security = "ssl"
+username = "alice"
+"#,
+    )
+    .unwrap();
+
+    assert_eq!(cfg.mail().smtp().unwrap().security(), MailSecurity::Tls);
+    assert_eq!(cfg.mail().imap().unwrap().security(), MailSecurity::Tls);
+}
+
+#[test]
 fn parse_rejects_missing_required_fields() {
     let toml = r#"
         display_name = "Alice"

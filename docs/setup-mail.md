@@ -60,7 +60,9 @@ lltt settings set smtp.host       smtp.example.org
 lltt settings set imap.mailbox    INBOX
 ```
 
-Допустимые значения `*.security`: `none`, `starttls`, `tls`.
+Допустимые значения `*.security`: `none`, `starttls`, `tls`, `ssl`.
+Значение `ssl` или `SSL` означает то же, что `tls`: защищённое
+соединение сразу при подключении.
 Пароль при сохранении через `settings set` также сохраняется в скрытом
 виде в БД.
 

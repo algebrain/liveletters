@@ -8,6 +8,7 @@ fn parse_security_recognises_known_values() {
         Ok(MailSecurity::StartTls)
     ));
     assert!(matches!(parse_security("tls"), Ok(MailSecurity::Tls)));
+    assert!(matches!(parse_security("SSL"), Ok(MailSecurity::Tls)));
     assert!(matches!(parse_security("none"), Ok(MailSecurity::None)));
     assert!(parse_security("foo").is_err());
 }
