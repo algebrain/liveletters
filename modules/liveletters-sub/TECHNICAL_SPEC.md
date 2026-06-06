@@ -63,12 +63,11 @@ fn run(ctx, args):
         Subscribe:
             service.subscribe(SubscribeCommand {
                 resource_address: address (parse → ResourceAddress),
-                subscriber_account_id: identity.account_id,
                 subscriber_delivery_address: delivery,
             })?
             // subscribe() ВНУТРИ уже:
             //   1) save_subscription() → таблица subscriptions
-            //   2) enqueue_outbox_record → событие subscription_changed (action=subscribe)
+            //   2) enqueue_outbox_record → событие subscription_changed (active=true)
             //   НО: подписка добавляется в meta.subscriptions в IDENTITY через save_identity
             //   отдельным вызовом в run() (см. ниже).
 
@@ -82,12 +81,18 @@ fn run(ctx, args):
             print table
 
         Rm:
-            service.unsubscribe(UnsubscribeCommand { resource_address, subscriber_account_id })?;
+            service.unsubscribe(UnsubscribeCommand {
+                resource_address,
+                subscriber_delivery_address: delivery,
+            })?;
             // mirror to TOML: meta.subscriptions remove address
             save_identity(...)? // перезапись файла
 ```
 
 NB: в текущей реализации команда `subscribe` через `app_core` пишет только в `subscriptions` + `outbox`, а в TOML (`meta.subscriptions`) дописывает сам `run` после успешного вызова. Это сознательное разделение: `app_core` ничего не знает про `config`.
+
+В сетевом событии подписки не передается локальный `account_id`: внешний
+идентификатор подписчика — его почтовый адрес доставки.
 
 ## 5. Ошибки
 

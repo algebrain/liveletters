@@ -159,7 +159,6 @@ pub fn list_subscriptions(
     let owned_subscribers = records
         .into_iter()
         .map(|record| SubscriberEntry {
-            subscriber_account_id: record.subscriber_account_id,
             subscriber_delivery_address: record.subscriber_delivery_address,
         })
         .collect();

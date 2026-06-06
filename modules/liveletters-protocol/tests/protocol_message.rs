@@ -143,9 +143,8 @@ fn subscription_changed_subscribe_round_trip_keeps_payload() {
         "Подписка",
         DomainEventPayload::SubscriptionChanged {
             resource_address: "alice-publish@example.org".into(),
-            subscriber_account_id: "acct_bob".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
-            action: "subscribe".into(),
+            active: true,
             created_at: 1_710_000_400,
         },
     )
@@ -157,15 +156,13 @@ fn subscription_changed_subscribe_round_trip_keeps_payload() {
     match decoded.payload() {
         DomainEventPayload::SubscriptionChanged {
             resource_address,
-            subscriber_account_id,
             subscriber_delivery_address,
-            action,
+            active,
             created_at,
         } => {
             assert_eq!(resource_address, "alice-publish@example.org");
-            assert_eq!(subscriber_account_id, "acct_bob");
             assert_eq!(subscriber_delivery_address, "bob-feed@example.org");
-            assert_eq!(action, "subscribe");
+            assert!(*active);
             assert_eq!(*created_at, 1_710_000_400);
         }
         other => panic!("unexpected payload after decode: {other:?}"),
@@ -176,14 +173,47 @@ fn subscription_changed_subscribe_round_trip_keeps_payload() {
 fn subscription_changed_serializes_with_snake_case_tag() {
     let payload = DomainEventPayload::SubscriptionChanged {
         resource_address: "alice-publish@example.org".into(),
-        subscriber_account_id: "acct_bob".into(),
         subscriber_delivery_address: "bob-feed@example.org".into(),
-        action: "unsubscribe".into(),
+        active: false,
         created_at: 1_710_000_500,
     };
 
     let json = serde_json::to_value(&payload).unwrap();
 
     assert_eq!(json["kind"], "subscription_changed");
-    assert_eq!(json["action"], "unsubscribe");
+    assert_eq!(json["active"], false);
+    assert!(json.get("subscriber_account_id").is_none());
+}
+
+#[test]
+fn subscription_changed_decodes_legacy_account_id_but_ignores_it() {
+    let json = r#"{
+        "envelope": {
+            "schema_version": "1",
+            "event_type": "subscription_changed",
+            "resource_id": "alice-publish@example.org",
+            "event_id": "sub-legacy"
+        },
+        "human_readable_body": "Подписка",
+        "payload": {
+            "kind": "subscription_changed",
+            "resource_address": "alice-publish@example.org",
+            "subscriber_account_id": "acct_bob",
+            "subscriber_delivery_address": "bob-feed@example.org",
+            "action": "subscribe",
+            "created_at": 1710000600
+        }
+    }"#;
+
+    let decoded = decode_message(json).unwrap();
+
+    assert_eq!(
+        decoded.payload(),
+        &DomainEventPayload::SubscriptionChanged {
+            resource_address: "alice-publish@example.org".into(),
+            subscriber_delivery_address: "bob-feed@example.org".into(),
+            active: true,
+            created_at: 1_710_000_600,
+        }
+    );
 }

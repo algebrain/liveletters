@@ -19,7 +19,6 @@ pub fn subscribe(
     let core = liveletters_app_core::AppCore::new(store);
     let _ = core.subscribe(liveletters_app_core::SubscribeCommand {
         resource_address,
-        subscriber_account_id: identity.account_id(),
         subscriber_delivery_address: &delivery_address,
         created_at,
     })?;
@@ -40,6 +39,7 @@ pub fn unsubscribe(
     resource_address: &str,
 ) -> Result<(), SubError> {
     let mut identity = load_current_identity(ctx)?;
+    let delivery_address = derive_delivery_address(&identity);
     let created_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -48,7 +48,7 @@ pub fn unsubscribe(
     let core = liveletters_app_core::AppCore::new(store);
     let _ = core.unsubscribe(liveletters_app_core::UnsubscribeCommand {
         resource_address,
-        subscriber_account_id: identity.account_id(),
+        subscriber_delivery_address: &delivery_address,
         created_at,
     })?;
 
@@ -89,10 +89,7 @@ pub fn list_subscriptions(
         println!("  (пусто)");
     } else {
         for sub in list.owned_subscribers() {
-            println!(
-                "  {}  →  {}",
-                sub.subscriber_account_id, sub.subscriber_delivery_address
-            );
+            println!("  {}", sub.subscriber_delivery_address);
         }
     }
     Ok(())

@@ -249,7 +249,6 @@ fn sync_without_subcommand_runs_pull_then_push() {
     store
         .save_subscription(&liveletters_store::SubscriptionRecord {
             resource_address: "blog-1".into(),
-            subscriber_account_id: "bob".into(),
             subscriber_delivery_address: "bob@example.test".into(),
         })
         .expect("save sub");
@@ -313,7 +312,6 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
     store
         .save_subscription(&liveletters_store::SubscriptionRecord {
             resource_address: "blog-1".into(),
-            subscriber_account_id: "bob".into(),
             subscriber_delivery_address: "bob@example.test".into(),
         })
         .expect("save sub");

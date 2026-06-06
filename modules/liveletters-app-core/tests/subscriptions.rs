@@ -18,7 +18,6 @@ fn subscribe_writes_outbox_record_and_persists_subscription() {
     let result: SubscribeResult = core
         .subscribe(SubscribeCommand {
             resource_address: "alice-publish@example.org",
-            subscriber_account_id: "acct_bob",
             subscriber_delivery_address: "bob-feed@example.org",
             created_at: 1_700_000_000,
         })
@@ -36,7 +35,10 @@ fn subscribe_writes_outbox_record_and_persists_subscription() {
         .list_subscriptions_for_resource("alice-publish@example.org")
         .unwrap();
     assert_eq!(records.len(), 1);
-    assert_eq!(records[0].subscriber_account_id, "acct_bob");
+    assert_eq!(
+        records[0].subscriber_delivery_address,
+        "bob-feed@example.org"
+    );
 }
 
 #[test]
@@ -46,7 +48,6 @@ fn unsubscribe_removes_subscription_and_writes_outbox() {
 
     core.subscribe(SubscribeCommand {
         resource_address: "alice-publish@example.org",
-        subscriber_account_id: "acct_bob",
         subscriber_delivery_address: "bob-feed@example.org",
         created_at: 1,
     })
@@ -55,7 +56,7 @@ fn unsubscribe_removes_subscription_and_writes_outbox() {
     let result = core
         .unsubscribe(UnsubscribeCommand {
             resource_address: "alice-publish@example.org",
-            subscriber_account_id: "acct_bob",
+            subscriber_delivery_address: "bob-feed@example.org",
             created_at: 2,
         })
         .unwrap();
@@ -85,14 +86,12 @@ fn list_subscriptions_returns_owned_and_subscribed() {
 
     core.subscribe(SubscribeCommand {
         resource_address: "alice-publish@example.org",
-        subscriber_account_id: "acct_bob",
         subscriber_delivery_address: "bob-feed@example.org",
         created_at: 1,
     })
     .unwrap();
     core.subscribe(SubscribeCommand {
         resource_address: "alice-publish@example.org",
-        subscriber_account_id: "acct_carol",
         subscriber_delivery_address: "carol-feed@example.org",
         created_at: 2,
     })
@@ -123,7 +122,6 @@ fn subscribe_rejects_invalid_address() {
     let err = core
         .subscribe(SubscribeCommand {
             resource_address: "not-an-address",
-            subscriber_account_id: "acct_bob",
             subscriber_delivery_address: "bob-feed@example.org",
             created_at: 1,
         })

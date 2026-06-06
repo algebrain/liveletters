@@ -538,31 +538,24 @@ impl<'a> SyncEngine<'a> {
             }
             DomainEventPayload::SubscriptionChanged {
                 resource_address,
-                subscriber_account_id,
                 subscriber_delivery_address,
-                action,
+                active,
                 ..
             } => {
                 let record = SubscriptionRecord {
                     resource_address: resource_address.clone(),
-                    subscriber_account_id: subscriber_account_id.clone(),
                     subscriber_delivery_address: subscriber_delivery_address.clone(),
                 };
-                match action.as_str() {
-                    "subscribe" => self
-                        .store
+                if *active {
+                    self.store
                         .save_subscription(&record)
-                        .map_err(ApplyEventError::Store),
-                    "unsubscribe" => {
-                        let _ = self
-                            .store
-                            .delete_subscription(resource_address, subscriber_account_id)
-                            .map_err(ApplyEventError::Store)?;
-                        Ok(())
-                    }
-                    other => Err(ApplyEventError::Invalid(format!(
-                        "unknown_subscription_action: {other}"
-                    ))),
+                        .map_err(ApplyEventError::Store)
+                } else {
+                    let _ = self
+                        .store
+                        .delete_subscription(resource_address, subscriber_delivery_address)
+                        .map_err(ApplyEventError::Store)?;
+                    Ok(())
                 }
             }
         }
@@ -616,19 +609,11 @@ fn validate_protocol_message(
         DomainEventPayload::PostHidden { .. } => {}
         DomainEventPayload::SubscriptionChanged {
             resource_address,
-            subscriber_account_id,
             subscriber_delivery_address,
-            action,
             ..
         } => {
-            if resource_address.trim().is_empty()
-                || subscriber_account_id.trim().is_empty()
-                || subscriber_delivery_address.trim().is_empty()
-            {
+            if resource_address.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
                 return Err("blank_subscription_field".into());
-            }
-            if !matches!(action.as_str(), "subscribe" | "unsubscribe") {
-                return Err("unknown_subscription_action".into());
             }
         }
     }

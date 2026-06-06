@@ -731,7 +731,6 @@ impl From<DomainError> for AppCoreError {
 
 pub struct SubscribeCommand<'a> {
     pub resource_address: &'a str,
-    pub subscriber_account_id: &'a str,
     pub subscriber_delivery_address: &'a str,
     pub created_at: u64,
 }
@@ -748,7 +747,7 @@ pub fn subscribe(
     command: SubscribeCommand<'_>,
 ) -> Result<SubscribeResult, AppCoreError> {
     let resource = ResourceAddress::new(command.resource_address)?;
-    let subscriber = AccountId::new(command.subscriber_account_id)?;
+    let subscriber = AccountId::new(command.subscriber_delivery_address)?;
     let delivery = ResourceAddress::new(command.subscriber_delivery_address)?;
     let _ = Subscription::new(resource.clone(), subscriber.clone(), delivery.clone());
 
@@ -775,16 +774,14 @@ pub fn subscribe(
         "Подписка",
         DomainEventPayload::SubscriptionChanged {
             resource_address: resource.as_str().to_owned(),
-            subscriber_account_id: command.subscriber_account_id.to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
-            action: "subscribe".to_owned(),
+            active: true,
             created_at: command.created_at,
         },
     )?;
 
     store.save_subscription(&SubscriptionRecord {
         resource_address: resource.as_str().to_owned(),
-        subscriber_account_id: command.subscriber_account_id.to_owned(),
         subscriber_delivery_address: delivery.as_str().to_owned(),
     })?;
 
@@ -805,7 +802,7 @@ pub fn subscribe(
 
 pub struct UnsubscribeCommand<'a> {
     pub resource_address: &'a str,
-    pub subscriber_account_id: &'a str,
+    pub subscriber_delivery_address: &'a str,
     pub created_at: u64,
 }
 
@@ -820,7 +817,8 @@ pub fn unsubscribe(
     command: UnsubscribeCommand<'_>,
 ) -> Result<UnsubscribeResult, AppCoreError> {
     let resource = ResourceAddress::new(command.resource_address)?;
-    let subscriber = AccountId::new(command.subscriber_account_id)?;
+    let subscriber = AccountId::new(command.subscriber_delivery_address)?;
+    let delivery = ResourceAddress::new(command.subscriber_delivery_address)?;
     let created_at = Timestamp::from_unix_seconds(command.created_at);
 
     let event_id_str = format!(
@@ -834,7 +832,7 @@ pub fn unsubscribe(
         event_id,
         resource.clone(),
         subscriber,
-        ResourceAddress::new("placeholder@example.org")?,
+        delivery.clone(),
         SubscriptionAction::Unsubscribe,
         created_at,
     );
@@ -849,14 +847,13 @@ pub fn unsubscribe(
         "Отписка",
         DomainEventPayload::SubscriptionChanged {
             resource_address: resource.as_str().to_owned(),
-            subscriber_account_id: command.subscriber_account_id.to_owned(),
-            subscriber_delivery_address: "".to_owned(),
-            action: "unsubscribe".to_owned(),
+            subscriber_delivery_address: delivery.as_str().to_owned(),
+            active: false,
             created_at: command.created_at,
         },
     )?;
 
-    let _ = store.delete_subscription(resource.as_str(), command.subscriber_account_id)?;
+    let _ = store.delete_subscription(resource.as_str(), delivery.as_str())?;
 
     enqueue_message(
         store,

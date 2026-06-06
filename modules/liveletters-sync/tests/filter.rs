@@ -9,18 +9,16 @@ use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 fn subscription_email(
     event_id: &str,
     resource_address: &str,
-    subscriber_account_id: &str,
     subscriber_delivery_address: &str,
-    action: &str,
+    active: bool,
 ) -> ReceivedEmail {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "subscription_changed", resource_address, event_id).unwrap(),
         "Подписка",
         DomainEventPayload::SubscriptionChanged {
             resource_address: resource_address.into(),
-            subscriber_account_id: subscriber_account_id.into(),
             subscriber_delivery_address: subscriber_delivery_address.into(),
-            action: action.into(),
+            active,
             created_at: 1_710_000_000,
         },
     )
@@ -77,9 +75,8 @@ fn apply_subscription_changed_persists_record() {
         .ingest_batch(vec![subscription_email(
             "sub-1",
             "alice-publish@example.org",
-            "acct_bob",
             "bob-feed@example.org",
-            "subscribe",
+            true,
         )])
         .unwrap();
 
@@ -95,7 +92,6 @@ fn apply_subscription_changed_persists_record() {
         records,
         vec![SubscriptionRecord {
             resource_address: "alice-publish@example.org".into(),
-            subscriber_account_id: "acct_bob".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
         }]
     );
@@ -110,9 +106,8 @@ fn apply_unsubscription_changed_removes_record() {
         .ingest_batch(vec![subscription_email(
             "sub-1",
             "alice-publish@example.org",
-            "acct_bob",
             "bob-feed@example.org",
-            "subscribe",
+            true,
         )])
         .unwrap();
 
@@ -120,9 +115,8 @@ fn apply_unsubscription_changed_removes_record() {
         .ingest_batch(vec![subscription_email(
             "unsub-1",
             "alice-publish@example.org",
-            "acct_bob",
             "bob-feed@example.org",
-            "unsubscribe",
+            false,
         )])
         .unwrap();
 
@@ -131,6 +125,54 @@ fn apply_unsubscription_changed_removes_record() {
             .list_subscriptions_for_resource("alice-publish@example.org")
             .unwrap()
             .is_empty()
+    );
+}
+
+#[test]
+fn apply_legacy_subscription_changed_ignores_account_id() {
+    let (store, _tmp) = open_temp_store();
+    let engine = SyncEngine::new(&store);
+    let raw_message = r#"{
+        "envelope": {
+            "schema_version": "1",
+            "event_type": "subscription_changed",
+            "resource_id": "alice-publish@example.org",
+            "event_id": "sub-legacy"
+        },
+        "human_readable_body": "Подписка",
+        "payload": {
+            "kind": "subscription_changed",
+            "resource_address": "alice-publish@example.org",
+            "subscriber_account_id": "not-a-real-global-id",
+            "subscriber_delivery_address": "bob-feed@example.org",
+            "action": "subscribe",
+            "created_at": 1710000000
+        }
+    }"#;
+    let outgoing = build_protocol_email(
+        "bob@example.test",
+        "alice-publish@example.org",
+        "Sync fixture",
+        &liveletters_protocol::decode_message(raw_message).unwrap(),
+    )
+    .unwrap();
+
+    engine
+        .ingest_batch(vec![ReceivedEmail {
+            message_id: "message-sub-legacy".into(),
+            raw_message: outgoing.raw_message,
+        }])
+        .unwrap();
+
+    let records = store
+        .list_subscriptions_for_resource("alice-publish@example.org")
+        .unwrap();
+    assert_eq!(
+        records,
+        vec![SubscriptionRecord {
+            resource_address: "alice-publish@example.org".into(),
+            subscriber_delivery_address: "bob-feed@example.org".into(),
+        }]
     );
 }
 

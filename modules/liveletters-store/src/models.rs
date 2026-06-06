@@ -83,6 +83,5 @@ pub struct MailSettingsRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscriptionRecord {
     pub resource_address: String,
-    pub subscriber_account_id: String,
     pub subscriber_delivery_address: String,
 }

@@ -148,14 +148,12 @@ fn send_to_subscribers_returns_count_for_each_subscriber() {
     store
         .save_subscription(&SubscriptionRecord {
             resource_address: "blog-1".into(),
-            subscriber_account_id: "bob".into(),
             subscriber_delivery_address: "bob@example.test".into(),
         })
         .expect("save sub bob");
     store
         .save_subscription(&SubscriptionRecord {
             resource_address: "blog-1".into(),
-            subscriber_account_id: "carol".into(),
             subscriber_delivery_address: "carol@example.test".into(),
         })
         .expect("save sub carol");
@@ -214,7 +212,6 @@ fn send_to_subscribers_propagates_smtp_error() {
     store
         .save_subscription(&SubscriptionRecord {
             resource_address: "blog-1".into(),
-            subscriber_account_id: "bob".into(),
             subscriber_delivery_address: "bob@example.test".into(),
         })
         .expect("save sub");

@@ -7,15 +7,11 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO subscriptions
-                (resource_address, subscriber_account_id, subscriber_delivery_address)
+                (resource_address, subscriber_delivery_address)
             VALUES
-                (?1, ?2, ?3)
+                (?1, ?2)
             "#,
-            params![
-                record.resource_address,
-                record.subscriber_account_id,
-                record.subscriber_delivery_address,
-            ],
+            params![record.resource_address, record.subscriber_delivery_address],
         )?;
 
         Ok(())
@@ -24,14 +20,14 @@ impl Store {
     pub fn delete_subscription(
         &self,
         resource_address: &str,
-        subscriber_account_id: &str,
+        subscriber_delivery_address: &str,
     ) -> Result<bool, StoreError> {
         let changed = self.connection().execute(
             r#"
             DELETE FROM subscriptions
-            WHERE resource_address = ?1 AND subscriber_account_id = ?2
+            WHERE resource_address = ?1 AND subscriber_delivery_address = ?2
             "#,
-            params![resource_address, subscriber_account_id],
+            params![resource_address, subscriber_delivery_address],
         )?;
 
         Ok(changed > 0)
@@ -43,18 +39,17 @@ impl Store {
     ) -> Result<Vec<SubscriptionRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT resource_address, subscriber_account_id, subscriber_delivery_address
+            SELECT resource_address, subscriber_delivery_address
             FROM subscriptions
             WHERE resource_address = ?1
-            ORDER BY subscriber_account_id ASC
+            ORDER BY subscriber_delivery_address ASC
             "#,
         )?;
 
         let rows = stmt.query_map(params![resource_address], |row| {
             Ok(SubscriptionRecord {
                 resource_address: row.get(0)?,
-                subscriber_account_id: row.get(1)?,
-                subscriber_delivery_address: row.get(2)?,
+                subscriber_delivery_address: row.get(1)?,
             })
         })?;
 
@@ -68,22 +63,21 @@ impl Store {
 
     pub fn list_subscriptions_for_subscriber(
         &self,
-        subscriber_account_id: &str,
+        subscriber_delivery_address: &str,
     ) -> Result<Vec<SubscriptionRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT resource_address, subscriber_account_id, subscriber_delivery_address
+            SELECT resource_address, subscriber_delivery_address
             FROM subscriptions
-            WHERE subscriber_account_id = ?1
+            WHERE subscriber_delivery_address = ?1
             ORDER BY resource_address ASC
             "#,
         )?;
 
-        let rows = stmt.query_map(params![subscriber_account_id], |row| {
+        let rows = stmt.query_map(params![subscriber_delivery_address], |row| {
             Ok(SubscriptionRecord {
                 resource_address: row.get(0)?,
-                subscriber_account_id: row.get(1)?,
-                subscriber_delivery_address: row.get(2)?,
+                subscriber_delivery_address: row.get(1)?,
             })
         })?;
 

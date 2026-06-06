@@ -82,7 +82,6 @@ pub struct AppSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscriberEntry {
-    pub subscriber_account_id: String,
     pub subscriber_delivery_address: String,
 }
 

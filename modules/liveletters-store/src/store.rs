@@ -112,9 +112,8 @@ impl Store {
 
             CREATE TABLE IF NOT EXISTS subscriptions (
                 resource_address TEXT NOT NULL,
-                subscriber_account_id TEXT NOT NULL,
                 subscriber_delivery_address TEXT NOT NULL,
-                PRIMARY KEY (resource_address, subscriber_account_id)
+                PRIMARY KEY (resource_address, subscriber_delivery_address)
             );
 
             CREATE TABLE IF NOT EXISTS mail_settings (
@@ -141,6 +140,7 @@ impl Store {
         )?;
 
         self.ensure_mail_settings_security_columns()?;
+        self.ensure_subscriptions_use_delivery_address_key()?;
 
         Ok(())
     }
@@ -165,5 +165,47 @@ impl Store {
             }
             Err(error) => Err(error.into()),
         }
+    }
+
+    fn ensure_subscriptions_use_delivery_address_key(&self) -> Result<(), StoreError> {
+        if !self.table_has_column("subscriptions", "subscriber_account_id")? {
+            return Ok(());
+        }
+
+        self.connection.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS subscriptions_new (
+                resource_address TEXT NOT NULL,
+                subscriber_delivery_address TEXT NOT NULL,
+                PRIMARY KEY (resource_address, subscriber_delivery_address)
+            );
+
+            INSERT OR IGNORE INTO subscriptions_new
+                (resource_address, subscriber_delivery_address)
+            SELECT resource_address, subscriber_delivery_address
+            FROM subscriptions
+            WHERE subscriber_delivery_address <> '';
+
+            DROP TABLE subscriptions;
+            ALTER TABLE subscriptions_new RENAME TO subscriptions;
+            "#,
+        )?;
+
+        Ok(())
+    }
+
+    fn table_has_column(&self, table: &str, column: &str) -> Result<bool, StoreError> {
+        let mut stmt = self
+            .connection
+            .prepare(&format!("PRAGMA table_info({table})"))?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+
+        for row in rows {
+            if row? == column {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 }
