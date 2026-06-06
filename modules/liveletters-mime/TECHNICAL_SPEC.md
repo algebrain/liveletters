@@ -61,6 +61,7 @@ decode_protocol_message(parts.technical_body())
 From: <from>
 To: <to>
 Subject: <subject>
+X-LiveLetters-Protocol: v1
 MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="liveletters-boundary"
 
@@ -76,6 +77,8 @@ Content-Type: application/json
 ```
 
 Граница `liveletters-boundary` намеренно детерминирована и зашита как константа в `build.rs`. Это не цитата из RFC 2046, а собственный маркер LiveLetters. Его детерминированность нужна для воспроизводимости тестов round-trip.
+
+Заголовок `X-LiveLetters-Protocol: v1` нужен IMAP-слою: `lltt sync pull` ищет по нему входящие письма LiveLetters и не скачивает обычную почту целиком.
 
 `Content-Type` верхнего уровня — `multipart/mixed`. `Content-Type` каждой части — `text/plain; charset="utf-8"` и `application/json` соответственно. Никаких вложений, альтернативных версий, related-частей текущая версия не поддерживает.
 
@@ -120,7 +123,7 @@ Content-Type: application/json
 - `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`;
 - `MimeError` с четырьмя вариантами;
 - `crate_name() -> &'static str` для диагностики;
-- 5 integration-тестов в `tests/parse.rs`: разбор заголовков и тела, извлечение human+technical, round-trip build→parse→extract→decode, отказ на письме без `\n\n`, отказ на non-multipart-письме;
+- 6 integration-тестов в `tests/parse.rs`: разбор заголовков и тела, наличие `X-LiveLetters-Protocol`, извлечение human+technical, round-trip build→parse→extract→decode, отказ на письме без `\n\n`, отказ на non-multipart-письме;
 - 1 lib-test `exposes_crate_name`.
 
 ## Требования к структуре каталога

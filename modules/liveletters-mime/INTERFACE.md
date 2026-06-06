@@ -132,7 +132,7 @@ pub fn build_protocol_email(
 Собирает сырое multipart-письмо из `ProtocolMessage`:
 
 1. сериализует `protocol_message` в JSON через `liveletters_protocol::encode_message`; ошибка протокола → `MimeError::Protocol(…)`;
-2. формирует заголовки `From` / `To` / `Subject` / `MIME-Version` / `Content-Type: multipart/mixed; boundary="liveletters-boundary"`;
+2. формирует заголовки `From` / `To` / `Subject` / `X-LiveLetters-Protocol: v1` / `MIME-Version` / `Content-Type: multipart/mixed; boundary="liveletters-boundary"`;
 3. формирует две части:
    - `text/plain; charset="utf-8"` с `protocol_message.human_readable_body()`;
    - `application/json` с сериализованным `ProtocolMessage`;

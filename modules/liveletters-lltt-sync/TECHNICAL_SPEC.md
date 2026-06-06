@@ -12,7 +12,7 @@ Store::get_mail_settings_record(profile_id)? → MailSettingsRecord
   → ConfiguredImapMailbox::new(ImapMailboxConfig)
 Store::get_sync_cursor(profile_id)? → last_seen_uid (или 0)
   → MailboxCursor::from_last_seen_uid
-mailbox.fetch_new(&cursor) → FetchBatch { emails, next_cursor }
+mailbox.fetch_new(&cursor) → ищет X-LiveLetters-Protocol: v1 → FetchBatch { emails, next_cursor }
 compute_next_cursor_uid(prev, batch.emails()) → uid.max(prev)
 SyncEngine::new(&store).ingest_batch(emails) → SyncReport
 tally(&report) → OutcomeCounts
@@ -78,9 +78,15 @@ CREATE TABLE sync_cursors (
 `message_body` — JSON-представление `ProtocolMessage`
 (сериализация через `liveletters_protocol::encode_message`).
 
+`pull` не скачивает обычные письма целиком. Основной путь использует
+`UID SEARCH ... HEADER X-LiveLetters-Protocol v1`; если сервер не
+поддерживает такой поиск, IMAP-транспорт загружает только заголовки
+кандидатов через `BODY.PEEK[HEADER.FIELDS (...)]` и полное тело
+скачивает только для писем LiveLetters.
+
 ## Признак `network`
 
-Крейт `livelettes-lltt-sync` экспортирует `feature = "network"`,
+Крейт `liveletters-lltt-sync` экспортирует `feature = "network"`,
 которая включает:
 
 - зависимость `liveletters-mail` с собственным признаком `network`

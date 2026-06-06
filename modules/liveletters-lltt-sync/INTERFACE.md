@@ -94,8 +94,9 @@ imap.host, imap.port, imap.security, imap.username, imap.password, imap.mailbox
 ```
 
 `<N>` — количество писем, отданных IMAP-сервером за одну сессию
-(с `UID > last_seen_uid`); `<M>` / `<K>` / `<L>` — подсчёт по
-исходам `SyncReport` (`Applied` / `Duplicate` / `Malformed`).
+(с `UID > last_seen_uid` и заголовком `X-LiveLetters-Protocol: v1`);
+обычные письма не скачиваются целиком. `<M>` / `<K>` / `<L>` — подсчёт
+по исходам `SyncReport` (`Applied` / `Duplicate` / `Malformed`).
 
 ### `lltt sync push`
 

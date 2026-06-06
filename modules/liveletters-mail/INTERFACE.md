@@ -302,7 +302,7 @@
 
 Сейчас её поведение такое:
 
-- создается обычный email с `From`, `To`, `Subject`, `MIME-Version`;
+- создается обычный email с `From`, `To`, `Subject`, `X-LiveLetters-Protocol: v1`, `MIME-Version`;
 - письмо получает multipart boundary;
 - человекочитаемая часть кладется как `text/plain`;
 - техническая часть кладется как `application/json`.

@@ -70,10 +70,15 @@ lltt settings set imap.mailbox    INBOX
 
 1. Читает `mail_settings` и `sync_cursors.last_imap_uid`.
 2. Подключается к IMAP-серверу, входит в учётную запись, открывает почтовый ящик.
-3. Делает `UID SEARCH UID <last+1>:*` и для каждого нового UID —
-   `UID FETCH BODY.PEEK[]`.
-4. Прогоняет полученные письма через `liveletters-sync::SyncEngine::ingest_batch`.
-5. Сохраняет максимальный UID обратно в `sync_cursors`.
+3. Ищет письма LiveLetters по заголовку
+   `X-LiveLetters-Protocol: v1` через `UID SEARCH ... HEADER`.
+4. Если сервер не поддерживает такой поиск, загружает только заголовки
+   кандидатов через `BODY.PEEK[HEADER.FIELDS (...)]` и полное тело
+   скачивает только для писем LiveLetters.
+5. Для найденных писем делает `UID FETCH ... BODY.PEEK[]` и читает
+   тело по объявленной IMAP literal-длине в байтах.
+6. Прогоняет полученные письма через `liveletters-sync::SyncEngine::ingest_batch`.
+7. Сохраняет курсор обратно в `sync_cursors`.
 
 Повторный `pull` сразу после успешного получает 0 новых писем —
 идемпотентность гарантируется сохранённым курсором.
@@ -85,7 +90,7 @@ lltt settings set imap.mailbox    INBOX
    - декодирует `message_body` в `ProtocolMessage`;
    - ищет подписчиков ресурса в таблице `subscriptions`;
    - для каждого подписчика собирает `OutgoingEmail` и отправляет
-     через SMTP;
+     через SMTP; письмо содержит заголовок `X-LiveLetters-Protocol: v1`;
    - при успехе на **всех** подписчиках удаляет запись из `outbox`.
 3. Если у ресурса нет подписчиков — печатает предупреждение и
    оставляет запись (безопасный отказ: подписчики могут появиться

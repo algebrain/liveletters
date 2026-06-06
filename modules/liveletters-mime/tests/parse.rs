@@ -70,6 +70,12 @@ fn build_and_decode_round_trip_preserves_payload() {
 }
 
 #[test]
+fn build_protocol_email_marks_liveletters_protocol_header() {
+    let raw = sample_multipart_mime();
+    assert!(raw.contains("X-LiveLetters-Protocol: v1\n"));
+}
+
+#[test]
 fn parse_email_rejects_message_without_blank_line_separator() {
     let err = parse_email("Subject: only-headers\nNo body").unwrap_err();
     assert!(matches!(

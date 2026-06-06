@@ -13,7 +13,7 @@ pub fn build_protocol_email(
         .map_err(|error| MimeError::Protocol(format_protocol_error(error)))?;
 
     let raw_message = format!(
-        "From: {from}\nTo: {to}\nSubject: {subject}\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"{boundary}\"\n\n--{boundary}\nContent-Type: text/plain; charset=\"utf-8\"\n\n{}\n--{boundary}\nContent-Type: application/json\n\n{}\n--{boundary}--\n",
+        "From: {from}\nTo: {to}\nSubject: {subject}\nX-LiveLetters-Protocol: v1\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"{boundary}\"\n\n--{boundary}\nContent-Type: text/plain; charset=\"utf-8\"\n\n{}\n--{boundary}\nContent-Type: application/json\n\n{}\n--{boundary}--\n",
         protocol_message.human_readable_body(),
         technical_payload
     );

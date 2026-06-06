@@ -86,7 +86,7 @@
 - `MailboxCursor`, `FetchBatch`, `SendStatus`, `FetchStatus`;
 - re-exports из `liveletters-mime`: `OutgoingEmail`, `ReceivedEmail`, `parse_email`, `extract_liveletters_parts`, `build_protocol_email`, `decode_protocol_message`, `MimeError`.
 
-Тестовые сценарии для transport слоя строятся без in-memory подделок: SMTP и IMAP проверяются через `tests/network_flow.rs`, где поднимается локальный `TcpListener` и проверяется честный TCP-обмен, а MIME-уровень проверяется на уровне `liveletters-mime` через round-trip `build_protocol_email` + `decode_protocol_message` и разбор заранее подготовленных raw-писем.
+Тестовые сценарии для transport слоя строятся без in-memory подделок: SMTP и IMAP проверяются через `tests/network_flow.rs`, где поднимается локальный `TcpListener` и проверяется честный TCP-обмен, включая байтовое чтение IMAP literal, поиск `X-LiveLetters-Protocol: v1` через `SEARCH HEADER` и fallback через `HEADER.FIELDS`. MIME-уровень проверяется на уровне `liveletters-mime` через round-trip `build_protocol_email` + `decode_protocol_message` и разбор заранее подготовленных raw-писем.
 
 Текущие реальные adapters пока ориентированы на plaintext TCP seam без TLS и нужны как честная интеграционная база для следующего прохода, а не как завершенный production transport.
 
