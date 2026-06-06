@@ -225,18 +225,24 @@ pub fn create_post(
                 post.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
-            "Новая запись в блоге",
+            &post_created_human_body(post.author_id().as_str(), post.body().as_str()),
             DomainEventPayload::PostCreated {
                 post_id: post.id().as_str().to_owned(),
                 resource_id: post.resource_id().as_str().to_owned(),
                 actor_id: post.author_id().as_str().to_owned(),
                 created_at: post.created_at().as_unix_seconds(),
+                body: post.body().as_str().to_owned(),
+                body_format: "plain".to_owned(),
                 visibility: encode_visibility(post.visibility()),
             },
         )?,
     )?;
 
     Ok(CreatePostResult { post, event })
+}
+
+fn post_created_human_body(author: &str, body: &str) -> String {
+    format!("{author} написал:\n\n{body}")
 }
 
 pub fn create_comment(

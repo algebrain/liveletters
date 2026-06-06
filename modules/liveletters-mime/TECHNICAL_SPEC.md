@@ -2,14 +2,14 @@
 
 ## Назначение
 
-`liveletters-mime` это библиотека разбора и сборки email-писем LiveLetters в их MIME-форме. Она отвечает за парсинг сырого RFC 5322-текста, извлечение из multipart-тела человекочитаемой и технической частей, а также за сборку исходящего письма из `ProtocolMessage`.
+`liveletters-mime` это библиотека разбора и сборки email-писем LiveLetters. Она отвечает за парсинг сырого RFC 5322-текста, извлечение человекочитаемой и технической частей, а также за сборку исходящего письма из `ProtocolMessage`.
 
 ## Зона ответственности
 
 - разбор сырого текста письма на заголовки и тело;
 - нормализация CRLF → LF;
-- извлечение `human_readable_body` (`text/plain`) и `technical_body` (`application/json`) из multipart/mixed-тела;
-- сборка `OutgoingEmail` из `ProtocolMessage` с фиксированной границей `liveletters-boundary`;
+- извлечение `human_readable_body` и `technical_body` из `text/plain`-письма со служебным блоком LiveLetters;
+- сборка `OutgoingEmail` из `ProtocolMessage`;
 - разбор `ProtocolMessage` из JSON-строки через `liveletters_protocol::decode_message` с человекочитаемой формулировкой ошибок;
 - типизированные структуры `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`.
 
@@ -18,7 +18,7 @@
 - реализовывать SMTP/IMAP/TCP/TLS — это `liveletters-mail`;
 - хранить письма или эвенты в SQLite — это `liveletters-store`;
 - делать retry/throttling/dedup — это `liveletters-sync`;
-- разбирать base64/quoted-printable и MIME-вложения — текущая версия работает только с `text/plain` + `application/json`;
+- разбирать quoted-printable и MIME-вложения;
 - валидировать email-адреса в `From`/`To`.
 
 ## Почему выделен в отдельный крейт
@@ -62,25 +62,18 @@ From: <from>
 To: <to>
 Subject: <subject>
 X-LiveLetters-Protocol: v1
-MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary="liveletters-boundary"
-
---liveletters-boundary
 Content-Type: text/plain; charset="utf-8"
 
 <human_readable_body>
---liveletters-boundary
-Content-Type: application/json
 
-<JSON-сериализованный ProtocolMessage>
---liveletters-boundary--
+-- 
+LiveLetters-Protocol: v1
+LiveLetters-Payload: <base64url(JSON-сериализованный ProtocolMessage)>
 ```
-
-Граница `liveletters-boundary` намеренно детерминирована и зашита как константа в `build.rs`. Это не цитата из RFC 2046, а собственный маркер LiveLetters. Его детерминированность нужна для воспроизводимости тестов round-trip.
 
 Заголовок `X-LiveLetters-Protocol: v1` нужен IMAP-слою: `lltt sync pull` ищет по нему входящие письма LiveLetters и не скачивает обычную почту целиком.
 
-`Content-Type` верхнего уровня — `multipart/mixed`. `Content-Type` каждой части — `text/plain; charset="utf-8"` и `application/json` соответственно. Никаких вложений, альтернативных версий, related-частей текущая версия не поддерживает.
+`Content-Type` письма — `text/plain; charset="utf-8"`. Человекочитаемая часть находится в начале тела. Служебный блок LiveLetters находится в конце тела и содержит JSON протокольного сообщения, закодированный как base64url без заполнения.
 
 ## Парсинг `Content-Type` и `boundary`
 
@@ -110,20 +103,20 @@ Content-Type: application/json
 
 - `Protocol(String)` — сбой `liveletters_protocol`: `BlankEnvelopeField(field)` / `BlankHumanReadableBody` / `MalformedJson(message)`. Содержит человекочитаемую формулировку, а не Debug-строку.
 - `InvalidEmailFormat(&'static str)` — структурная проблема MIME. Сообщение фиксировано в коде, без пользовательских данных, чтобы не давать потенциальному атакующему лишних подсказок о содержимом письма.
-- `MissingHumanReadablePart` — в multipart-теле не нашлось `text/plain`.
-- `MissingTechnicalPart` — в multipart-теле не нашлось `application/json`.
+- `MissingHumanReadablePart` — в письме не нашлась человекочитаемая часть.
+- `MissingTechnicalPart` — в письме не нашлась служебная часть LiveLetters.
 
 `From<MimeError> for liveletters_mail::TransportError` объявлен в `liveletters-mail::lib.rs`. Это позволяет transport-слою возвращать `MimeError` наверх через единый `Result<_, TransportError>` без `map_err` на каждом шаге.
 
-## Текущее минимальное состояние реализации
+## Минимальный состав реализации
 
-Сейчас модуль уже включает:
+Модуль включает:
 
 - `parse_email`, `extract_liveletters_parts`, `build_protocol_email`, `decode_protocol_message`;
 - `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`;
 - `MimeError` с четырьмя вариантами;
 - `crate_name() -> &'static str` для диагностики;
-- 6 integration-тестов в `tests/parse.rs`: разбор заголовков и тела, наличие `X-LiveLetters-Protocol`, извлечение human+technical, round-trip build→parse→extract→decode, отказ на письме без `\n\n`, отказ на non-multipart-письме;
+- integration-тесты в `tests/parse.rs`: разбор заголовков и тела, наличие `X-LiveLetters-Protocol`, извлечение human+technical, round-trip build→parse→extract→decode, отсутствие JSON-вложения, отказ на письме без `\n\n`, отказ на письме без служебного блока;
 - 1 lib-test `exposes_crate_name`.
 
 ## Требования к структуре каталога
@@ -144,40 +137,39 @@ Content-Type: application/json
 
 Реализованные проверки:
 
-- `parses_headers_and_body_from_multipart_email` — `parse_email` корректно достаёт `Subject` и сохраняет тело с маркерами границ;
-- `extracts_human_and_technical_parts_from_multipart_email` — `extract_liveletters_parts` достаёт и человекочитаемую, и техническую часть;
+- `parses_headers_and_body_from_protocol_email` — `parse_email` корректно достаёт `Subject` и сохраняет тело письма;
+- `extracts_human_and_technical_parts_from_inline_protocol_email` — `extract_liveletters_parts` достаёт и человекочитаемую, и техническую часть;
 - `build_and_decode_round_trip_preserves_payload` — round-trip `build → parse → extract → decode` сохраняет `DomainEventPayload::PostCreated { post_id, .. }`;
 - `parse_email_rejects_message_without_blank_line_separator` — без `\n\n` между заголовками и телом возвращается `MimeError::InvalidEmailFormat`;
-- `extract_liveletters_parts_rejects_non_multipart_email` — на `text/plain`-письме без multipart возвращается `MimeError::InvalidEmailFormat`.
+- `extract_liveletters_parts_rejects_non_multipart_email` — на `text/plain`-письме без служебного блока возвращается `MimeError::MissingTechnicalPart`.
 
-Тесты намеренно идут через настоящие строки, а не через in-memory fakes. `sample_multipart_mime()` собирает «сырое» письмо через `build_protocol_email`, а потом прогоняет его через парсер. Это закрывает как минимум round-trip баг класса «изменили формат, забыли обновить парсер».
+Тесты намеренно идут через настоящие строки, а не через in-memory fakes. `sample_protocol_mime()` собирает «сырое» письмо через `build_protocol_email`, а потом прогоняет его через парсер.
 
 ## Требования к документации
 
 Обязательна документация:
 
 - описание конвейера `parse_email → extract_liveletters_parts → decode_protocol_message`;
-- описание формата LiveLetters-письма с фиксированной границей;
-- описание роли `build_protocol_email` и детерминированности `liveletters-boundary`;
+- описание формата LiveLetters-письма;
+- описание роли `build_protocol_email`;
 - описание вариантов `MimeError`;
 - явная фиксация того, что модуль не делает (вложения, base64, quoted-printable).
 
 ## Критерии готовности
 
 - `parse_email` разбирает любой RFC 5322-текст с `\n\n` между заголовками и телом;
-- `extract_liveletters_parts` достаёт `text/plain` и `application/json` из `multipart/mixed` с параметром `boundary=`;
-- `build_protocol_email` собирает письмо с фиксированной границей `liveletters-boundary`;
+- `extract_liveletters_parts` достаёт человекочитаемый текст и служебный блок LiveLetters из `text/plain`-письма;
+- `build_protocol_email` собирает `text/plain`-письмо со служебным блоком LiveLetters;
 - round-trip `build → parse → extract → decode` сохраняет `ProtocolMessage` побитово;
 - 5 integration-тестов и 1 lib-test зелёные.
 
-Сейчас практически считаются уже закрытыми:
+Свойства реализации:
 
 - выделение MIME-логики в отдельный крейт без зависимостей от SMTP/IMAP;
-- фиксированная граница multipart;
 - типизированные структуры `OutgoingEmail`/`ReceivedEmail`/`ParsedEmail`/`ExtractedMailParts`;
 - покрытие тестами round-trip и всех четырёх классов ошибок `MimeError`.
 
-Модуль пока не считается завершенным в части:
+Ограничения:
 
 - нет поддержки base64-encoded body;
 - нет поддержки quoted-printable;
@@ -185,7 +177,7 @@ Content-Type: application/json
 - нет нормализации `Content-Transfer-Encoding`;
 - нет строгой валидации email-адресов в `From`/`To`.
 
-Эти направления зафиксированы как возможный следующий шаг, но не блокируют текущую версию.
+Эти направления не входят в границы модуля.
 
 ## Связанные документы
 

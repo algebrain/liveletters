@@ -39,6 +39,12 @@ fn create_post_with_friends_only_persists_visibility() {
     let envelope: Value = serde_json::from_str(&outbox[0].message_body).unwrap();
     assert_eq!(envelope["envelope"]["event_type"], "post_created");
     assert_eq!(envelope["payload"]["visibility"], "friends_only");
+    assert_eq!(envelope["payload"]["body"], "Привет, мир");
+    assert_eq!(envelope["payload"]["body_format"], "plain");
+    assert_eq!(
+        envelope["human_readable_body"],
+        "acct_alice написал:\n\nПривет, мир"
+    );
 }
 
 #[test]

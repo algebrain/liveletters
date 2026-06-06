@@ -58,6 +58,8 @@ pub fn write_post_eml(dir: &std::path::Path, post_id: &str, body: &str) -> PathB
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_000,
+            body: body.into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )

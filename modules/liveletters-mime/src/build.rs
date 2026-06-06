@@ -1,3 +1,4 @@
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use liveletters_protocol::{ProtocolError, ProtocolMessage, decode_message, encode_message};
 
 use crate::{MimeError, OutgoingEmail};
@@ -8,14 +9,13 @@ pub fn build_protocol_email(
     subject: &str,
     protocol_message: &ProtocolMessage,
 ) -> Result<OutgoingEmail, MimeError> {
-    let boundary = "liveletters-boundary";
     let technical_payload = encode_message(protocol_message)
         .map_err(|error| MimeError::Protocol(format_protocol_error(error)))?;
+    let encoded_payload = URL_SAFE_NO_PAD.encode(technical_payload.as_bytes());
 
     let raw_message = format!(
-        "From: {from}\nTo: {to}\nSubject: {subject}\nX-LiveLetters-Protocol: v1\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"{boundary}\"\n\n--{boundary}\nContent-Type: text/plain; charset=\"utf-8\"\n\n{}\n--{boundary}\nContent-Type: application/json\n\n{}\n--{boundary}--\n",
+        "From: {from}\nTo: {to}\nSubject: {subject}\nX-LiveLetters-Protocol: v1\nContent-Type: text/plain; charset=\"utf-8\"\n\n{}\n\n-- \nLiveLetters-Protocol: v1\nLiveLetters-Payload: {encoded_payload}\n",
         protocol_message.human_readable_body(),
-        technical_payload
     );
 
     Ok(OutgoingEmail {

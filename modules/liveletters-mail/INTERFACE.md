@@ -298,14 +298,14 @@
 
 `build_protocol_email(from, to, subject, protocol_message) -> Result<OutgoingEmail, TransportError>`
 
-Она берет `ProtocolMessage` и упаковывает его в multipart email.
+Она берет `ProtocolMessage` и упаковывает его в email.
 
-Сейчас её поведение такое:
+Поведение:
 
-- создается обычный email с `From`, `To`, `Subject`, `X-LiveLetters-Protocol: v1`, `MIME-Version`;
-- письмо получает multipart boundary;
+- создается обычный email с `From`, `To`, `Subject`, `X-LiveLetters-Protocol: v1`;
+- письмо получает `Content-Type: text/plain; charset="utf-8"`;
 - человекочитаемая часть кладется как `text/plain`;
-- техническая часть кладется как `application/json`.
+- техническая часть кодируется как `LiveLetters-Payload` в служебном блоке в конце тела письма.
 
 ### Зачем она нужна
 
@@ -383,11 +383,9 @@
 
 Она:
 
-- проверяет, что письмо multipart;
-- находит boundary;
-- проходит по частям письма;
-- ищет `text/plain`;
-- ищет `application/json`;
+- проверяет `Content-Type`;
+- отделяет человекочитаемый текст от служебного блока LiveLetters;
+- декодирует `LiveLetters-Payload`;
 - возвращает их как `ExtractedMailParts`.
 
 ### Зачем это нужно
@@ -617,11 +615,11 @@
 
 ### `MissingHumanReadablePart`
 
-Означает, что письмо похоже на multipart, но в нем не удалось найти ожидаемую человекочитаемую часть.
+Означает, что письмо не содержит ожидаемую человекочитаемую часть.
 
 ### `MissingTechnicalPart`
 
-Означает, что письмо не содержит нужный technical JSON part.
+Означает, что письмо не содержит служебную часть LiveLetters.
 
 ### `Protocol(...)`
 

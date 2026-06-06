@@ -2,18 +2,18 @@
 
 ## Назначение
 
-`liveletters-mime` это отдельный крейт, отвечающий за всё, что связано с MIME-формой LiveLetters-писем: парсинг сырого текста письма, извлечение из multipart-тела человекочитаемой и технической частей, а также сборка исходящего письма из `ProtocolMessage`.
+`liveletters-mime` это отдельный крейт, отвечающий за форму LiveLetters-писем: парсинг сырого текста письма, извлечение человекочитаемой и технической частей, а также сборка исходящего письма из `ProtocolMessage`.
 
 Крейт намеренно отделён от `liveletters-mail` по двум причинам:
 
 - MIME-логика не зависит от того, как именно мы отправляем и получаем письма (SMTP, IMAP, локальный mock, TcpListener) и нужна тестам даже тогда, когда сетевой transport отключён (feature `network` в `liveletters-mail` по умолчанию выключена);
 - MIME-логика зависит только от `liveletters-protocol`, но не от `liveletters-store` или `liveletters-app-core`, что держит её переносимой и пригодной для повторного использования в CLI и в Tauri-клиенте.
 
-Крейт занимает одну конкретную нишу: превращать «текст письма в стандарте RFC 5322 / multipart» в строго типизированные структуры LiveLetters и обратно. Он не делает:
+Крейт занимает одну конкретную нишу: превращать «текст письма в стандарте RFC 5322» в строго типизированные структуры LiveLetters и обратно. Он не делает:
 
 - отправку или приём писем (это `liveletters-mail`);
 - хранение писем в БД (это `liveletters-store`);
-- разбор нестандартных MIME-деревьев, вложений, кодировок base64/quoted-printable в теле (текущая версия работает только с `text/plain` + `application/json` внутри multipart/mixed).
+- разбор нестандартных MIME-деревьев, вложений и кодировок quoted-printable в теле. Исходящие письма строятся как `text/plain` со служебным блоком LiveLetters в конце тела. Старый `multipart/mixed` с `application/json` поддерживается только как входящий формат для уже отправленных писем.
 
 ## Где находится интерфейс
 
@@ -87,16 +87,25 @@ pub fn parse_email(raw_email: &str) -> Result<ParsedEmail, MimeError>
 pub fn extract_liveletters_parts(parsed: &ParsedEmail) -> Result<ExtractedMailParts, MimeError>
 ```
 
-Извлекает из `ParsedEmail` LiveLetters-специфичную структуру:
+Извлекает из `ParsedEmail` LiveLetters-специфичную структуру.
 
-- требует заголовок `Content-Type` со значением, содержащим подстроку `multipart/` (любой `multipart/*`, но в нашей форме это `multipart/mixed`);
-- парсит параметр `boundary="…"` (поддерживает и границу в кавычках, и без);
-- разбивает тело по маркеру `--{boundary}`;
-- в каждой части ищет `Content-Type`:
-  - если в нём есть `text/plain` — это `human_readable_body`;
-  - если в нём есть `application/json` — это `technical_body`;
-  - остальные части игнорируются;
-- возвращает `MimeError::MissingHumanReadablePart` / `MimeError::MissingTechnicalPart`, если соответствующая часть не найдена.
+Основной формат исходящих писем — обычный `text/plain`:
+
+```text
+<человекочитаемый текст>
+
+-- 
+LiveLetters-Protocol: v1
+LiveLetters-Payload: <base64url-json>
+```
+
+`human_readable_body` берётся из текста до служебного блока,
+`technical_body` получается декодированием `LiveLetters-Payload`.
+
+Для совместимости также поддерживается старый входящий формат
+`multipart/mixed`: `text/plain` считается человекочитаемой частью, а
+`application/json` — технической частью. Новые письма в таком виде не
+создаются.
 
 `ExtractedMailParts` предоставляет:
 
@@ -129,16 +138,15 @@ pub fn build_protocol_email(
 ) -> Result<OutgoingEmail, MimeError>
 ```
 
-Собирает сырое multipart-письмо из `ProtocolMessage`:
+Собирает сырое текстовое письмо из `ProtocolMessage`:
 
 1. сериализует `protocol_message` в JSON через `liveletters_protocol::encode_message`; ошибка протокола → `MimeError::Protocol(…)`;
-2. формирует заголовки `From` / `To` / `Subject` / `X-LiveLetters-Protocol: v1` / `MIME-Version` / `Content-Type: multipart/mixed; boundary="liveletters-boundary"`;
-3. формирует две части:
-   - `text/plain; charset="utf-8"` с `protocol_message.human_readable_body()`;
-   - `application/json` с сериализованным `ProtocolMessage`;
+2. кодирует JSON как base64url без заполнения;
+3. формирует заголовки `From` / `To` / `Subject` / `X-LiveLetters-Protocol: v1` / `Content-Type: text/plain; charset="utf-8"`;
+4. кладёт `protocol_message.human_readable_body()` в обычное тело письма и добавляет в конец служебный блок `LiveLetters-Payload`;
 4. возвращает `OutgoingEmail { from, to, subject, raw_message }`, где `raw_message` — готовое к отправке тело письма целиком (вместе с заголовками и разделителями).
 
-Граница `liveletters-boundary` зафиксирована в коде как константа. Она намеренно детерминирована, чтобы сделать round-trip `build_protocol_email` → `parse_email` → `extract_liveletters_parts` → `decode_protocol_message` воспроизводимым в тестах.
+Служебный блок может быть виден в исходнике письма или в некоторых почтовых клиентах, но он не является отдельным вложением. Это сделано намеренно: надёжность доставки важнее скрытности, а длинный JSON не должен попадать в заголовки письма.
 
 `OutgoingEmail` — это плоская структура с четырьмя `String`-полями:
 
@@ -172,9 +180,9 @@ pub enum MimeError {
 Смысл вариантов:
 
 - `Protocol(String)` — сбой на стыке с `liveletters_protocol`: пустое поле envelope, пустое `human_readable_body`, битый JSON.
-- `InvalidEmailFormat(&'static str)` — структурная проблема MIME: нет `\n\n` между заголовками и телом, заголовок без `:`, отсутствует `Content-Type`, не multipart, нет параметра `boundary`.
-- `MissingHumanReadablePart` — в multipart-теле не нашлось `text/plain`.
-- `MissingTechnicalPart` — в multipart-теле не нашлось `application/json`.
+- `InvalidEmailFormat(&'static str)` — структурная проблема письма: нет `\n\n` между заголовками и телом, заголовок без `:`, отсутствует `Content-Type`, повреждён служебный блок или старый multipart не содержит `boundary`.
+- `MissingHumanReadablePart` — в старом multipart-теле не нашлось `text/plain`.
+- `MissingTechnicalPart` — не найден служебный блок LiveLetters или в старом multipart-теле не нашлось `application/json`.
 
 `MimeError` намеренно **не несёт** подробностей «в каком байте сломались заголовки»: текущая модель ошибок фиксирует класс проблемы, а не позицию. Это сознательное упрощение: LiveLetters не пытается быть почтовым клиентом общего назначения и не предоставляет пользователю средств ручного восстановления битых писем.
 
@@ -190,12 +198,14 @@ use liveletters_protocol::{MessageEnvelope, ProtocolMessage, DomainEventPayload}
 
 let message = ProtocolMessage::new(
     MessageEnvelope::new("1", "post_created", "blog-1", "event-1")?,
-    "Новая запись в блоге",
+    "alice написал:\n\nТекст поста",
     DomainEventPayload::PostCreated {
         post_id: "post-1".into(),
         resource_id: "blog-1".into(),
         actor_id: "alice".into(),
         created_at: 1_710_000_000,
+        body: "Текст поста".into(),
+        body_format: "plain".into(),
         visibility: "public".into(),
     },
 )?;
@@ -211,7 +221,7 @@ let parsed = parse_email(&outgoing.raw_message)?;
 let parts = extract_liveletters_parts(&parsed)?;
 let decoded = decode_protocol_message(parts.technical_body())?;
 
-assert_eq!(decoded.human_readable_body(), "Новая запись в блоге");
+assert_eq!(decoded.human_readable_body(), "alice написал:\n\nТекст поста");
 ```
 
 ### Обработать письмо, пришедшее из IMAP
@@ -236,7 +246,7 @@ match extract_liveletters_parts(&parsed) {
 
 ## Что модуль не делает
 
-- не разбирает вложения, base64-encoded body, quoted-printable, разные `multipart/alternative`/`multipart/related`/`multipart/encrypted` — крейт работает строго с `multipart/mixed` + `text/plain` + `application/json`;
+- не разбирает произвольные вложения, quoted-printable, разные `multipart/alternative`/`multipart/related`/`multipart/encrypted`; новый исходящий формат — `text/plain` со служебным блоком LiveLetters, старый `multipart/mixed` читается только для совместимости;
 - не валидирует email-адреса в полях `From`/`To` — это работа SMTP-слоя;
 - не делает retry, throttling, deduplication писем — это ответственность `liveletters-sync`;
 - не сохраняет ничего в БД — это ответственность `liveletters-store`.

@@ -28,6 +28,8 @@ fn sample_protocol_message(event_id: &str) -> ProtocolMessage {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_000,
+            body: "Тестовое письмо".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )

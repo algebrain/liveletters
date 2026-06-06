@@ -13,6 +13,8 @@ fn post_created_round_trip_keeps_envelope_and_payload() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_000,
+            body: "Текст поста".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )
@@ -74,6 +76,8 @@ fn blank_human_body_is_rejected() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_000,
+            body: "Текст поста".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )

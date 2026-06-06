@@ -394,6 +394,7 @@ impl<'a> SyncEngine<'a> {
                 post_id,
                 actor_id,
                 created_at,
+                body,
                 visibility,
                 ..
             } => {
@@ -412,7 +413,7 @@ impl<'a> SyncEngine<'a> {
                         resource_id: resource_id.to_owned(),
                         author_id: actor_id.clone(),
                         created_at: *created_at,
-                        body: "Imported post".into(),
+                        body: body.clone(),
                         visibility: visibility.clone(),
                         hidden: false,
                     })
@@ -622,6 +623,18 @@ fn validate_protocol_message(
         && body.trim().is_empty()
     {
         return Err("blank_comment_body".into());
+    }
+
+    if let DomainEventPayload::PostCreated {
+        body, body_format, ..
+    } = payload
+    {
+        if body.trim().is_empty() {
+            return Err("blank_post_body".into());
+        }
+        if !matches!(body_format.as_str(), "plain" | "markdown" | "html") {
+            return Err("unknown_body_format".into());
+        }
     }
 
     Ok(())

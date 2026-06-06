@@ -7,6 +7,8 @@ pub enum DomainEventPayload {
         resource_id: String,
         actor_id: String,
         created_at: u64,
+        body: String,
+        body_format: String,
         visibility: String,
     },
     CommentCreated {
@@ -49,6 +51,10 @@ enum WireDomainEventPayload {
         resource_id: String,
         actor_id: String,
         created_at: u64,
+        #[serde(default)]
+        body: String,
+        #[serde(default = "default_body_format")]
+        body_format: String,
         visibility: String,
     },
     CommentCreated {
@@ -115,12 +121,16 @@ impl From<&DomainEventPayload> for WireDomainEventPayload {
                 resource_id,
                 actor_id,
                 created_at,
+                body,
+                body_format,
                 visibility,
             } => Self::PostCreated {
                 post_id: post_id.clone(),
                 resource_id: resource_id.clone(),
                 actor_id: actor_id.clone(),
                 created_at: *created_at,
+                body: body.clone(),
+                body_format: body_format.clone(),
                 visibility: visibility.clone(),
             },
             DomainEventPayload::CommentCreated {
@@ -195,12 +205,16 @@ impl TryFrom<WireDomainEventPayload> for DomainEventPayload {
                 resource_id,
                 actor_id,
                 created_at,
+                body,
+                body_format,
                 visibility,
             } => Ok(Self::PostCreated {
                 post_id,
                 resource_id,
                 actor_id,
                 created_at,
+                body,
+                body_format,
                 visibility,
             }),
             WireDomainEventPayload::CommentCreated {
@@ -274,4 +288,8 @@ impl TryFrom<WireDomainEventPayload> for DomainEventPayload {
             }
         }
     }
+}
+
+fn default_body_format() -> String {
+    "plain".to_owned()
 }

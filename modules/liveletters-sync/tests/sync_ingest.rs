@@ -58,9 +58,11 @@ fn valid_post_created_message_is_applied() {
                 resource_id: "blog-1".into(),
                 actor_id: "alice".into(),
                 created_at: 1,
+                body: "Текст поста".into(),
+                body_format: "plain".into(),
                 visibility: "public".into(),
             },
-            "Новая запись",
+            "alice написал:\n\nТекст поста",
         )])
         .expect("batch should ingest");
 
@@ -69,7 +71,9 @@ fn valid_post_created_message_is_applied() {
         report.outcomes()[0],
         SyncMessageOutcome::Applied { .. }
     ));
-    assert_eq!(store.list_posts().unwrap().len(), 1);
+    let posts = store.list_posts().unwrap();
+    assert_eq!(posts.len(), 1);
+    assert_eq!(posts[0].body, "Текст поста");
     assert_eq!(store.list_raw_event_records().unwrap().len(), 1);
 }
 
@@ -84,6 +88,8 @@ fn duplicate_event_is_detected_without_reapplying() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1,
+            body: "Текст поста".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
         "Новая запись",
@@ -182,6 +188,8 @@ fn replayed_post_created_is_reported_separately_from_duplicate_event_id() {
                 resource_id: "blog-1".into(),
                 actor_id: "alice".into(),
                 created_at: 1,
+                body: "Старая запись".into(),
+                body_format: "plain".into(),
                 visibility: "public".into(),
             },
             "Старая запись",
@@ -266,6 +274,8 @@ fn invalid_event_with_mismatched_resource_id_is_rejected() {
             resource_id: "blog-payload".into(),
             actor_id: "alice".into(),
             created_at: 1,
+            body: "Некорректное событие".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )
@@ -293,6 +303,62 @@ fn invalid_event_with_mismatched_resource_id_is_rejected() {
     assert!(store.list_posts().unwrap().is_empty());
     let raw_events = store.list_raw_event_records().unwrap();
     assert_eq!(raw_events[0].apply_status, "invalid");
+}
+
+#[test]
+fn invalid_post_created_with_blank_body_is_rejected() {
+    let (store, _tmp) = open_temp_store();
+    let engine = SyncEngine::new(&store);
+
+    let report = engine
+        .ingest_batch(vec![protocol_email(
+            "event-blank-post",
+            DomainEventPayload::PostCreated {
+                post_id: "post-blank".into(),
+                resource_id: "blog-1".into(),
+                actor_id: "alice".into(),
+                created_at: 1,
+                body: "   ".into(),
+                body_format: "plain".into(),
+                visibility: "public".into(),
+            },
+            "Пустая запись",
+        )])
+        .expect("batch should ingest");
+
+    assert!(matches!(
+        report.outcomes()[0],
+        SyncMessageOutcome::Invalid { .. }
+    ));
+    assert!(store.list_posts().unwrap().is_empty());
+}
+
+#[test]
+fn invalid_post_created_with_unknown_body_format_is_rejected() {
+    let (store, _tmp) = open_temp_store();
+    let engine = SyncEngine::new(&store);
+
+    let report = engine
+        .ingest_batch(vec![protocol_email(
+            "event-unknown-format",
+            DomainEventPayload::PostCreated {
+                post_id: "post-format".into(),
+                resource_id: "blog-1".into(),
+                actor_id: "alice".into(),
+                created_at: 1,
+                body: "Текст".into(),
+                body_format: "rst".into(),
+                visibility: "public".into(),
+            },
+            "Неизвестный формат",
+        )])
+        .expect("batch should ingest");
+
+    assert!(matches!(
+        report.outcomes()[0],
+        SyncMessageOutcome::Invalid { .. }
+    ));
+    assert!(store.list_posts().unwrap().is_empty());
 }
 
 #[test]
@@ -324,6 +390,8 @@ fn deferred_events_can_be_reprocessed_after_dependencies_appear() {
                 resource_id: "blog-1".into(),
                 actor_id: "alice".into(),
                 created_at: 1,
+                body: "Пост появился позже".into(),
+                body_format: "plain".into(),
                 visibility: "public".into(),
             },
             "Пост появился позже",

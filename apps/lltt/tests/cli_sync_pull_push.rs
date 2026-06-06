@@ -230,6 +230,8 @@ fn sync_without_subcommand_runs_pull_then_push() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_000,
+            body: "Привет из полного sync".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )
@@ -261,6 +263,8 @@ fn sync_without_subcommand_runs_pull_then_push() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_100,
+            body: "Тело".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )
@@ -327,6 +331,8 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_000,
+            body: "Тело".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )
@@ -384,6 +390,8 @@ fn sync_pull_advances_cursor_idempotently() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_000,
+            body: "Привет из IMAP".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )

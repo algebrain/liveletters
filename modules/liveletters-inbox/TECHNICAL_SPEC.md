@@ -61,7 +61,7 @@ apps/lltt
 ## 4. Цепочка обработки одного `.eml`
 
 1. `fs::read_to_string(file)` — читает файл в UTF-8.
-2. `parse_email(&raw)` (`liveletters-mime`) — вытаскивает заголовки и тело; ожидается `multipart/mixed` с двумя частями (`text/plain` + `application/json`).
+2. `parse_email(&raw)` (`liveletters-mime`) — вытаскивает заголовки и тело; ожидается письмо LiveLetters с человекочитаемым текстом и служебным блоком.
 3. Извлечение `message_id` из заголовка `Message-ID` (или `Message-Id` — MIME регистронезависим). Если заголовка нет — пустая строка; это не ошибка (sync всё равно попробует применить).
 4. `SyncEngine::ingest_batch(vec![ReceivedEmail { message_id, raw_message: raw }])`.
 5. На каждый `SyncMessageOutcome` — печать строки и инкремент соответствующего счётчика.
@@ -118,7 +118,7 @@ apps/lltt
 |---|---|
 | Файл не существует | `InboxError::FileNotFound(file)` |
 | Не UTF-8 | `InboxError::Io(io::Error)` |
-| Не multipart | `InboxError::Mime(InvalidEmailFormat)` |
+| Нет служебного блока LiveLetters | `InboxError::Mime(MissingTechnicalPart)` |
 | Нет `current-user` (нет `init`) | `InboxError::Store(StoreError::StoreNotInitialized)` |
 | `list --status nonsense` | `InboxError::InvalidStatus("nonsense")` |
 | `show <unknown_id>` | `InboxError::MessageNotFound("<unknown_id>")` |
@@ -134,4 +134,3 @@ apps/lltt
   `list` переведён с `list_raw_message_records` + reverse/take
   на `list_raw_message_records_paged` (SQL-уровень).
 - Запланировано: реальный IMAP через `liveletters-mail::ConfiguredImapMailbox`; `import::run` остаётся как fallback для оффлайнового импорта.
-

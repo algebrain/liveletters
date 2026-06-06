@@ -71,10 +71,9 @@ fn configured_smtp_transport_sends_message_over_tcp() {
         }
         let raw_message = String::from_utf8(data).expect("SMTP data should be UTF-8");
         assert!(raw_message.contains("Subject: Новая запись\r\n"));
-        assert!(
-            raw_message
-                .contains("Content-Type: multipart/mixed; boundary=\"liveletters-boundary\"")
-        );
+        assert!(raw_message.contains("Content-Type: text/plain; charset=\"utf-8\""));
+        assert!(raw_message.contains("LiveLetters-Payload: "));
+        assert!(!raw_message.contains("Content-Type: application/json"));
         socket
             .write_all(b"250 2.0.0 Queued\r\n")
             .expect("queue response should be written");
@@ -95,6 +94,8 @@ fn configured_smtp_transport_sends_message_over_tcp() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_000,
+            body: "Текст поста".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )
@@ -137,6 +138,8 @@ fn configured_imap_mailbox_fetches_messages_with_cursor() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_123,
+            body: "Живое письмо".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )

@@ -47,6 +47,8 @@ fn post_created_email(event_id: &str, post_id: &str, resource_id: &str) -> Recei
             resource_id: resource_id.into(),
             actor_id: "alice".into(),
             created_at: 1,
+            body: "Текст поста".into(),
+            body_format: "plain".into(),
             visibility: "public".into(),
         },
     )

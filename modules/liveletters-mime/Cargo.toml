@@ -8,4 +8,5 @@ license.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+base64 = { workspace = true }
 liveletters-protocol = { path = "../liveletters-protocol" }
