@@ -55,10 +55,11 @@ modules/liveletters-cu/src/
 | `["init", "alice", "--force"]` | `CuAction::Init { name: "alice", force: true }` |
 | `["show", "alice"]` | `CuAction::Show { name: "alice", reveal: false }` |
 | `["show", "alice", "--reveal"]` | `CuAction::Show { name: "alice", reveal: true }` |
-| `["add", "alice", "--from", "drafts/alice.toml"]` | `CuAction::Add { ... }` |
+| `["add", "alice"]` | `CuAction::Add { name: "alice", from: None }` |
+| `["add", "alice", "--from", "drafts/alice.toml"]` | `CuAction::Add { name: "alice", from: Some(...) }` |
 | `["rm", "alice", "--yes"]` | `CuAction::Rm { name: "alice", yes: true }` |
 
-Отсутствующая подкоманда, неизвестный флаг, лишний позиционный аргумент и отсутствующий `--from` возвращают `CuError::InvalidArgs`.
+Отсутствующая подкоманда, неизвестный флаг или лишний позиционный аргумент возвращают `CuError::InvalidArgs`.
 
 ## Выполнение
 
@@ -76,7 +77,7 @@ modules/liveletters-cu/src/
 2. `List` вызывает `list::run`;
 3. `Init` вызывает `user_init::run`;
 4. `Show` вызывает `show::run`;
-5. `Add` вызывает `add::run`;
+5. `Add` вызывает `add::run`; если `--from` не указан, передаёт `<home>/drafts/<name>.toml`;
 6. `Rm` вызывает `rm::run`.
 
 ## `user init`

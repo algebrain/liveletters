@@ -17,7 +17,7 @@ impl std::fmt::Display for ConfigError {
             Self::NoCurrentUser(path) => {
                 write!(
                     f,
-                    "текущий пользователь liveletters не задан (файл `{}` отсутствует); создайте пользователя командой `lltt user init <имя>`, добавьте его командой `lltt user add <имя> --from <файл>`, затем выберите командой `lltt cu <имя>`",
+                    "текущий пользователь liveletters не задан (файл `{}` отсутствует); создайте пользователя командой `lltt user init <имя>`, добавьте его командой `lltt user add <имя>`, затем выберите командой `lltt cu <имя>`",
                     path.display()
                 )
             }

@@ -117,3 +117,24 @@ mailbox = "INBOX"
     assert_eq!(mail.imap_port, 993);
     assert_eq!(mail.imap_mailbox, "INBOX");
 }
+
+#[test]
+fn user_add_uses_default_draft_path_when_from_is_omitted() {
+    let tmp = TempDir::new().unwrap();
+    init_home(&tmp);
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["user", "init", "alice"])
+        .assert()
+        .success();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["user", "add", "alice"])
+        .assert()
+        .success();
+
+    assert!(tmp.path().join("identities/alice.toml").exists());
+    assert!(!tmp.path().join("current-user").exists());
+}

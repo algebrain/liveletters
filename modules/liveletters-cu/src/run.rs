@@ -40,8 +40,11 @@ pub fn run_user(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error +
             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?,
         CuAction::Show { name, reveal } => super::show::run(ctx, &name, reveal)
             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?,
-        CuAction::Add { name, from } => super::add::run(ctx, &name, &from)
-            .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?,
+        CuAction::Add { name, from } => {
+            let from = from.unwrap_or_else(|| default_draft_path(ctx, &name));
+            super::add::run(ctx, &name, &from)
+                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?
+        }
         CuAction::Rm { name, yes } => super::rm::run(ctx, &name, yes)
             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?,
         _ => unreachable!("parse_user_action returned current-user action"),
@@ -59,9 +62,7 @@ fn parse_current_action(tokens: &[String]) -> Result<CuAction, CuError> {
         Some("posts") => parse_posts(&tokens[1..]),
         Some("show") => Err(CuError::UseUserCommand("lltt user show <имя>".to_owned())),
         Some("list") => Err(CuError::UseUserCommand("lltt user list".to_owned())),
-        Some("add") => Err(CuError::UseUserCommand(
-            "lltt user add <имя> --from <файл>".to_owned(),
-        )),
+        Some("add") => Err(CuError::UseUserCommand("lltt user add <имя>".to_owned())),
         Some("rm") => Err(CuError::UseUserCommand(
             "lltt user rm <имя> --yes".to_owned(),
         )),
@@ -198,9 +199,11 @@ fn parse_add(rest: &[String]) -> Result<CuAction, CuError> {
     }
     let name =
         name.ok_or_else(|| CuError::InvalidArgs("`add` требует имя идентичности".to_owned()))?;
-    let from =
-        from.ok_or_else(|| CuError::InvalidArgs("`add` требует --from <путь>".to_owned()))?;
     Ok(CuAction::Add { name, from })
+}
+
+fn default_draft_path(ctx: &CommandContext, name: &str) -> std::path::PathBuf {
+    ctx.home.join("drafts").join(format!("{name}.toml"))
 }
 
 fn parse_rm(rest: &[String]) -> Result<CuAction, CuError> {

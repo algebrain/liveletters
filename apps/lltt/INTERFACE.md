@@ -60,7 +60,7 @@
 | `lltt user list` | Печатает построчно имена всех конфигов в `<home>/identities/`. После чистого `init` список пуст. |
 | `lltt user init <имя> [--force]` | Создаёт черновик `<home>/drafts/<имя>.toml`, печатает путь и содержимое. Без `--force` не перезаписывает существующий черновик. |
 | `lltt user show <имя> [--reveal]` | Печатает содержимое конфига `<home>/identities/<имя>.toml`. Пароли маскируются, кроме режима `--reveal`. |
-| `lltt user add <имя> --from <путь>` | Читает TOML-файл, валидирует имя и содержимое, сохраняет `<home>/identities/<имя>.toml`, копирует почтовые секции в `mail_settings`. Если включено `pwd_obfuscate`, отдельно просит подтвердить SMTP- и IMAP-пароль скрытым вводом со звёздочками и сохраняет их в виде `obf:v1:...`. Текущего пользователя не меняет. |
+| `lltt user add <имя> [--from <путь>]` | Читает TOML-файл, валидирует имя и содержимое, сохраняет `<home>/identities/<имя>.toml`, копирует почтовые секции в `mail_settings`. Без `--from` берёт `<home>/drafts/<имя>.toml`. Если включено `pwd_obfuscate`, отдельно просит подтвердить SMTP- и IMAP-пароль скрытым вводом со звёздочками и сохраняет их в виде `obf:v1:...`. Текущего пользователя не меняет. |
 | `lltt user rm <имя> --yes` | Удаляет файл `<home>/identities/<имя>.toml`. **Требует флаг `--yes`** для подтверждения. **Запрещено** удалять того, кто сейчас выбран текущим (сначала `lltt cu <другое_имя>`, затем `lltt user rm <имя> --yes`). |
 
 Полный публичный API `liveletters-cu` (включая коды ошибок, формат `Args`, поведение `CuAction`) — в [`modules/liveletters-cu/INTERFACE.md`](../../modules/liveletters-cu/INTERFACE.md).
@@ -108,7 +108,7 @@
 
 Имя текущего пользователя liveletters хранится в **текстовом файле `<home>/current-user`** (одна строка — имя без расширения). Задаётся только командой `lltt cu <имя>`. Читается командой `lltt cu`, командой `lltt cu show` и всеми остальными командами, которым нужна текущая идентичность.
 
-Если файл `<home>/current-user` отсутствует, команды `init`, `user ...`, `cu <имя>` и старые запрещённые формы `cu list/add/rm/show <имя>` могут выполниться или вернуть свою обычную ошибку. Команды, которым нужен уже выбранный пользователь (`status`, `feed`, `post`, `cu`, `cu show`, `cu posts` и т. п.), возвращают код 2 и подсказывают: `lltt user init <имя>`, `lltt user add <имя> --from <файл>`, затем `lltt cu <имя>`.
+Если файл `<home>/current-user` отсутствует, команды `init`, `user ...`, `cu <имя>` и старые запрещённые формы `cu list/add/rm/show <имя>` могут выполниться или вернуть свою обычную ошибку. Команды, которым нужен уже выбранный пользователь (`status`, `feed`, `post`, `cu`, `cu show`, `cu posts` и т. п.), возвращают код 2 и подсказывают: `lltt user init <имя>`, `lltt user add <имя>`, затем `lltt cu <имя>`.
 
 См. также [`liveletters-config::read_current_identity`](../../modules/liveletters-config/src/io.rs) и [`liveletters-config::write_current_identity`](../../modules/liveletters-config/src/io.rs).
 
@@ -153,7 +153,7 @@ $ lltt user init alice
 создан черновик /var/lib/lltt/drafts/alice.toml
 ...
 
-$ lltt user add alice --from /var/lib/lltt/drafts/alice.toml
+$ lltt user add alice
 добавлен identities/alice.toml
 
 $ lltt cu alice

@@ -33,7 +33,7 @@ pub enum CuAction {
     },
     Add {
         name: String,
-        from: std::path::PathBuf,
+        from: Option<std::path::PathBuf>,
     },
     Rm {
         name: String,

@@ -194,6 +194,12 @@ subscriptions    = []
 Подключите файл командой:
 
 ```sh
+lltt user add alice
+```
+
+Если TOML лежит не в стандартном черновике, укажите путь явно:
+
+```sh
 lltt user add alice --from "$LIVELETTERS_HOME/drafts/alice.toml"
 ```
 
@@ -706,7 +712,7 @@ lltt user list
 # 3. Создаём черновик идентичности, правим его в редакторе и добавляем
 lltt user init alice
 ${EDITOR:-vi} "$LIVELETTERS_HOME/drafts/alice.toml"
-lltt user add alice --from "$LIVELETTERS_HOME/drafts/alice.toml"
+lltt user add alice
 lltt cu alice
 
 # 4. Проверяем состояние и профиль пользователя
@@ -763,7 +769,8 @@ lltt doctor --verbose
 | `lltt user init <имя>` | Создать черновик идентичности |
 | `lltt user init <имя> --force` | Перезаписать черновик |
 | `lltt user show <имя>` | Показать сведения об идентичности |
-| `lltt user add <имя> --from <файл>` | Добавить идентичность из TOML-файла |
+| `lltt user add <имя>` | Добавить идентичность из стандартного черновика |
+| `lltt user add <имя> --from <файл>` | Добавить идентичность из другого TOML-файла |
 | `lltt user rm <имя> --yes` | Удалить идентичность |
 | `lltt settings` | Показать все настройки |
 | `lltt settings set <ключ> <значение>` | Изменить одну настройку |

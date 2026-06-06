@@ -40,7 +40,7 @@ mailbox = "INBOX"
 Затем добавьте пользователя:
 
 ```sh
-lltt user add alice --from "$LIVELETTERS_HOME/drafts/alice.toml"
+lltt user add alice
 lltt cu alice
 ```
 

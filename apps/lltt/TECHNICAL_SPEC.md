@@ -242,7 +242,7 @@ pub enum ContextError {
 }
 ```
 
-`NoCurrentUser` — частый случай сразу после `lltt init` или после ручного удаления `<home>/current-user`. Сообщение подсказывает последовательность: `lltt user init <имя>`, `lltt user add <имя> --from <файл>`, затем `lltt cu <имя>`.
+`NoCurrentUser` — частый случай сразу после `lltt init` или после ручного удаления `<home>/current-user`. Сообщение подсказывает последовательность: `lltt user init <имя>`, `lltt user add <имя>`, затем `lltt cu <имя>`.
 
 ## Зависимости
 
@@ -275,7 +275,7 @@ pub enum ContextError {
   - `status_succeeds_after_init` — после чистого `init` команда `lltt status` возвращает код 2, потому что текущий пользователь ещё не выбран.
 - [`apps/lltt/tests/cli_init.rs`](tests/cli_init.rs) — 3 теста на `lltt init`.
 - [`apps/lltt/tests/cli_cu.rs`](tests/cli_cu.rs) — тесты на `lltt cu`, `lltt cu posts` и запрет старых форм управления списком.
-- [`apps/lltt/tests/cli_user.rs`](tests/cli_user.rs) — тесты на `lltt user init`, `lltt user add` и отсутствие автоматического выбора текущего пользователя.
+- [`apps/lltt/tests/cli_user.rs`](tests/cli_user.rs) — тесты на `lltt user init`, `lltt user add`, путь черновика по умолчанию и отсутствие автоматического выбора текущего пользователя.
 - [`apps/lltt/tests/cli_sub.rs`](tests/cli_sub.rs) — тесты на `lltt sub` (подписка/отписка/список).
 - [`apps/lltt/tests/cli_feed.rs`](tests/cli_feed.rs) — тесты на `lltt feed` как ленту подписок через бинарь.
 - [`apps/lltt/tests/cli_post.rs`](tests/cli_post.rs) — тесты на `lltt post new` через бинарь.
