@@ -10,7 +10,7 @@
 /// печатающая пароль, не должна различать «пусто» и «непусто» (иначе
 /// раскрывается факт установки секрета). Чтобы узнать, задан ли пароль
 /// на самом деле, обратитесь к БД напрямую (`SELECT smtp_password
-/// FROM mail_settings`) или используйте приватный API креЙта
+/// FROM mail_settings`) или используйте приватный API крейта
 /// `liveletters-store`.
 pub fn mask_password(plain: &str, reveal: bool) -> String {
     if reveal {

@@ -20,7 +20,7 @@ pub fn summary() -> &'static str {
     "управление входящей почтой"
 }
 
-/// Имя креЙта для логов и assert'ов.
+/// Имя крейта для логов и assert'ов.
 pub fn crate_name() -> &'static str {
     "liveletters-inbox"
 }

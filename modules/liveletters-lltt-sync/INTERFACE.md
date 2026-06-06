@@ -3,8 +3,9 @@
 ## Назначение
 
 `liveletters-lltt-sync` — библиотечный крейт, реализующий команду
-`lltt sync` с двумя подкомандами:
+`lltt sync`:
 
+- `lltt sync` — выполнить полный цикл: сначала `pull`, затем `push`;
 - `lltt sync pull` — забрать новые письма с IMAP-сервера текущего
   пользователя liveletters и прогнать их через
   `liveletters-sync::SyncEngine::ingest_batch`;
@@ -13,7 +14,7 @@
   отправке запись удаляется из outbox.
 
 Реальная реализация подключается под признаком `network` (см.
-`Cargo.toml`). Без признака обе подкоманды возвращают
+`Cargo.toml`). Без признака команда возвращает
 `run::NetworkFeatureDisabled` с понятным сообщением; сборка
 `apps/lltt` сама включает признак, поэтому пользователь видит
 нормальное поведение по умолчанию.
@@ -25,8 +26,8 @@
 
 Наружу экспортируются:
 
-- `Args { action: SyncAction }` — clap-аргументы с подкомандой
-  `Pull` или `Push`;
+- `Args { action: Option<SyncAction> }` — clap-аргументы с
+  необязательной подкомандой `Pull` или `Push`;
 - `SyncAction::{Pull, Push}` — варианты подкоманды;
 - `SyncError` — типизированные ошибки команды
   (`MailSettingsMissing`, `Imap`, `Smtp`, `Store`, `Engine`,
@@ -51,7 +52,7 @@
 #[derive(Debug, clap::Args)]
 pub struct Args {
     #[command(subcommand)]
-    pub action: SyncAction,
+    pub action: Option<SyncAction>,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -67,8 +68,8 @@ pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send
 
 ## Требования к запуску
 
-`sync pull` и `sync push` требуют заполненной таблицы `mail_settings`
-(см. `liveletters-settings`). Без неё команда возвращает
+`sync`, `sync pull` и `sync push` требуют заполненной таблицы
+`mail_settings` (см. `liveletters-settings`). Без неё команда возвращает
 `SyncError::MailSettingsMissing(<profile_id>)` с сообщением
 «настройки почты для {profile_id} отсутствуют; запустите
 `lltt settings set smtp.host …`».
@@ -106,3 +107,8 @@ imap.host, imap.port, imap.security, imap.username, imap.password, imap.mailbox
 `<N>` — количество успешно отправленных писем подписчикам;
 `<K>` — количество outbox-записей, при отправке которых произошла
 ошибка (запись остаётся в outbox для повторной попытки).
+
+### `lltt sync`
+
+Печатает сначала отчёт `pull`, затем отчёт `push`. Если `pull`
+вернул ошибку, `push` не запускается.

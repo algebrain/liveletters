@@ -30,7 +30,7 @@ pub struct OutboxEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HomeFeed {
+pub struct CurrentUserPosts {
     posts: Vec<PostSummary>,
 }
 
@@ -109,7 +109,7 @@ impl SubscriptionsList {
     }
 }
 
-impl HomeFeed {
+impl CurrentUserPosts {
     pub fn new(posts: Vec<PostSummary>) -> Self {
         Self { posts }
     }

@@ -6,9 +6,9 @@
 
 1. разбирает аргументы командной строки через `clap`;
 2. строит [`CommandContext`](../../modules/liveletters-output/src/context.rs) (путь к домашнему каталогу + имя текущего пользователя liveletters, если он требуется команде);
-3. диспетчеризует вызов в `run(...)` соответствующего командного креЙта из [`modules/`](../../modules).
+3. диспетчеризует вызов в `run(...)` соответствующего командного крейта из [`modules/`](../../modules).
 
-Содержательной логики в самом `apps/lltt` нет — она разнесена по независимым креЙтам (`liveletters-init`, `liveletters-cu`, `liveletters-sub`, `liveletters-feed`, `liveletters-inbox`, `liveletters-post`, `liveletters-comment`, `liveletters-outbox`, `liveletters-thread`, `liveletters-status`, `liveletters-doctor`, `liveletters-settings`, `liveletters-lltt-sync`, плюс общий `liveletters-output`). Каждый из них реализует свою подкоманду и документирован отдельно.
+Содержательной логики в самом `apps/lltt` нет — она разнесена по независимым крейтам (`liveletters-init`, `liveletters-cu`, `liveletters-sub`, `liveletters-feed`, `liveletters-inbox`, `liveletters-post`, `liveletters-comment`, `liveletters-outbox`, `liveletters-thread`, `liveletters-status`, `liveletters-doctor`, `liveletters-settings`, `liveletters-lltt-sync`, плюс общий `liveletters-output`). Каждый из них реализует свою подкоманду и документирован отдельно.
 
 ## Где находится интерфейс
 
@@ -27,7 +27,7 @@
 | `cu` | `liveletters-cu` | Показать, выбрать или просмотреть текущего пользователя liveletters. См. раздел «Подкоманды `cu`» ниже. |
 | `user` | `liveletters-cu` | Управление списком идентичностей: создать черновик, добавить, показать, удалить, перечислить. См. раздел «Подкоманды `user`» ниже. |
 | `sub` | `liveletters-sub` | Управление подписками текущего пользователя liveletters на блоги других пользователей. См. раздел «Подкоманды `sub`» ниже. |
-| `feed` | `liveletters-feed` | Показать ленту текущего пользователя liveletters. Поддерживает `--limit <N>` (показать не более N последних постов). |
+| `feed` | `liveletters-feed` | Показать ленту подписок текущего пользователя liveletters: посты ресурсов, на которые он подписан. Поддерживает `--limit <N>` (показать не более N последних постов подписок). |
 | `inbox` | `liveletters-inbox` | Управление входящей почтой. Подкоманды: `import <файл…>` — импортировать одно или несколько писем из `.eml`-файлов через `SyncEngine`; `list [--status <категория>] [--limit <N>]` — таблица последних N строк `raw_messages` с фильтром по статусу; `show <message_id>` — печать полного тела одного письма. |
 | `post` | `liveletters-post` | Создать запись в блоге. Подкоманда: `new [--body-file <path>] [--visibility <public\|friends_only>]` — тело из файла или из stdin, видимость по умолчанию `public`. |
 | `comment` | `liveletters-comment` | Создать комментарий к записи. Подкоманда: `new --post <id> [--parent <id>] [--body-file <path>] [--visibility <public\|friends_only>]`. |
@@ -36,19 +36,20 @@
 | `status` | `liveletters-status` | Краткий отчёт: 5 полей (постов, комментариев, отложенных, исходящих, последняя активность). |
 | `doctor` | `liveletters-doctor` | Полная диагностика синхронизации: 9 полей (здоровье + 7 категорий входящих + размер outbox). С флагом `--verbose` (`-v`) дополнительно показывает deferred-события, identities и размеры таблиц БД. |
 | `settings` | `liveletters-settings` | Показать или изменить настройки `user_settings`/`mail_settings`. Подкоманды: `show` (по умолчанию) — сводка; `set <ключ> <значение>` — изменить одно поле. |
-| `sync` | `liveletters-lltt-sync` | Сетевая синхронизация. Подкоманды: `pull` — забрать письма с IMAP через `ConfiguredImapMailbox` и прогнать через `SyncEngine`; `push` — отправить outbox через `ConfiguredSmtpTransport` подписчикам ресурса. |
+| `sync` | `liveletters-lltt-sync` | Сетевая синхронизация. Без подкоманды выполняет `pull`, затем `push`; `sync pull` и `sync push` запускают только одну половину цикла. |
 
 Подкоманды `sync` работают при наличии в `mail_settings` настроек SMTP/IMAP; обычно они попадают туда из почтовых секций черновика при `lltt user add`. Если настроек нет, команда возвращает `SyncError::MailSettingsMissing` (код 1) с подсказкой заполнить почту или запустить `lltt settings set smtp.host …`.
 
 ### Подкоманды `cu`
 
-Команда `lltt cu` имеет три операции и работает только с выбранным текущим пользователем. Старые формы управления списком (`lltt cu list`, `lltt cu add`, `lltt cu rm`, `lltt cu show <имя>`) запрещены и возвращают ошибку с подсказкой перейти на `lltt user ...`.
+Команда `lltt cu` имеет четыре операции и работает только с выбранным текущим пользователем. Старые формы управления списком (`lltt cu list`, `lltt cu add`, `lltt cu rm`, `lltt cu show <имя>`) запрещены и возвращают ошибку с подсказкой перейти на `lltt user ...`.
 
 | Форма | Что делает |
 |---|---|
 | `lltt cu <имя>` | Переключает текущего пользователя liveletters на `<имя>`. Имя должно существовать в `<home>/identities/`. Записывает новое значение в `<home>/current-user`. Печатает `текущий пользователь: <имя>`. |
 | `lltt cu` | Без аргументов — печатает имя текущего пользователя liveletters (то, что лежит в `<home>/current-user`). |
 | `lltt cu show [--reveal]` | Печатает содержимое конфига текущего пользователя через `liveletters_output::print_identity`. Пароли SMTP/IMAP по умолчанию маскируются как `********`; флаг `--reveal` показывает их в открытом виде. |
+| `lltt cu posts [--limit <N>]` | Печатает собственные посты текущего пользователя liveletters в обратном хронологическом порядке. Это не лента подписок; лента подписок вызывается через `lltt feed`. |
 
 ### Подкоманды `user`
 
@@ -107,7 +108,7 @@
 
 Имя текущего пользователя liveletters хранится в **текстовом файле `<home>/current-user`** (одна строка — имя без расширения). Задаётся только командой `lltt cu <имя>`. Читается командой `lltt cu`, командой `lltt cu show` и всеми остальными командами, которым нужна текущая идентичность.
 
-Если файл `<home>/current-user` отсутствует, команды `init`, `user ...`, `cu <имя>` и старые запрещённые формы `cu list/add/rm/show <имя>` могут выполниться или вернуть свою обычную ошибку. Команды, которым нужен уже выбранный пользователь (`status`, `feed`, `post`, `cu`, `cu show` и т. п.), возвращают код 2 и подсказывают: `lltt user init <имя>`, `lltt user add <имя> --from <файл>`, затем `lltt cu <имя>`.
+Если файл `<home>/current-user` отсутствует, команды `init`, `user ...`, `cu <имя>` и старые запрещённые формы `cu list/add/rm/show <имя>` могут выполниться или вернуть свою обычную ошибку. Команды, которым нужен уже выбранный пользователь (`status`, `feed`, `post`, `cu`, `cu show`, `cu posts` и т. п.), возвращают код 2 и подсказывают: `lltt user init <имя>`, `lltt user add <имя> --from <файл>`, затем `lltt cu <имя>`.
 
 См. также [`liveletters-config::read_current_identity`](../../modules/liveletters-config/src/io.rs) и [`liveletters-config::write_current_identity`](../../modules/liveletters-config/src/io.rs).
 
@@ -131,7 +132,7 @@
 
 ## Файлы результата
 
-Бинарь `lltt` печатает данные в `stdout` и сообщения об ошибках в `stderr`. Никаких постоянных файлов в произвольных местах он не создаёт: вся работа с файлами делегирована командным креЙтам (например, `liveletters-init` создаёт `liveletters.sqlite3`, `mail-password-obfuscation.key` и служебные каталоги внутри домашнего каталога).
+Бинарь `lltt` печатает данные в `stdout` и сообщения об ошибках в `stderr`. Никаких постоянных файлов в произвольных местах он не создаёт: вся работа с файлами делегирована командным крейтам (например, `liveletters-init` создаёт `liveletters.sqlite3`, `mail-password-obfuscation.key` и служебные каталоги внутри домашнего каталога).
 
 ## Зависимости
 
@@ -172,6 +173,11 @@ receive: [0] alice-feed@example.org
 
 $ echo "Привет, мир." | lltt post new
 запись создана: post-1717161234567
+
+$ lltt cu posts
+посты пользователя
+пользователь: Alice
+постов: 1
 
 $ lltt thread post-1717161234567
 ┌─ пост #post-1717161234567 от acct_alice

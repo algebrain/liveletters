@@ -11,6 +11,7 @@ path = "src/lib.rs"
 clap = { workspace = true, features = ["derive"] }
 liveletters-config = { path = "../liveletters-config" }
 liveletters-output = { path = "../liveletters-output" }
+liveletters-posts = { path = "../liveletters-posts" }
 liveletters-store = { path = "../liveletters-store" }
 liveletters-secret-box = { path = "../liveletters-secret-box" }
 thiserror = { workspace = true }

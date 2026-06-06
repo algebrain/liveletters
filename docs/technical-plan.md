@@ -285,7 +285,7 @@ alice
 
 Бинарь и общие модули:
 
-- `apps/lltt/Cargo.toml` — манифест бинаря, зависит от 13 командных креЙтов и `liveletters-config`/`liveletters-store`/`liveletters-output`
+- `apps/lltt/Cargo.toml` — манифест бинаря, зависит от 13 командных крейтов и `liveletters-config`/`liveletters-store`/`liveletters-output`
 - `apps/lltt/src/main.rs` — clap-дерево, диспетчер по `enum Command`, обработка ошибок и exit-кодов
 - `apps/lltt/src/context.rs` — `resolve_home()`, `resolve_current_user_name()`, `build_context()` (читает имя ТОЛЬКО из `<home>/current-user`; `LLTT_CU` не используется)
 - `apps/lltt/INTERFACE.md` — публичная поверхность бинаря (12 подкоманд, окружение, exit-коды)
@@ -323,7 +323,7 @@ alice
 5. В `liveletters-store` создать таблицу `subscriptions(resource_address, subscriber_account_id, subscriber_delivery_address, PK(resource_address, subscriber_account_id))` + 4 метода (`save_subscription`, `delete_subscription → Result<bool>`, `list_subscriptions_for_resource`, `list_subscriptions_for_subscriber`) + `SubscriptionRecord`.
 6. В `liveletters-app-core` ввести команды `subscribe`/`unsubscribe` (каждая атомарно пишет в `subscriptions` + enqueue 1 outbox) и query `ListSubscriptionsQuery` (без зависимости от `liveletters-config`).
 7. В `liveletters-sync` добавить `SyncEngine::new_with_identity(store, own_address, &[subscribed])`, обработать `SubscriptionChanged` в `apply_payload` и отфильтровать `PostCreated`/`CommentCreated` если `resource_id` не равен `own_address` и не входит в `subscribed`. Фильтр записывает `raw_events` с `apply_status="filtered"` и `failure_reason="not_subscribed"` и возвращает `SyncMessageOutcome::Filtered { message_id, event_id, reason }`. В `SyncReport`/`DeferredReprocessingSummary` добавить поле `filtered`.
-8. Создать креЙт `liveletters-sub` (`Cargo.toml`, `src/lib.rs`, `src/args.rs`, `src/run.rs`, `src/error.rs`, `INTERFACE.md`, `TECHNICAL_SPEC.md`) с операциями `subscribe`/`list`/`rm`. `delivery_address` берётся из `mail.receive[0]`, фолбэк — `mail.publish`. Короткое имя — `sub`.
+8. Создать крейт `liveletters-sub` (`Cargo.toml`, `src/lib.rs`, `src/args.rs`, `src/run.rs`, `src/error.rs`, `INTERFACE.md`, `TECHNICAL_SPEC.md`) с операциями `subscribe`/`list`/`rm`. `delivery_address` берётся из `mail.receive[0]`, фолбэк — `mail.publish`. Короткое имя — `sub`.
 9. В `apps/lltt` добавить `Command::Sub(liveletters_sub::Args)` + 3 интеграционных теста в `apps/lltt/tests/cli_sub.rs`. Обновить `INTERFACE.md` бинаря.
 10. Переименовать последующие этапы плана (5→6, 6→7, 7→8, 8→9, 9→10) и обновить сводку.
 
@@ -342,9 +342,9 @@ alice
 2. Реализовать `src/cli/feed.rs`:
    - открывает `Store` через `open_for_home_dir`;
    - создаёт `AppCore::new(&store)`;
-   - вызывает `get_home_feed(active_identity)`;
-    - печатает ленту в человекочитаемом виде.
-3. В `liveletters-app-core` подтвердить, что `get_home_feed` принимает идентичность как параметр (а не выводит из контекста). Если сигнатура не совпадает — добавить перегрузку.
+   - вызывает чтение постов, подходящих под подписки текущей идентичности;
+   - печатает ленту подписок в человекочитаемом виде.
+3. В `liveletters-app-core` подтвердить, что запросы чтения постов принимают идентичность как параметр (а не выводят её из контекста).
 4. Покрыть путь: написать в тестах временный файл `.eml` с валидным протокольным сообщением, импортировать его, вызвать `lltt feed`, проверить, что в ленте появился пост.
 
 **Пример запуска.**
@@ -453,7 +453,7 @@ apps/lltt
                                   (DiagnosticsReader)
 ```
 
-Четыре командных креЙта; общая зависимость — `liveletters-store`. Дополнительно: `liveletters-doctor` зависит от `liveletters-diagnostics`, `liveletters-settings` — от `liveletters-config` (для `read_current_identity`).
+Четыре командных крейта; общая зависимость — `liveletters-store`. Дополнительно: `liveletters-doctor` зависит от `liveletters-diagnostics`, `liveletters-settings` — от `liveletters-config` (для `read_current_identity`).
 
 **Задачи.**
 

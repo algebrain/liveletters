@@ -19,7 +19,7 @@ pub fn summary() -> &'static str {
     "краткий отчёт о состоянии домашнего каталога"
 }
 
-/// Имя креЙта для логов и assert'ов.
+/// Имя крейта для логов и assert'ов.
 pub fn crate_name() -> &'static str {
     "liveletters-status"
 }

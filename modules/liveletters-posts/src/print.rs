@@ -1,17 +1,18 @@
+use liveletters_app_core::{CurrentUserPosts, PostSummary};
 use liveletters_output::format_unix_iso8601_utc;
 use liveletters_output::print_kv;
-use liveletters_store::PostRecord;
 
 const BODY_MAX: usize = 80;
 
-pub fn print_feed(posts: &[PostRecord], identity_display: &str, limit: Option<usize>) {
+pub fn print_posts(posts_list: &CurrentUserPosts, identity_display: &str, limit: Option<usize>) {
+    let posts = posts_list.posts();
     let total = posts.len();
     let shown = match limit {
         Some(n) => n.min(total),
         None => total,
     };
 
-    print_kv(&[("лента подписок", identity_display)]);
+    print_kv(&[("посты пользователя", identity_display)]);
     println!("постов: {total} (показано: {shown})");
     println!();
 
@@ -25,7 +26,7 @@ pub fn print_feed(posts: &[PostRecord], identity_display: &str, limit: Option<us
     }
 }
 
-fn print_post(post: &PostRecord) {
+fn print_post(post: &PostSummary) {
     let visibility = if post.visibility.is_empty() {
         "—"
     } else {

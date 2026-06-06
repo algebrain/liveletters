@@ -7,7 +7,7 @@
 1. разбирает аргументы командной строки через `clap`;
 2. разрешает `CommandContext` (домашний каталог + имя текущего пользователя liveletters, если он нужен команде) из файловой системы;
 3. проверяет, что домашний каталог существует и что задан текущий пользователь для команд, которым он обязателен;
-4. вызывает `run(...)` нужного креЙта из [`modules/`](../../modules).
+4. вызывает `run(...)` нужного крейта из [`modules/`](../../modules).
 
 Содержательная работа каждой команды вынесена в отдельный крейт с собственной парой `Args`/`Error` и собственными `INTERFACE.md`/`TECHNICAL_SPEC.md`.
 
@@ -57,7 +57,7 @@ apps/lltt/
 └── tests/
     ├── cli_smoke.rs           # --help показывает 14 подкоманд; неизвестная команда → ошибка; NoCurrentUser → код 2
     ├── cli_init.rs            # lltt init через бинарь
-    ├── cli_cu.rs              # lltt cu через бинарь
+    ├── cli_cu.rs              # lltt cu, lltt cu posts через бинарь
     ├── cli_user.rs            # lltt user через бинарь
     ├── cli_sub.rs             # lltt sub (подписка/отписка/список) через бинарь
     ├── cli_feed.rs            # lltt feed через бинарь
@@ -73,7 +73,7 @@ apps/lltt/
     ├── cli_doctor_verbose.rs  # lltt doctor --verbose (3 секции)
     ├── cli_settings.rs        # lltt settings show|set (включая обфускацию пароля)
     ├── cli_default.rs         # <HOME>/.liveletters/ без LIVELETTERS_HOME
-    └── cli_sync_pull_push.rs  # lltt sync pull|push с IMAP/SMTP-фикстурами на 127.0.0.1:0
+    └── cli_sync_pull_push.rs  # lltt sync, sync pull, sync push с IMAP/SMTP-фикстурами на 127.0.0.1:0
 ```
 
 `Cargo.toml` бинаря не имеет собственного `lib.rs`: это означает, что `apps/lltt` — только исполняемый файл, без библиотечной части.
@@ -108,7 +108,7 @@ enum Command {
 }
 ```
 
-Каждый вариант — это «тонкая обёртка» над `Args` соответствующего креЙта. clap-derive сам разбирает аргументы подкоманды в `Args` креЙта.
+Каждый вариант — это «тонкая обёртка» над `Args` соответствующего крейта. clap-derive сам разбирает аргументы подкоманды в `Args` крейта.
 
 ### `main`
 
@@ -252,15 +252,15 @@ pub enum ContextError {
 | `liveletters-store` | `resolve_data_dir_from_env` (приоритет `LIVELETTERS_HOME` > `<HOME>` > `<USERPROFILE>` > `.`) |
 | `liveletters-output` | `CommandContext` (общий тип для всех команд), `parse_visibility`, `read_body` |
 | `liveletters-init` | команда `init` |
-| `liveletters-cu` | команды `cu` и `user` |
-| `liveletters-feed` | команда `feed` |
+| `liveletters-cu` | команды `cu`, `cu posts` и `user` |
+| `liveletters-feed` | команда `feed`, лента подписок |
 | `liveletters-inbox` | команды `inbox import` и `inbox list` |
 | `liveletters-post` | команда `post new` |
 | `liveletters-comment` | команда `comment new` |
 | `liveletters-outbox` | команда `outbox list` (read-only) |
 | `liveletters-thread` | команда `thread <post_id>` |
 | `liveletters-status`, `liveletters-doctor`, `liveletters-settings` | диагностические команды: `status`, `doctor`, `settings show|set` |
-| `liveletters-lltt-sync` | команды `sync pull` (IMAP → SyncEngine) и `sync push` (outbox → SMTP подписчикам) |
+| `liveletters-lltt-sync` | команда `sync`: полный цикл `pull` затем `push`; отдельные команды `sync pull` и `sync push` |
 | `clap` (derive) | разбор аргументов |
 
 ## Тесты
@@ -274,10 +274,10 @@ pub enum ContextError {
   - `command_when_current_user_file_removed_returns_error` — `init`, создание `alice`, выбор `lltt cu alice`, затем удаление `<home>/current-user`, затем `lltt status` → код 2;
   - `status_succeeds_after_init` — после чистого `init` команда `lltt status` возвращает код 2, потому что текущий пользователь ещё не выбран.
 - [`apps/lltt/tests/cli_init.rs`](tests/cli_init.rs) — 3 теста на `lltt init`.
-- [`apps/lltt/tests/cli_cu.rs`](tests/cli_cu.rs) — тесты на `lltt cu` и запрет старых форм управления списком.
+- [`apps/lltt/tests/cli_cu.rs`](tests/cli_cu.rs) — тесты на `lltt cu`, `lltt cu posts` и запрет старых форм управления списком.
 - [`apps/lltt/tests/cli_user.rs`](tests/cli_user.rs) — тесты на `lltt user init`, `lltt user add` и отсутствие автоматического выбора текущего пользователя.
 - [`apps/lltt/tests/cli_sub.rs`](tests/cli_sub.rs) — тесты на `lltt sub` (подписка/отписка/список).
-- [`apps/lltt/tests/cli_feed.rs`](tests/cli_feed.rs) — тесты на `lltt feed` через бинарь.
+- [`apps/lltt/tests/cli_feed.rs`](tests/cli_feed.rs) — тесты на `lltt feed` как ленту подписок через бинарь.
 - [`apps/lltt/tests/cli_post.rs`](tests/cli_post.rs) — тесты на `lltt post new` через бинарь.
 - [`apps/lltt/tests/cli_comment.rs`](tests/cli_comment.rs) — тесты на `lltt comment new` через бинарь.
 - [`apps/lltt/tests/cli_thread.rs`](tests/cli_thread.rs) — тесты на `lltt thread <post_id>` через бинарь.
@@ -290,10 +290,10 @@ pub enum ContextError {
 - [`apps/lltt/tests/cli_doctor_verbose.rs`](tests/cli_doctor_verbose.rs) — 2 теста на `lltt doctor --verbose` (3 секции; без `--verbose` вывод совпадает с легаси).
 - [`apps/lltt/tests/cli_settings.rs`](tests/cli_settings.rs) — 3 теста на `lltt settings show|set` (включая обфускацию `smtp.password` через бинарь).
 - [`apps/lltt/tests/cli_default.rs`](tests/cli_default.rs) — 2 теста на ветку `<HOME>/.liveletters/` без `LIVELETTERS_HOME`, с фейковой `HOME` в `/tmp`.
-- [`apps/lltt/tests/cli_sync_pull_push.rs`](tests/cli_sync_pull_push.rs) — 3 e2e-теста на `lltt sync pull|push` через бинарь с IMAP/SMTP-фикстурами на `127.0.0.1:0` (без mailpit/Docker): pull без настроек (понятная ошибка), pull с идемпотентным курсором (2 вызова → 1 + 0 писем), push с очисткой outbox и проверкой `RCPT TO` на SMTP-сервере.
+- [`apps/lltt/tests/cli_sync_pull_push.rs`](tests/cli_sync_pull_push.rs) — 4 e2e-теста на `lltt sync`, `lltt sync pull` и `lltt sync push` через бинарь с IMAP/SMTP-фикстурами на `127.0.0.1:0` (без mailpit/Docker): pull без настроек (понятная ошибка), pull с идемпотентным курсором (2 вызова → 1 + 0 писем), push с очисткой outbox и проверкой `RCPT TO` на SMTP-сервере, полный цикл `pull` затем `push`.
 
 ## Что осталось за пределами текущей версии
 
-- В бинаре нет цветного вывода и индикаторов прогресса — весь вывод идёт через `println!`/`eprintln!` базовых креЙтов.
-- В бинаре нет встроенной справки по подкоманде (например, `lltt cu --help` пока спартанский вывод clap-derive). Будет улучшено, когда заполнится оставшаяся заглушка (`sync`).
+- В бинаре нет цветного вывода и индикаторов прогресса — весь вывод идёт через `println!`/`eprintln!` базовых крейтов.
+- В бинаре нет встроенной справки по подкоманде (например, `lltt cu --help` пока спартанский вывод clap-derive).
 - В бинаре нет `lltt --version` (на самом деле clap-derive добавляет `--version` из `Cargo.toml`; но семантическое версионирование пока не настроено).

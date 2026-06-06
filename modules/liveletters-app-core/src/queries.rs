@@ -1,12 +1,14 @@
 use liveletters_store::{CommentRecord, OutboxRecord, PostRecord, Store};
 
 use crate::{
-    AppCoreError, AppSettings, BootstrapState, CommentSummary, HomeFeed, OutboxEntry,
+    AppCoreError, AppSettings, BootstrapState, CommentSummary, CurrentUserPosts, OutboxEntry,
     PendingOutbox, PostSummary, PostThread, SubscriberEntry, SubscriptionsList,
     decode_visibility_name,
 };
 
-pub struct GetHomeFeedQuery;
+pub struct GetCurrentUserPostsQuery<'a> {
+    pub author_id: &'a str,
+}
 
 pub struct GetPostThreadQuery<'a> {
     pub post_id: &'a str,
@@ -20,14 +22,18 @@ pub struct ListSubscriptionsQuery<'a> {
     pub subscribed_addresses: &'a [String],
 }
 
-pub fn get_home_feed(store: &Store, _query: GetHomeFeedQuery) -> Result<HomeFeed, AppCoreError> {
+pub fn get_current_user_posts(
+    store: &Store,
+    query: GetCurrentUserPostsQuery<'_>,
+) -> Result<CurrentUserPosts, AppCoreError> {
     let posts = store
         .list_posts()?
         .into_iter()
+        .filter(|post| post.author_id == query.author_id)
         .map(post_summary_from_record)
         .collect();
 
-    Ok(HomeFeed::new(posts))
+    Ok(CurrentUserPosts::new(posts))
 }
 
 pub fn get_post_thread(

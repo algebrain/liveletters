@@ -37,6 +37,9 @@ modules/liveletters-cu/src/
 | `[]` | `CuAction::Current` |
 | `["show"]` | `CuAction::ShowCurrent { reveal: false }` |
 | `["show", "--reveal"]` | `CuAction::ShowCurrent { reveal: true }` |
+| `["posts"]` | `CuAction::Posts { limit: None }` |
+| `["posts", "--limit", "20"]` | `CuAction::Posts { limit: Some(20) }` |
+| `["posts", "--limit=20"]` | `CuAction::Posts { limit: Some(20) }` |
 | `["alice"]` | `CuAction::Switch { name: "alice" }` |
 
 Если первый токен равен `list`, `add`, `rm` или `show` с именем, возвращается `CuError::UseUserCommand(...)`. Если после имени переключения есть дополнительные токены, возвращается `CuError::ConflictingArgs`.
@@ -65,6 +68,7 @@ modules/liveletters-cu/src/
 2. `Current` вызывает `current::run`;
 3. `Switch` вызывает `switch::run`, который проверяет наличие файла идентичности и пишет `current-user`;
 4. `ShowCurrent` читает `current-user`, затем вызывает `show::run`.
+5. `Posts` вызывает `liveletters_posts::run` с разобранным `limit`.
 
 `run_user`:
 
@@ -127,7 +131,7 @@ modules/liveletters-cu/src/
 
 - `modules/liveletters-cu/tests/cu_flow.rs` проверяет старые базовые операции крейта: текущий пользователь, переключение, список, показ, добавление, удаление и маскирование вывода.
 - Юнит-тесты `password_obfuscation` проверяют скрытие SMTP/IMAP-паролей, несовпадение подтверждения и отключённое `pwd_obfuscate`.
-- `apps/lltt/tests/cli_cu.rs` проверяет CLI-поведение `cu`, запрет старых форм управления списком и подсказки перейти на `user`.
+- `apps/lltt/tests/cli_cu.rs` проверяет CLI-поведение `cu`, `cu posts`, запрет старых форм управления списком и подсказки перейти на `user`.
 - `apps/lltt/tests/cli_user.rs` проверяет создание черновика, `--force`, добавление пользователя, перенос почты в `mail_settings` и отсутствие автоматического выбора текущего пользователя.
 
 ## Ограничения

@@ -19,6 +19,9 @@ pub enum CuAction {
     ShowCurrent {
         reveal: bool,
     },
+    Posts {
+        limit: Option<usize>,
+    },
     List,
     Init {
         name: String,

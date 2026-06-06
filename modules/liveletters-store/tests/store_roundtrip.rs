@@ -76,6 +76,35 @@ fn saved_post_can_be_read_back() {
 }
 
 #[test]
+fn list_posts_returns_newest_first() {
+    let (store, _tmp) = common::open_temp_store();
+
+    for (post_id, created_at) in [("old", 1_710_000_000), ("new", 1_710_000_100)] {
+        store
+            .save_post_record(&PostRecord {
+                post_id: post_id.into(),
+                resource_id: "blog-1".into(),
+                author_id: "alice".into(),
+                created_at,
+                body: post_id.into(),
+                visibility: "public".into(),
+                hidden: false,
+            })
+            .unwrap();
+    }
+
+    let posts = store.list_posts().unwrap();
+
+    assert_eq!(
+        posts
+            .iter()
+            .map(|post| post.post_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["new", "old"]
+    );
+}
+
+#[test]
 fn saved_comment_is_returned_for_its_post() {
     let (store, _tmp) = common::open_temp_store();
 

@@ -1,4 +1,4 @@
-//! Команда `lltt feed` — показ ленты текущего пользователя liveletters.
+//! Команда `lltt feed` — лента постов из подписок текущего пользователя.
 
 mod args;
 mod error;
@@ -11,15 +11,12 @@ pub use liveletters_output::CommandContext;
 pub use print::print_feed;
 pub use run::run;
 
-/// Имя команды для clap-дерева и для диагностических сообщений.
 pub const COMMAND_NAME: &str = "feed";
 
-/// Короткое описание команды, попадает в `lltt --help`.
 pub fn summary() -> &'static str {
-    "показать ленту текущего пользователя liveletters"
+    "показать ленту подписок"
 }
 
-/// Имя креЙта для логов и assert'ов.
 pub fn crate_name() -> &'static str {
     "liveletters-feed"
 }

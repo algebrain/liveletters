@@ -4,8 +4,12 @@ use crate::{Args, CommandContext, SyncAction};
 
 pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send + Sync>> {
     match args.action {
-        SyncAction::Pull => pull_dispatch(ctx),
-        SyncAction::Push => push_dispatch(ctx),
+        None => {
+            pull_dispatch(ctx)?;
+            push_dispatch(ctx)
+        }
+        Some(SyncAction::Pull) => pull_dispatch(ctx),
+        Some(SyncAction::Push) => push_dispatch(ctx),
     }
 }
 
@@ -36,10 +40,7 @@ pub struct NetworkFeatureDisabled;
 #[cfg(not(feature = "network"))]
 impl std::fmt::Display for NetworkFeatureDisabled {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "подкоманды sync pull/push требуют сборки lltt с признаком network"
-        )
+        write!(f, "команда sync требует сборки lltt с признаком network")
     }
 }
 

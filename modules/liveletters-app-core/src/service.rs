@@ -3,9 +3,9 @@ use liveletters_store::Store;
 use crate::{
     AppCoreError, AppSettings, BootstrapState, CreateCommentCommand,
     CreateCommentFromIdentityCommand, CreateCommentResult, CreatePostCommand,
-    CreatePostFromIdentityCommand, CreatePostResult, EditCommentCommand, EditCommentResult,
-    GetBootstrapStateQuery, GetHomeFeedQuery, GetPendingOutboxQuery, GetPostThreadQuery,
-    GetSettingsQuery, HidePostCommand, HidePostResult, HomeFeed, ListSubscriptionsQuery,
+    CreatePostFromIdentityCommand, CreatePostResult, CurrentUserPosts, EditCommentCommand,
+    EditCommentResult, GetBootstrapStateQuery, GetCurrentUserPostsQuery, GetPendingOutboxQuery,
+    GetPostThreadQuery, GetSettingsQuery, HidePostCommand, HidePostResult, ListSubscriptionsQuery,
     PendingOutbox, PostThread, ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult,
     SaveSettingsCommand, SaveSettingsResult, SubscribeCommand, SubscribeResult, SubscriptionsList,
     UnsubscribeCommand, UnsubscribeResult, commands, queries,
@@ -48,8 +48,11 @@ impl<'a> AppCore<'a> {
         commands::create_comment(self.store, command)
     }
 
-    pub fn get_home_feed(&self, query: GetHomeFeedQuery) -> Result<HomeFeed, AppCoreError> {
-        queries::get_home_feed(self.store, query)
+    pub fn get_current_user_posts(
+        &self,
+        query: GetCurrentUserPostsQuery<'_>,
+    ) -> Result<CurrentUserPosts, AppCoreError> {
+        queries::get_current_user_posts(self.store, query)
     }
 
     pub fn hide_post(&self, command: HidePostCommand<'_>) -> Result<HidePostResult, AppCoreError> {

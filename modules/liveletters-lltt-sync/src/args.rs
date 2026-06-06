@@ -3,7 +3,7 @@ use clap::Args as ClapArgs;
 #[derive(Debug, ClapArgs)]
 pub struct Args {
     #[command(subcommand)]
-    pub action: SyncAction,
+    pub action: Option<SyncAction>,
 }
 
 #[derive(Debug, clap::Subcommand)]

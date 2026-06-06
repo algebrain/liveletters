@@ -35,6 +35,7 @@
 | `lltt cu` | Печатает имя из `<home>/current-user`. Требует выбранного пользователя. |
 | `lltt cu <имя>` | Проверяет наличие `<home>/identities/<имя>.toml` и записывает `<имя>` в `<home>/current-user`. |
 | `lltt cu show [--reveal]` | Печатает идентичность текущего пользователя. Пароли маскируются, кроме режима `--reveal`. |
+| `lltt cu posts [--limit <N>]` | Делегирует в `liveletters-posts` и печатает собственные посты текущего пользователя в обратном хронологическом порядке. |
 
 Старые формы `lltt cu list`, `lltt cu show <имя>`, `lltt cu add ...`, `lltt cu rm ...` запрещены. Они возвращают `CuError::UseUserCommand` с подсказкой перейти на соответствующую форму `lltt user ...`.
 
@@ -120,6 +121,7 @@ SMTP- и IMAP-пароли подтверждаются отдельно. Вво
 ## Побочные эффекты
 
 - `lltt cu <имя>` пишет только `<home>/current-user`.
+- `lltt cu posts` только читает идентичность и таблицу постов.
 - `lltt user init` пишет только `<home>/drafts/<имя>.toml`.
 - `lltt user add` пишет `<home>/identities/<имя>.toml`, может переписать исходный TOML с уже скрытыми паролями и сохраняет `mail_settings` в БД.
 - `lltt user rm` удаляет файл идентичности.
@@ -131,5 +133,6 @@ SMTP- и IMAP-пароли подтверждаются отдельно. Вво
 - `liveletters-store` — сохранение `mail_settings`;
 - `liveletters-secret-box` — скрытие паролей;
 - `liveletters-output` — `CommandContext`, печать идентичности;
+- `liveletters-posts` — показ собственных постов текущего пользователя;
 - `console` — скрытый ввод со звёздочками;
 - `toml`, `thiserror`, `clap`.

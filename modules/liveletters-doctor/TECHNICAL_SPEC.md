@@ -3,7 +3,7 @@
 ## Назначение
 
 `liveletters-doctor` — командный крейт `lltt doctor`. Печатает
-`DiagnosticsSnapshot`, агрегированный `DiagnosticsReader` из креЙта
+`DiagnosticsSnapshot`, агрегированный `DiagnosticsReader` из крейта
 `liveletters-diagnostics`. С `--verbose` дополнительно показывает
 deferred-события, identities и размеры таблиц БД.
 

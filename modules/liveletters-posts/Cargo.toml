@@ -1,5 +1,5 @@
 [package]
-name = "liveletters-feed"
+name = "liveletters-posts"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,6 +9,7 @@ path = "src/lib.rs"
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
+liveletters-app-core = { path = "../liveletters-app-core" }
 liveletters-config = { path = "../liveletters-config" }
 liveletters-output = { path = "../liveletters-output" }
 liveletters-store = { path = "../liveletters-store" }

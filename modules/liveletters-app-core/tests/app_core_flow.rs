@@ -1,6 +1,6 @@
 use liveletters_app_core::{
     AppCore, AppSettings, CommentSummary, CreateCommentCommand, CreatePostCommand,
-    GetBootstrapStateQuery, GetHomeFeedQuery, GetPendingOutboxQuery, GetPostThreadQuery,
+    GetBootstrapStateQuery, GetCurrentUserPostsQuery, GetPendingOutboxQuery, GetPostThreadQuery,
     GetSettingsQuery, PostSummary, ReprocessDeferredEventsCommand, SaveSettingsCommand, Visibility,
 };
 use liveletters_mail::{ReceivedEmail, build_protocol_email};
@@ -11,7 +11,7 @@ use liveletters_sync::SyncEngine;
 mod common;
 
 #[test]
-fn creates_post_and_exposes_it_in_home_feed() {
+fn creates_post_and_exposes_it_in_current_user_posts() {
     let (store, _tmp) = common::open_temp_store();
     let app = AppCore::new(&store);
 
@@ -28,12 +28,12 @@ fn creates_post_and_exposes_it_in_home_feed() {
 
     assert_eq!(created.post().id().as_str(), "post-1");
 
-    let feed = app
-        .get_home_feed(GetHomeFeedQuery)
-        .expect("feed should load");
+    let posts = app
+        .get_current_user_posts(GetCurrentUserPostsQuery { author_id: "alice" })
+        .expect("posts should load");
 
     assert_eq!(
-        feed.posts(),
+        posts.posts(),
         &[PostSummary {
             post_id: "post-1".to_owned(),
             resource_id: "blog-1".to_owned(),
@@ -151,7 +151,7 @@ fn rejects_comment_for_missing_post() {
 }
 
 #[test]
-fn hides_post_and_keeps_hidden_state_in_feed() {
+fn hides_post_and_keeps_hidden_state_in_current_user_posts() {
     let (store, _tmp) = common::open_temp_store();
     let app = AppCore::new(&store);
 
@@ -175,11 +175,11 @@ fn hides_post_and_keeps_hidden_state_in_feed() {
 
     assert!(hidden.post().is_hidden());
 
-    let feed = app
-        .get_home_feed(GetHomeFeedQuery)
-        .expect("feed should load");
+    let posts = app
+        .get_current_user_posts(GetCurrentUserPostsQuery { author_id: "alice" })
+        .expect("posts should load");
 
-    assert!(feed.posts()[0].hidden);
+    assert!(posts.posts()[0].hidden);
 
     let outbox = app
         .get_pending_outbox(GetPendingOutboxQuery)

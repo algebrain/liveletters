@@ -1,7 +1,7 @@
-//! Сетевая синхронизация: `lltt sync pull` (IMAP) и `lltt sync push` (SMTP).
+//! Сетевая синхронизация: `lltt sync`, `lltt sync pull` и `lltt sync push`.
 //!
 //! Реальная реализация подключается под признаком `network` (см. `Cargo.toml`
-//! креЙта). Без признака обе подкоманды возвращают
+//! крейта). Без признака команды возвращают
 //! [`crate::run::NetworkFeatureDisabled`].
 
 mod args;
@@ -26,7 +26,7 @@ pub use run::run;
 pub const COMMAND_NAME: &str = "sync";
 
 pub fn summary() -> &'static str {
-    "sync pull / push"
+    "sync, sync pull / push"
 }
 
 pub fn crate_name() -> &'static str {

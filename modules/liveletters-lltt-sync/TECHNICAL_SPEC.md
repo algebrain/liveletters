@@ -1,7 +1,9 @@
 # liveletters-lltt-sync
 
-Реализация команды `lltt sync {pull,push}` — сетевой синхронизации
-текущего пользователя liveletters с IMAP/SMTP-серверами.
+Реализация команды `lltt sync` — сетевой синхронизации текущего
+пользователя liveletters с IMAP/SMTP-серверами. Без подкоманды
+команда выполняет `pull`, затем `push`; подкоманды `pull` и `push`
+оставлены для запуска одной половины цикла.
 
 ## Алгоритм `pull`
 
@@ -49,6 +51,17 @@ print: подключено/отправлено/ошибок
 команда завершается с кодом 0 (это сделано осознанно: частичная
 отправка считается «неполной», повторная попытка безопасна).
 
+## Алгоритм `sync`
+
+```
+pull_dispatch(ctx)?
+push_dispatch(ctx)
+```
+
+Если `pull` возвращает ошибку, `push` не вызывается. Это важно:
+при неудачном получении нельзя создавать у пользователя впечатление,
+что полный обмен прошёл успешно.
+
 ## Структура таблицы `sync_cursors`
 
 ```sql
@@ -76,7 +89,7 @@ CREATE TABLE sync_cursors (
 - варианты `SyncError::Imap`, `SyncError::Smtp`, `parse_security`
   (видны только при наличии признака).
 
-Без `network` обе подкоманды возвращают
+Без `network` команда возвращает
 `run::NetworkFeatureDisabled` с подсказкой про сборку. `apps/lltt`
 включает признак через `features = ["network"]` в зависимости
 `liveletters-lltt-sync`.
@@ -90,7 +103,7 @@ CREATE TABLE sync_cursors (
   (`std::net::TcpListener` на `127.0.0.1:0`): отправка по
   подписчикам, пропуск при пустом списке, проброс ошибки
   SMTP-сервера, round-trip `build_protocol_email`.
-- `apps/lltt/tests/cli_sync_pull_push.rs` — 3 e2e-теста: pull
+- `apps/lltt/tests/cli_sync_pull_push.rs` — 4 e2e-теста: pull
   без настроек (понятная ошибка), pull с идемпотентностью
   курсора, push с очисткой outbox и проверкой `RCPT TO` на
-  SMTP-сервере.
+  SMTP-сервере, полный цикл `sync` без подкоманды.

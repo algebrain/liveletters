@@ -1,4 +1,4 @@
-//! e2e тесты `lltt sync pull` и `lltt sync push` через бинарь.
+//! e2e тесты `lltt sync`, `lltt sync pull` и `lltt sync push` через бинарь.
 //!
 //! SMTP-«сервер» поднимается в отдельной нити на `127.0.0.1:0` по
 //! идиоме `liveletters-mail/tests/network_flow.rs`. IMAP-имитация
@@ -35,14 +35,24 @@ fn set(tmp: &TempDir, key: &str, value: &str) {
 }
 
 fn set_mail_settings(tmp: &TempDir, host: &str, port: u16) {
-    set(tmp, "smtp.host", host);
-    set(tmp, "smtp.port", &port.to_string());
+    set_split_mail_settings(tmp, host, port, host, port);
+}
+
+fn set_split_mail_settings(
+    tmp: &TempDir,
+    smtp_host: &str,
+    smtp_port: u16,
+    imap_host: &str,
+    imap_port: u16,
+) {
+    set(tmp, "smtp.host", smtp_host);
+    set(tmp, "smtp.port", &smtp_port.to_string());
     set(tmp, "smtp.security", "none");
     set(tmp, "smtp.username", "alice@example.test");
     set(tmp, "smtp.password", "secret");
     set(tmp, "smtp.hello_domain", "local.test");
-    set(tmp, "imap.host", host);
-    set(tmp, "imap.port", &port.to_string());
+    set(tmp, "imap.host", imap_host);
+    set(tmp, "imap.port", &imap_port.to_string());
     set(tmp, "imap.security", "none");
     set(tmp, "imap.username", "alice");
     set(tmp, "imap.password", "secret");
@@ -200,6 +210,92 @@ fn sync_pull_without_mail_settings_returns_helpful_error() {
         stderr.contains("настройки почты"),
         "stderr должен сообщать об отсутствии mail_settings; got: {stderr}"
     );
+}
+
+#[test]
+fn sync_without_subcommand_runs_pull_then_push() {
+    let tmp = TempDir::new().expect("tempdir");
+    init_home(&tmp);
+
+    use liveletters_mail::build_protocol_email;
+    use liveletters_protocol::{
+        DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message,
+    };
+
+    let incoming = ProtocolMessage::new(
+        MessageEnvelope::new("1", "post_created", "blog-1", "event-pull-all").unwrap(),
+        "Привет из полного sync",
+        DomainEventPayload::PostCreated {
+            post_id: "post-pull-all".into(),
+            resource_id: "blog-1".into(),
+            actor_id: "alice".into(),
+            created_at: 1_710_000_000,
+            visibility: "public".into(),
+        },
+    )
+    .unwrap();
+    let incoming_raw =
+        build_protocol_email("alice@example.test", "bob@example.test", "Тест", &incoming)
+            .expect("build")
+            .raw_message;
+
+    let (imap_host, imap_port, served) = spawn_fake_imap(incoming_raw);
+    let rcpts = Arc::new(Mutex::new(Vec::<String>::new()));
+    let (smtp_host, smtp_port) = spawn_fake_smtp(Arc::clone(&rcpts));
+    set_split_mail_settings(&tmp, &smtp_host, smtp_port, &imap_host, imap_port);
+
+    let store = liveletters_store::Store::open_for_home_dir(tmp.path()).expect("store");
+    store
+        .save_subscription(&liveletters_store::SubscriptionRecord {
+            resource_address: "blog-1".into(),
+            subscriber_account_id: "bob".into(),
+            subscriber_delivery_address: "bob@example.test".into(),
+        })
+        .expect("save sub");
+
+    let outgoing = ProtocolMessage::new(
+        MessageEnvelope::new("1", "post_created", "blog-1", "event-push-all").unwrap(),
+        "Тело",
+        DomainEventPayload::PostCreated {
+            post_id: "post-push-all".into(),
+            resource_id: "blog-1".into(),
+            actor_id: "alice".into(),
+            created_at: 1_710_000_100,
+            visibility: "public".into(),
+        },
+    )
+    .unwrap();
+    store
+        .save_outbox_record(&liveletters_store::OutboxRecord {
+            event_id: "event-push-all".into(),
+            event_type: "post_created".into(),
+            resource_id: "blog-1".into(),
+            message_body: encode_message(&outgoing).expect("encode"),
+        })
+        .expect("save outbox");
+
+    let assert = lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("sync")
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        stdout.contains("получено писем:       1"),
+        "stdout = {stdout}"
+    );
+    assert!(
+        stdout.contains("отправлено писем:     1"),
+        "stdout = {stdout}"
+    );
+    assert!(served.load(Ordering::SeqCst) >= 1);
+    assert!(
+        rcpts
+            .lock()
+            .expect("lock")
+            .contains(&"bob@example.test".to_owned())
+    );
+    assert!(store.list_outbox_records().expect("outbox").is_empty());
 }
 
 #[test]

@@ -24,7 +24,7 @@
 - создать комментарий;
 - скрыть пост;
 - отредактировать комментарий;
-- получить домашнюю ленту;
+- получить собственные посты текущего пользователя;
 - получить тред поста;
 - получить очередь outbox;
 - переобработать deferred events.
@@ -342,27 +342,28 @@
 
 Сейчас наружу экспортируются:
 
-- `GetHomeFeedQuery`
+- `GetCurrentUserPostsQuery`
 - `GetPostThreadQuery`
 - `GetPendingOutboxQuery`
 
-## `GetHomeFeedQuery`
+## `GetCurrentUserPostsQuery`
 
-Это маркерный query-type без полей.
+Это query-type с полем `author_id`.
 
 Он нужен, чтобы явно выразить намерение:
 
-- прочитать домашнюю ленту.
+- прочитать собственные посты указанного автора.
 
 Когда вызывается:
 
-- `AppCore::get_home_feed(GetHomeFeedQuery)`
+- `AppCore::get_current_user_posts(GetCurrentUserPostsQuery)`
 
 модуль:
 
 - читает все посты из store;
+- оставляет только записи с совпадающим `author_id`;
 - преобразует их в `PostSummary`;
-- собирает `HomeFeed`.
+- собирает `CurrentUserPosts`.
 
 Это read-only сценарий. Он не меняет состояние и не запускает дополнительную orchestration-логику.
 
@@ -411,7 +412,7 @@
 - `PostSummary`
 - `CommentSummary`
 - `OutboxEntry`
-- `HomeFeed`
+- `CurrentUserPosts`
 - `PostThread`
 - `PendingOutbox`
 - `DeferredReprocessingSummary`
@@ -438,7 +439,7 @@
 
 Используется:
 
-- в `HomeFeed`;
+- в `CurrentUserPosts`;
 - в `PostThread`;
 - дальше маппится в backend DTO.
 
@@ -454,13 +455,13 @@
 
 Она нужна, когда верхний слой хочет не просто знать, что outbox существует, а читать его как список нормальных элементов.
 
-## `HomeFeed`
+## `CurrentUserPosts`
 
-Это контейнер для списка постов ленты.
+Это контейнер для списка собственных постов текущего пользователя.
 
 Создается через:
 
-- `HomeFeed::new(posts)`
+- `CurrentUserPosts::new(posts)`
 
 Читается через:
 

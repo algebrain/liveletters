@@ -16,7 +16,7 @@ pub fn summary() -> &'static str {
     "управление подписками на блоги"
 }
 
-/// Имя креЙта для логов и assert'ов.
+/// Имя крейта для логов и assert'ов.
 pub fn crate_name() -> &'static str {
     "liveletters-sub"
 }
@@ -24,7 +24,7 @@ pub fn crate_name() -> &'static str {
 /// Запуск команды `lltt sub`.
 ///
 /// Принимает [`CommandContext`] и распарсенные [`Args`] (а не полную строку),
-/// чтобы бинарь `apps/lltt` отвечал за clap-разбор, а креЙт — за бизнес-логику.
+/// чтобы бинарь `apps/lltt` отвечал за clap-разбор, а крейт — за бизнес-логику.
 pub fn run(
     ctx: &CommandContext,
     args: &Args,

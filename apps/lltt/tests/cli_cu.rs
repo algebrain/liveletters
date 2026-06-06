@@ -4,6 +4,7 @@ use std::fs;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
+use liveletters_store::{PostRecord, Store};
 use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 use tempfile::TempDir;
@@ -230,4 +231,46 @@ fn old_cu_management_commands_are_rejected_with_user_hint() {
             .failure()
             .stderr(contains("lltt user"));
     }
+}
+
+#[test]
+fn cu_posts_prints_current_users_posts_newest_first() {
+    let tmp = TempDir::new().unwrap();
+    init_home(&tmp);
+    write_identity(&tmp, "alice");
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["cu", "alice"])
+        .assert()
+        .success();
+
+    let store = Store::open_for_home_dir(tmp.path()).unwrap();
+    for (post_id, author_id, created_at) in [
+        ("old-alice", "alice", 1_710_000_000),
+        ("new-alice", "alice", 1_710_000_100),
+        ("bob-post", "bob", 1_710_000_200),
+    ] {
+        store
+            .save_post_record(&PostRecord {
+                post_id: post_id.into(),
+                resource_id: format!("{author_id}-blog"),
+                author_id: author_id.into(),
+                created_at,
+                body: post_id.into(),
+                visibility: "public".into(),
+                hidden: false,
+            })
+            .unwrap();
+    }
+
+    let assert = lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["cu", "posts", "--limit", "1"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
+
+    assert!(stdout.contains("new-alice"), "stdout = {stdout}");
+    assert!(!stdout.contains("old-alice"), "stdout = {stdout}");
+    assert!(!stdout.contains("bob-post"), "stdout = {stdout}");
 }

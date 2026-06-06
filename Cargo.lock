@@ -527,6 +527,7 @@ dependencies = [
  "console",
  "liveletters-config",
  "liveletters-output",
+ "liveletters-posts",
  "liveletters-secret-box",
  "liveletters-store",
  "tempfile",
@@ -566,7 +567,6 @@ name = "liveletters-feed"
 version = "0.1.0"
 dependencies = [
  "clap",
- "liveletters-app-core",
  "liveletters-config",
  "liveletters-output",
  "liveletters-store",
@@ -663,6 +663,18 @@ dependencies = [
  "liveletters-output",
  "liveletters-store",
  "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "liveletters-posts"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "liveletters-app-core",
+ "liveletters-config",
+ "liveletters-output",
+ "liveletters-store",
  "thiserror",
 ]
 

@@ -21,6 +21,9 @@ pub fn run_current(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Erro
             super::show::run(ctx, &name, reveal)
                 .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?;
         }
+        CuAction::Posts { limit } => {
+            liveletters_posts::run(ctx, &liveletters_posts::Args { limit })?
+        }
         _ => unreachable!("parse_current_action returned user-only action"),
     }
     Ok(())
@@ -53,6 +56,7 @@ fn parse_current_action(tokens: &[String]) -> Result<CuAction, CuError> {
         Some("show") if tokens.len() == 2 && tokens[1] == "--reveal" => {
             Ok(CuAction::ShowCurrent { reveal: true })
         }
+        Some("posts") => parse_posts(&tokens[1..]),
         Some("show") => Err(CuError::UseUserCommand("lltt user show <имя>".to_owned())),
         Some("list") => Err(CuError::UseUserCommand("lltt user list".to_owned())),
         Some("add") => Err(CuError::UseUserCommand(
@@ -70,6 +74,34 @@ fn parse_current_action(tokens: &[String]) -> Result<CuAction, CuError> {
             })
         }
     }
+}
+
+fn parse_posts(rest: &[String]) -> Result<CuAction, CuError> {
+    let mut limit: Option<usize> = None;
+    let mut iter = rest.iter();
+    while let Some(token) = iter.next() {
+        if let Some(value) = token.strip_prefix("--limit=") {
+            limit = Some(parse_limit(value)?);
+        } else if token == "--limit" {
+            let value = iter
+                .next()
+                .ok_or_else(|| CuError::InvalidArgs("`--limit` требует значение".to_owned()))?;
+            limit = Some(parse_limit(value)?);
+        } else if let Some(value) = token.strip_prefix("--") {
+            return Err(CuError::InvalidArgs(format!("неизвестный флаг: --{value}")));
+        } else {
+            return Err(CuError::InvalidArgs(format!(
+                "`posts` не принимает позиционный аргумент: {token}"
+            )));
+        }
+    }
+    Ok(CuAction::Posts { limit })
+}
+
+fn parse_limit(value: &str) -> Result<usize, CuError> {
+    value.parse::<usize>().map_err(|_| {
+        CuError::InvalidArgs(format!("`--limit` требует целое число, получили: {value}"))
+    })
 }
 
 fn parse_user_action(tokens: &[String]) -> Result<CuAction, CuError> {

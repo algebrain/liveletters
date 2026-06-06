@@ -30,7 +30,7 @@ impl Store {
             r#"
             SELECT post_id, resource_id, author_id, created_at, body, visibility, hidden
             FROM posts
-            ORDER BY created_at ASC, post_id ASC
+            ORDER BY created_at DESC, post_id DESC
             "#,
         )?;
 

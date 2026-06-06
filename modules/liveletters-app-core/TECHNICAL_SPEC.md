@@ -33,7 +33,7 @@
 - подписка на ресурс;
 - импорт входящих протокольных сообщений;
 - запуск синхронизации;
-- чтение ленты;
+- чтение собственных постов текущего пользователя;
 - чтение страницы ресурса;
 - чтение треда;
 - чтение статуса синхронизации.
@@ -67,10 +67,10 @@
 - query use cases для:
   - `get_bootstrap_state`
   - `get_settings`
-  - `get_home_feed`
+  - `get_current_user_posts`
   - `get_post_thread`
   - `get_pending_outbox`
-- read models для bootstrap state, settings, feed, thread, outbox и deferred reprocessing summary;
+- read models для bootstrap state, settings, собственных постов, thread, outbox и deferred reprocessing summary;
 - orchestration поверх `liveletters-store` и `liveletters-sync` без переноса этой логики в app layer.
 
 Текущий settings use case contour теперь уже закрывает:
@@ -128,7 +128,7 @@
 Сейчас (в рамках второго прохода) уже покрыты:
 
 - локальный outbox contour;
-- thread/feed queries;
+- thread/posts queries;
 - orchestration deferred reprocessing поверх sync/store.
 
 Но модуль еще не считается завершенным:

@@ -1,6 +1,6 @@
-//! Общие фикстуры для тестов `liveletters-feed`.
+//! Общие фикстуры для тестов `liveletters-posts`.
 
-use liveletters_app_core::{HomeFeed, PostSummary};
+use liveletters_app_core::{CurrentUserPosts, PostSummary};
 
 pub fn sample_post(id: &str, body: &str, hidden: bool) -> PostSummary {
     PostSummary {
@@ -14,6 +14,6 @@ pub fn sample_post(id: &str, body: &str, hidden: bool) -> PostSummary {
     }
 }
 
-pub fn feed_with(posts: Vec<PostSummary>) -> HomeFeed {
-    HomeFeed::new(posts)
+pub fn posts_with(posts: Vec<PostSummary>) -> CurrentUserPosts {
+    CurrentUserPosts::new(posts)
 }

@@ -36,7 +36,7 @@ enum Command {
     User(cu::Args),
     /// Управление подписками на блоги.
     Sub(sub::Args),
-    /// Показать ленту текущего пользователя liveletters.
+    /// Показать ленту подписок.
     Feed(feed::Args),
     /// Управление входящей почтой.
     Inbox(inbox::Args),
@@ -127,6 +127,9 @@ fn cu_requires_current(tokens: &[String]) -> bool {
         [] => true,
         [one] if one == "show" => true,
         [one, flag] if one == "show" && flag == "--reveal" => true,
+        [one] if one == "posts" => true,
+        [one, flag, _] if one == "posts" && flag == "--limit" => true,
+        [one, flag] if one == "posts" && flag.starts_with("--limit=") => true,
         _ => false,
     }
 }

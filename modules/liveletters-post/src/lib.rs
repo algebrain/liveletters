@@ -17,7 +17,7 @@ pub fn summary() -> &'static str {
     "создать новую запись в блоге"
 }
 
-/// Имя креЙта для логов и assert'ов.
+/// Имя крейта для логов и assert'ов.
 pub fn crate_name() -> &'static str {
     "liveletters-post"
 }

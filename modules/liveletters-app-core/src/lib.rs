@@ -17,12 +17,12 @@ pub use errors::AppCoreError;
 pub use ids::{new_comment_id, new_post_id, unix_millis_now};
 pub use liveletters_domain::Visibility;
 pub use queries::{
-    GetBootstrapStateQuery, GetHomeFeedQuery, GetPendingOutboxQuery, GetPostThreadQuery,
-    GetSettingsQuery, ListSubscriptionsQuery, get_bootstrap_state, get_home_feed,
+    GetBootstrapStateQuery, GetCurrentUserPostsQuery, GetPendingOutboxQuery, GetPostThreadQuery,
+    GetSettingsQuery, ListSubscriptionsQuery, get_bootstrap_state, get_current_user_posts,
     get_pending_outbox, get_post_thread, get_settings, list_subscriptions,
 };
 pub use read_models::{
-    AppSettings, BootstrapState, CommentSummary, DeferredReprocessingSummary, HomeFeed,
+    AppSettings, BootstrapState, CommentSummary, CurrentUserPosts, DeferredReprocessingSummary,
     OutboxEntry, PendingOutbox, PostSummary, PostThread, SubscriberEntry, SubscriptionsList,
 };
 pub use service::AppCore;

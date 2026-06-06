@@ -16,7 +16,7 @@
 - функция `print_kv(pairs: &[(&str, &str)])` — печать пар «ключ: значение»;
 - функция `print_table(headers: &[&str], rows: &[Vec<String>])` — печать таблицы с выравниванием колонок;
 - функция `print_identity(cfg: &IdentityConfig, reveal: bool)` — печать секций `[identity]`, `[mail]`, `[mail.smtp]`, `[mail.imap]`, `[resources_owned]` с маскированием SMTP/IMAP-паролей;
-- `crate_name() -> &'static str` — имя креЙта, для диагностических сообщений и тестов.
+- `crate_name() -> &'static str` — имя крейта, для диагностических сообщений и тестов.
 
 Внутренние модули `context` и `format` не публикуются.
 
@@ -29,7 +29,7 @@ pub struct CommandContext {
 }
 ```
 
-Контекст передаётся первым аргументом в `pub fn run(&CommandContext, &Args) -> Result<(), Box<dyn Error + Send + Sync>>` каждого командного креЙта. Содержит:
+Контекст передаётся первым аргументом в `pub fn run(&CommandContext, &Args) -> Result<(), Box<dyn Error + Send + Sync>>` каждого командного крейта. Содержит:
 
 - `home` — путь к домашнему каталогу `lltt` (значение переменной `LIVELETTERS_HOME` или `<user-home>/.liveletters/`, см. `liveletters-store::resolve_data_dir_from_env`);
 - `identity_name` — имя текущего пользователя liveletters (читается из файла `<home>/current-user` через `liveletters_config::read_current_identity`). В коде называется `identity_name` (исторически), в публичной документации — «текущий пользователь liveletters».

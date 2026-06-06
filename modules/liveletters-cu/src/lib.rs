@@ -26,7 +26,7 @@ pub fn summary() -> &'static str {
     "управление текущим пользователем и списком идентичностей"
 }
 
-/// Имя креЙта для логов и assert'ов.
+/// Имя крейта для логов и assert'ов.
 pub fn crate_name() -> &'static str {
     "liveletters-cu"
 }
