@@ -302,10 +302,9 @@
 
 Поведение:
 
-- создается обычный email с `From`, `To`, `Subject`, `X-LiveLetters-Protocol: v1`;
-- письмо получает `Content-Type: text/plain; charset="utf-8"`;
-- человекочитаемая часть кладется как `text/plain`;
-- техническая часть кодируется как `LiveLetters-Payload` в служебном блоке в конце тела письма.
+- создается `multipart/mixed` email с `From`, `To`, `Subject`, `X-LiveLetters-Protocol: v1`, `MIME-Version: 1.0` и `Content-Type: multipart/mixed; boundary="liveletters-boundary"`;
+- человекочитаемая часть кладется в `text/plain; charset="utf-8"` под-часть;
+- техническая часть (JSON) кладется в `application/json; name="liveletters.json"` под-часть с `Content-Disposition: attachment; filename="liveletters.json"`.
 
 ### Зачем она нужна
 
@@ -383,9 +382,8 @@
 
 Она:
 
-- проверяет `Content-Type`;
-- отделяет человекочитаемый текст от служебного блока LiveLetters;
-- декодирует `LiveLetters-Payload`;
+- проверяет, что `Content-Type` — `multipart/mixed` с `boundary`;
+- идёт по под-частям, отделяет `text/plain` как `human_readable_body`, а `application/json` как `technical_body`;
 - возвращает их как `ExtractedMailParts`.
 
 ### Зачем это нужно

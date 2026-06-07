@@ -71,9 +71,12 @@ fn configured_smtp_transport_sends_message_over_tcp() {
         }
         let raw_message = String::from_utf8(data).expect("SMTP data should be UTF-8");
         assert!(raw_message.contains("Subject: Новая запись\r\n"));
-        assert!(raw_message.contains("Content-Type: text/plain; charset=\"utf-8\""));
-        assert!(raw_message.contains("LiveLetters-Payload: "));
-        assert!(!raw_message.contains("Content-Type: application/json"));
+        assert!(
+            raw_message
+                .contains("Content-Type: multipart/mixed; boundary=\"liveletters-boundary\"")
+        );
+        assert!(raw_message.contains("filename=\"liveletters.json\""));
+        assert!(!raw_message.contains("LiveLetters-Payload: "));
         socket
             .write_all(b"250 2.0.0 Queued\r\n")
             .expect("queue response should be written");

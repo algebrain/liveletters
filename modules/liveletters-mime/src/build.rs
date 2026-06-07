@@ -1,4 +1,3 @@
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use liveletters_protocol::{ProtocolError, ProtocolMessage, decode_message, encode_message};
 
 use crate::{MimeError, OutgoingEmail};
@@ -11,11 +10,26 @@ pub fn build_protocol_email(
 ) -> Result<OutgoingEmail, MimeError> {
     let technical_payload = encode_message(protocol_message)
         .map_err(|error| MimeError::Protocol(format_protocol_error(error)))?;
-    let encoded_payload = URL_SAFE_NO_PAD.encode(technical_payload.as_bytes());
 
     let raw_message = format!(
-        "From: {from}\nTo: {to}\nSubject: {subject}\nX-LiveLetters-Protocol: v1\nContent-Type: text/plain; charset=\"utf-8\"\n\n{}\n\n-- \nLiveLetters-Protocol: v1\nLiveLetters-Payload: {encoded_payload}\n",
-        protocol_message.human_readable_body(),
+        "From: {from}\n\
+         To: {to}\n\
+         Subject: {subject}\n\
+         X-LiveLetters-Protocol: v1\n\
+         MIME-Version: 1.0\n\
+         Content-Type: multipart/mixed; boundary=\"{BOUNDARY}\"\n\
+         \n\
+         --{BOUNDARY}\n\
+         Content-Type: text/plain; charset=\"utf-8\"\n\
+         \n\
+         {human}\n\
+         --{BOUNDARY}\n\
+         Content-Type: application/json; name=\"{JSON_FILENAME}\"\n\
+         Content-Disposition: attachment; filename=\"{JSON_FILENAME}\"\n\
+         \n\
+         {technical_payload}\n\
+         --{BOUNDARY}--\n",
+        human = protocol_message.human_readable_body(),
     );
 
     Ok(OutgoingEmail {
@@ -25,6 +39,9 @@ pub fn build_protocol_email(
         raw_message,
     })
 }
+
+const BOUNDARY: &str = "liveletters-boundary";
+const JSON_FILENAME: &str = "liveletters.json";
 
 pub fn decode_protocol_message(input: &str) -> Result<ProtocolMessage, MimeError> {
     decode_message(input).map_err(|error| MimeError::Protocol(format_protocol_error(error)))

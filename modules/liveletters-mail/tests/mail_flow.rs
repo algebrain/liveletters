@@ -88,5 +88,98 @@ fn mime_errors_convert_to_transport_errors() {
     assert!(matches!(transport, TransportError::InvalidEmailFormat(_)));
 }
 
+#[test]
+fn built_email_round_trips_through_multipart_with_named_json() {
+    let message = sample_post_created_message();
+    let outgoing = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Новая запись",
+        &message,
+    )
+    .expect("raw email should be built");
+
+    assert!(
+        outgoing
+            .raw_message
+            .contains("Content-Type: multipart/mixed; boundary=\"liveletters-boundary\"")
+    );
+    assert!(
+        outgoing
+            .raw_message
+            .contains("Content-Disposition: attachment; filename=\"liveletters.json\"")
+    );
+    assert!(!outgoing.raw_message.contains("LiveLetters-Payload:"));
+
+    let parsed = parse_email(&outgoing.raw_message).expect("email should parse");
+    let extracted = extract_liveletters_parts(&parsed).expect("multipart should extract");
+    let decoded = decode_protocol_message(extracted.technical_body()).expect("json should decode");
+
+    assert_eq!(extracted.human_readable_body(), "Новая запись в блоге");
+    assert!(matches!(
+        decoded.payload(),
+        DomainEventPayload::PostCreated { post_id, .. } if post_id == "post-1"
+    ));
+}
+
+#[test]
+fn multipart_filename_appears_in_part_header() {
+    let message = sample_post_created_message();
+    let outgoing = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Новая запись",
+        &message,
+    )
+    .expect("raw email should be built");
+
+    let occurrences = outgoing
+        .raw_message
+        .matches("filename=\"liveletters.json\"")
+        .count();
+    assert_eq!(
+        occurrences, 1,
+        "filename должен встречаться ровно один раз в JSON-части"
+    );
+}
+
+#[test]
+fn multipart_email_round_trips_long_cyrillic_body() {
+    let long_ru_body = "Привет, мир!\n\nЭто тестовое письмо на русском языке.\n\
+                        С новой строки, с цифрами 0123456789 и знаками — «»…\n\
+                        — LiveLetters";
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "post_created", "blog-1", "event-1").unwrap(),
+        long_ru_body,
+        DomainEventPayload::PostCreated {
+            post_id: "post-1".into(),
+            resource_id: "blog-1".into(),
+            actor_id: "alice".into(),
+            created_at: 1_710_000_000,
+            body: "Текст поста".into(),
+            body_format: "plain".into(),
+            visibility: "public".into(),
+        },
+    )
+    .unwrap();
+    let outgoing = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Новая запись от alice в blog-1",
+        &message,
+    )
+    .expect("raw email should be built");
+
+    let parsed = parse_email(&outgoing.raw_message).expect("email should parse");
+    let extracted = extract_liveletters_parts(&parsed).expect("multipart should extract");
+    let decoded = decode_protocol_message(extracted.technical_body()).expect("json should decode");
+
+    assert_eq!(extracted.human_readable_body(), long_ru_body);
+    assert!(matches!(
+        decoded.payload(),
+        DomainEventPayload::PostCreated { post_id, .. } if post_id == "post-1"
+    ));
+}
+
 #[cfg(feature = "network")]
 mod network_flow;

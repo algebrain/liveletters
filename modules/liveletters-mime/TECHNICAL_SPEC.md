@@ -62,18 +62,24 @@ From: <from>
 To: <to>
 Subject: <subject>
 X-LiveLetters-Protocol: v1
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="liveletters-boundary"
+
+--liveletters-boundary
 Content-Type: text/plain; charset="utf-8"
 
 <human_readable_body>
+--liveletters-boundary
+Content-Type: application/json; name="liveletters.json"
+Content-Disposition: attachment; filename="liveletters.json"
 
--- 
-LiveLetters-Protocol: v1
-LiveLetters-Payload: <base64url(JSON-сериализованный ProtocolMessage)>
+<JSON-сериализованный ProtocolMessage>
+--liveletters-boundary--
 ```
 
 Заголовок `X-LiveLetters-Protocol: v1` нужен IMAP-слою: `lltt sync pull` ищет по нему входящие письма LiveLetters и не скачивает обычную почту целиком.
 
-`Content-Type` письма — `text/plain; charset="utf-8"`. Человекочитаемая часть находится в начале тела. Служебный блок LiveLetters находится в конце тела и содержит JSON протокольного сообщения, закодированный как base64url без заполнения.
+`Content-Type` письма — `multipart/mixed` с фиксированной границей `liveletters-boundary`. Человекочитаемая часть лежит в `text/plain; charset="utf-8"` под-части, а сериализованный JSON — в `application/json` под-части с `Content-Disposition: attachment; filename="liveletters.json"`. Никакого base64url-кодирования: JSON передаётся как есть в именованной MIME-части. Это снимает проблему с антиспам-фильтрами, которые ранее флагали длинный base64url-блок внутри `text/plain` как обфускацию.
 
 ## Парсинг `Content-Type` и `boundary`
 
@@ -103,8 +109,8 @@ LiveLetters-Payload: <base64url(JSON-сериализованный ProtocolMess
 
 - `Protocol(String)` — сбой `liveletters_protocol`: `BlankEnvelopeField(field)` / `BlankHumanReadableBody` / `MalformedJson(message)`. Содержит человекочитаемую формулировку, а не Debug-строку.
 - `InvalidEmailFormat(&'static str)` — структурная проблема MIME. Сообщение фиксировано в коде, без пользовательских данных, чтобы не давать потенциальному атакующему лишних подсказок о содержимом письма.
-- `MissingHumanReadablePart` — в письме не нашлась человекочитаемая часть.
-- `MissingTechnicalPart` — в письме не нашлась служебная часть LiveLetters.
+- `MissingHumanReadablePart` — в multipart-теле не нашлась `text/plain` под-часть.
+- `MissingTechnicalPart` — в multipart-теле не нашлась `application/json` под-часть.
 
 `From<MimeError> for liveletters_mail::TransportError` объявлен в `liveletters-mail::lib.rs`. Это позволяет transport-слою возвращать `MimeError` наверх через единый `Result<_, TransportError>` без `map_err` на каждом шаге.
 
@@ -138,10 +144,10 @@ LiveLetters-Payload: <base64url(JSON-сериализованный ProtocolMess
 Реализованные проверки:
 
 - `parses_headers_and_body_from_protocol_email` — `parse_email` корректно достаёт `Subject` и сохраняет тело письма;
-- `extracts_human_and_technical_parts_from_inline_protocol_email` — `extract_liveletters_parts` достаёт и человекочитаемую, и техническую часть;
+- `parses_human_and_protocol_from_multipart_with_filename` — `extract_liveletters_parts` достаёт human+technical из multipart с `filename="liveletters.json"`;
 - `build_and_decode_round_trip_preserves_payload` — round-trip `build → parse → extract → decode` сохраняет `DomainEventPayload::PostCreated { post_id, .. }`;
 - `parse_email_rejects_message_without_blank_line_separator` — без `\n\n` между заголовками и телом возвращается `MimeError::InvalidEmailFormat`;
-- `extract_liveletters_parts_rejects_non_multipart_email` — на `text/plain`-письме без служебного блока возвращается `MimeError::MissingTechnicalPart`.
+- `extract_liveletters_parts_rejects_non_multipart_email` — на `text/plain`-письме возвращается `MimeError::InvalidEmailFormat`.
 
 Тесты намеренно идут через настоящие строки, а не через in-memory fakes. `sample_protocol_mime()` собирает «сырое» письмо через `build_protocol_email`, а потом прогоняет его через парсер.
 
@@ -153,7 +159,7 @@ LiveLetters-Payload: <base64url(JSON-сериализованный ProtocolMess
 - описание формата LiveLetters-письма;
 - описание роли `build_protocol_email`;
 - описание вариантов `MimeError`;
-- явная фиксация того, что модуль не делает (вложения, base64, quoted-printable).
+- явная фиксация того, что модуль не делает (произвольные вложения, quoted-printable, несколько альтернативных `multipart`-веток).
 
 ## Критерии готовности
 

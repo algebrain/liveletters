@@ -9,7 +9,8 @@ Content-Type: text/plain; charset="utf-8"
 
 Человекочитаемая часть письма.
 --liveletters-boundary
-Content-Type: application/json
+Content-Type: application/json; name="liveletters.json"
+Content-Disposition: attachment; filename="liveletters.json"
 
 {
   "envelope": {

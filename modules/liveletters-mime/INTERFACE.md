@@ -13,7 +13,7 @@
 
 - отправку или приём писем (это `liveletters-mail`);
 - хранение писем в БД (это `liveletters-store`);
-- разбор нестандартных MIME-деревьев, вложений и кодировок quoted-printable в теле. Исходящие письма строятся как `text/plain` со служебным блоком LiveLetters в конце тела. Старый `multipart/mixed` с `application/json` поддерживается только как входящий формат для уже отправленных писем.
+- разбор нестандартных MIME-деревьев, вложений и кодировок quoted-printable в теле. Исходящие письма строятся как `multipart/mixed` с `text/plain; charset="utf-8"` под-частью и `application/json; name="liveletters.json"` вложением. Никакого base64url-блока в теле больше нет: JSON кладётся как отдельная MIME-часть с `Content-Disposition: attachment; filename="liveletters.json"`.
 
 ## Где находится интерфейс
 
@@ -89,23 +89,24 @@ pub fn extract_liveletters_parts(parsed: &ParsedEmail) -> Result<ExtractedMailPa
 
 Извлекает из `ParsedEmail` LiveLetters-специфичную структуру.
 
-Основной формат исходящих писем — обычный `text/plain`:
+Основной формат исходящих писем — `multipart/mixed` с двумя частями:
 
 ```text
-<человекочитаемый текст>
+Content-Type: multipart/mixed; boundary="liveletters-boundary"
 
--- 
-LiveLetters-Protocol: v1
-LiveLetters-Payload: <base64url-json>
+--liveletters-boundary
+Content-Type: text/plain; charset="utf-8"
+
+<человекочитаемый текст>
+--liveletters-boundary
+Content-Type: application/json; name="liveletters.json"
+Content-Disposition: attachment; filename="liveletters.json"
+
+<JSON-сериализованный ProtocolMessage>
+--liveletters-boundary--
 ```
 
-`human_readable_body` берётся из текста до служебного блока,
-`technical_body` получается декодированием `LiveLetters-Payload`.
-
-Для совместимости также поддерживается старый входящий формат
-`multipart/mixed`: `text/plain` считается человекочитаемой частью, а
-`application/json` — технической частью. Новые письма в таком виде не
-создаются.
+`human_readable_body` берётся из `text/plain` под-части, `technical_body` — это JSON из `application/json` под-части. JSON передаётся как есть, без base64url-кодирования.
 
 `ExtractedMailParts` предоставляет:
 
@@ -141,12 +142,12 @@ pub fn build_protocol_email(
 Собирает сырое текстовое письмо из `ProtocolMessage`:
 
 1. сериализует `protocol_message` в JSON через `liveletters_protocol::encode_message`; ошибка протокола → `MimeError::Protocol(…)`;
-2. кодирует JSON как base64url без заполнения;
-3. формирует заголовки `From` / `To` / `Subject` / `X-LiveLetters-Protocol: v1` / `Content-Type: text/plain; charset="utf-8"`;
-4. кладёт `protocol_message.human_readable_body()` в обычное тело письма и добавляет в конец служебный блок `LiveLetters-Payload`;
-4. возвращает `OutgoingEmail { from, to, subject, raw_message }`, где `raw_message` — готовое к отправке тело письма целиком (вместе с заголовками и разделителями).
+2. формирует заголовки `From` / `To` / `Subject` / `X-LiveLetters-Protocol: v1` / `MIME-Version: 1.0` / `Content-Type: multipart/mixed; boundary="liveletters-boundary"`;
+3. кладёт `protocol_message.human_readable_body()` в `text/plain; charset="utf-8"` под-часть;
+4. кладёт сериализованный JSON в `application/json; name="liveletters.json"` под-часть с `Content-Disposition: attachment; filename="liveletters.json"`;
+5. возвращает `OutgoingEmail { from, to, subject, raw_message }`, где `raw_message` — готовое к отправке тело письма целиком (вместе с заголовками и разделителями).
 
-Служебный блок может быть виден в исходнике письма или в некоторых почтовых клиентах, но он не является отдельным вложением. Это сделано намеренно: надёжность доставки важнее скрытности, а длинный JSON не должен попадать в заголовки письма.
+Имя файла `liveletters.json` для технической части выбрано намеренно: длинный base64url-блок внутри `text/plain` выглядит для почтовых антиспам-фильтров как обфускация и провоцирует ложные срабатывания. Выделение JSON в отдельное именованное вложение делает письмо «честным» для MTA.
 
 `OutgoingEmail` — это плоская структура с четырьмя `String`-полями:
 
@@ -181,8 +182,8 @@ pub enum MimeError {
 
 - `Protocol(String)` — сбой на стыке с `liveletters_protocol`: пустое поле envelope, пустое `human_readable_body`, битый JSON.
 - `InvalidEmailFormat(&'static str)` — структурная проблема письма: нет `\n\n` между заголовками и телом, заголовок без `:`, отсутствует `Content-Type`, повреждён служебный блок или старый multipart не содержит `boundary`.
-- `MissingHumanReadablePart` — в старом multipart-теле не нашлось `text/plain`.
-- `MissingTechnicalPart` — не найден служебный блок LiveLetters или в старом multipart-теле не нашлось `application/json`.
+- `MissingHumanReadablePart` — в multipart-теле не нашлось `text/plain` под-части.
+- `MissingTechnicalPart` — в multipart-теле не нашлось `application/json` под-части.
 
 `MimeError` намеренно **не несёт** подробностей «в каком байте сломались заголовки»: текущая модель ошибок фиксирует класс проблемы, а не позицию. Это сознательное упрощение: LiveLetters не пытается быть почтовым клиентом общего назначения и не предоставляет пользователю средств ручного восстановления битых писем.
 
@@ -246,7 +247,7 @@ match extract_liveletters_parts(&parsed) {
 
 ## Что модуль не делает
 
-- не разбирает произвольные вложения, quoted-printable, разные `multipart/alternative`/`multipart/related`/`multipart/encrypted`; новый исходящий формат — `text/plain` со служебным блоком LiveLetters, старый `multipart/mixed` читается только для совместимости;
+- не разбирает произвольные вложения, quoted-printable, разные `multipart/alternative`/`multipart/related`/`multipart/encrypted`; крейт работает только с `multipart/mixed` фиксированной структуры (две под-части: `text/plain` и `application/json` с `filename="liveletters.json"`);
 - не валидирует email-адреса в полях `From`/`To` — это работа SMTP-слоя;
 - не делает retry, throttling, deduplication писем — это ответственность `liveletters-sync`;
 - не сохраняет ничего в БД — это ответственность `liveletters-store`.

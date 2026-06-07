@@ -1,18 +1,9 @@
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-
 use crate::{ExtractedMailParts, MimeError, ParsedEmail};
-
-const INLINE_PROTOCOL_MARKER: &str = "\n-- \nLiveLetters-Protocol: v1\nLiveLetters-Payload: ";
 
 pub fn extract_liveletters_parts(parsed: &ParsedEmail) -> Result<ExtractedMailParts, MimeError> {
     let Some(content_type) = parsed.header("Content-Type") else {
         return Err(MimeError::InvalidEmailFormat("missing Content-Type header"));
     };
-
-    if content_type.contains("text/plain") {
-        return extract_inline_protocol(parsed.body());
-    }
-
     if !content_type.contains("multipart/") {
         return Err(MimeError::InvalidEmailFormat(
             "expected multipart Content-Type",
@@ -57,23 +48,6 @@ pub fn extract_liveletters_parts(parsed: &ParsedEmail) -> Result<ExtractedMailPa
     Ok(ExtractedMailParts::new(
         human_readable_body.ok_or(MimeError::MissingHumanReadablePart)?,
         technical_body.ok_or(MimeError::MissingTechnicalPart)?,
-    ))
-}
-
-fn extract_inline_protocol(raw_body: &str) -> Result<ExtractedMailParts, MimeError> {
-    let Some((human, encoded_payload)) = raw_body.rsplit_once(INLINE_PROTOCOL_MARKER) else {
-        return Err(MimeError::MissingTechnicalPart);
-    };
-
-    let payload = URL_SAFE_NO_PAD
-        .decode(encoded_payload.trim())
-        .map_err(|_| MimeError::InvalidEmailFormat("invalid LiveLetters payload encoding"))?;
-    let technical_body = String::from_utf8(payload)
-        .map_err(|_| MimeError::InvalidEmailFormat("LiveLetters payload is not UTF-8"))?;
-
-    Ok(ExtractedMailParts::new(
-        human.trim_end().to_owned(),
-        technical_body,
     ))
 }
 

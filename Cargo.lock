@@ -648,7 +648,6 @@ dependencies = [
 name = "liveletters-mime"
 version = "0.1.0"
 dependencies = [
- "base64",
  "liveletters-protocol",
 ]
 
