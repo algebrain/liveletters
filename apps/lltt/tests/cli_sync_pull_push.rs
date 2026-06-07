@@ -194,6 +194,64 @@ fn spawn_fake_imap(payload: String) -> (String, u16, Arc<AtomicUsize>) {
     ("127.0.0.1".to_owned(), port, served)
 }
 
+/// IMAP-сервер, имитирующий поведение Yandex: всегда возвращает
+/// `* SEARCH 1` в ответ на любой UID SEARCH, игнорируя `start_uid`.
+/// Принимает до 3 соединений подряд.
+fn spawn_fake_imap_persistent_uid(payload: String) -> (String, u16) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+
+    let _h = thread::spawn(move || {
+        for _ in 0..3 {
+            let (mut socket, _) = match listener.accept() {
+                Ok(p) => p,
+                Err(_) => return,
+            };
+            socket
+                .write_all(b"* OK IMAP4rev1 ready\r\n")
+                .expect("greeting");
+            let mut reader = socket.try_clone().expect("clone");
+            let mut buf = [0_u8; 16384];
+            loop {
+                let n = match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => n,
+                    Err(_) => break,
+                };
+                let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
+                for line in chunk.split("\r\n") {
+                    if line.is_empty() {
+                        continue;
+                    }
+                    let tag = line.split_whitespace().next().unwrap_or("");
+                    if line.contains("LOGIN") {
+                        let resp = format!("{tag} OK LOGIN completed\r\n");
+                        socket.write_all(resp.as_bytes()).ok();
+                    } else if line.contains("SELECT") {
+                        let resp = format!("* 1 EXISTS\r\n{tag} OK SELECT completed\r\n");
+                        socket.write_all(resp.as_bytes()).ok();
+                    } else if line.contains("UID SEARCH") {
+                        let resp = format!("* SEARCH 1\r\n{tag} OK SEARCH completed\r\n");
+                        socket.write_all(resp.as_bytes()).ok();
+                    } else if line.contains("UID FETCH") {
+                        let literal_size = payload.len();
+                        let fetch_response = format!(
+                            "* 1 FETCH (UID 1 BODY[] {{{literal_size}}})\r\n{payload}\r\n)\r\n{tag} OK FETCH completed\r\n"
+                        );
+                        socket.write_all(fetch_response.as_bytes()).ok();
+                    } else if line.contains("LOGOUT") {
+                        let resp = format!("* BYE\r\n{tag} OK LOGOUT completed\r\n");
+                        socket.write_all(resp.as_bytes()).ok();
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    let _ = _h;
+    ("127.0.0.1".to_owned(), port)
+}
+
 #[test]
 fn sync_pull_without_mail_settings_returns_helpful_error() {
     let tmp = TempDir::new().expect("tempdir");
@@ -503,4 +561,58 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
     );
 
     assert!(store.list_outbox_records().expect("outbox").is_empty());
+}
+
+#[test]
+fn sync_pull_re_fetches_same_uid_when_imap_ignores_start_uid() {
+    let tmp = TempDir::new().expect("tempdir");
+    init_home(&tmp);
+
+    use liveletters_mail::build_protocol_email;
+    use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
+
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "post_created", "blog-1", "event-pull-2").unwrap(),
+        "Привет из IMAP",
+        DomainEventPayload::PostCreated {
+            post_id: "post-2".into(),
+            resource_id: "blog-1".into(),
+            actor_id: "alice".into(),
+            created_at: 1_710_000_000,
+            body: "Привет из IMAP".into(),
+            body_format: "plain".into(),
+            visibility: "public".into(),
+        },
+    )
+    .unwrap();
+    let outgoing = build_protocol_email("alice@example.test", "bob@example.test", "Тест", &message)
+        .expect("build");
+    let raw = outgoing.raw_message;
+
+    let (host, port) = spawn_fake_imap_persistent_uid(raw);
+    set_mail_settings(&tmp, &host, port);
+
+    let assert1 = lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["sync", "pull"])
+        .assert()
+        .success();
+    let stdout1 = String::from_utf8_lossy(&assert1.get_output().stdout);
+    assert!(
+        stdout1.contains("получено писем:       1"),
+        "first sync should receive the email; stdout = {stdout1}"
+    );
+
+    thread::sleep(Duration::from_millis(50));
+
+    let assert2 = lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["sync", "pull"])
+        .assert()
+        .success();
+    let stdout2 = String::from_utf8_lossy(&assert2.get_output().stdout);
+    assert!(
+        stdout2.contains("получено писем:       0"),
+        "RED: second sync should receive 0 emails after cursor advance, but IMAP ignores start_uid; stdout = {stdout2}"
+    );
 }

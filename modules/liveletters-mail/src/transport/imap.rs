@@ -310,7 +310,8 @@ fn search_liveletters_uids(
     let header_search_lines = send_command_collecting(reader, search_tag, &header_command)?;
     match command_status(&header_search_lines, search_tag)? {
         CommandStatus::Ok => {
-            let matched = extract_search_uids(&header_search_lines);
+            let mut matched = extract_search_uids(&header_search_lines);
+            matched.retain(|uid| *uid >= start_uid);
             if matched.is_empty() {
                 fallback_search_by_fetching_headers(
                     reader,
@@ -354,8 +355,9 @@ fn fallback_search_by_fetching_headers(
         ));
     }
 
-    let candidates = extract_search_uids(&all_search_lines);
+    let mut candidates = extract_search_uids(&all_search_lines);
     let max_seen_uid = candidates.iter().copied().max();
+    candidates.retain(|uid| *uid >= start_uid);
     let mut liveletters_uids = Vec::new();
     for uid in candidates {
         let headers = fetch_header_literal(reader, fetch_tag, uid).map_err(|error| match error {
