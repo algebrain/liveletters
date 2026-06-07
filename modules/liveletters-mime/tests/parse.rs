@@ -172,3 +172,27 @@ fn multipart_email_preserves_long_cyrillic_human_body() {
         DomainEventPayload::PostCreated { post_id, .. } if post_id == "post-1"
     ));
 }
+
+#[test]
+fn parse_email_handles_folded_headers_without_crashing() {
+    let raw = include_str!("fixtures/folded-headers.eml");
+    let parsed = parse_email(raw).expect("email with folded headers should parse");
+    assert_eq!(parsed.subject(), None);
+    assert!(parsed.body().contains("Hello Bob"));
+}
+
+#[test]
+fn extract_parts_from_email_with_folded_headers() {
+    let raw = include_str!("fixtures/folded-headers.eml");
+    let parsed = parse_email(raw).expect("email should parse");
+    let parts = extract_liveletters_parts(&parsed).expect("parts should extract");
+    assert_eq!(
+        parts.human_readable_body(),
+        "Hello Bob, this message tests folded headers."
+    );
+    let decoded = decode_protocol_message(parts.technical_body()).expect("payload should decode");
+    assert!(matches!(
+        decoded.payload(),
+        DomainEventPayload::PostCreated { post_id, .. } if post_id == "post-1"
+    ));
+}

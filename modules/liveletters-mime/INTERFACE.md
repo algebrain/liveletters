@@ -247,7 +247,7 @@ match extract_liveletters_parts(&parsed) {
 
 ## Что модуль не делает
 
-- не разбирает произвольные вложения, quoted-printable, разные `multipart/alternative`/`multipart/related`/`multipart/encrypted`; крейт работает только с `multipart/mixed` фиксированной структуры (две под-части: `text/plain` и `application/json` с `filename="liveletters.json"`);
+- не разбирает произвольные вложения (`multipart/alternative`/`multipart/related`/`multipart/encrypted`); крейт работает только с `multipart/mixed` фиксированной структуры (две под-части: `text/plain` и `application/json` с `filename="liveletters.json"`);
 - не валидирует email-адреса в полях `From`/`To` — это работа SMTP-слоя;
 - не делает retry, throttling, deduplication писем — это ответственность `liveletters-sync`;
 - не сохраняет ничего в БД — это ответственность `liveletters-store`.

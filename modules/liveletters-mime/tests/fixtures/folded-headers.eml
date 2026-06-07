@@ -1,0 +1,51 @@
+Received: from mail.example.com (mail.example.com [192.168.1.1])
+	by relay.example.net (Postfix) with ESMTPS id ABC123
+	for <bob@example.net>; Sun, 07 Jun 2026 20:58:27 +0300
+Received: from smtp.example.com (smtp.example.com [10.0.0.1])
+	by mail.example.com (Yandex) with ESMTPS id XYZ789;
+	Sun, 07 Jun 2026 20:58:27 +0300 (MSK)
+Received: by smtp.example.com (smtp) with ESMTPSA id AAA111;
+	Sun, 07 Jun 2026 20:58:26 +0300
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.test;
+	s=mail; t=1780855107; bh=dGVzdC1kaWdlc3Q=;
+	h=To:From;
+	b=dGhpcyBpcyBhIGZha2UgREtJTS1TaWduYXR1cmUgdGhhdCBpcyB2ZXJ5IGxvbmcK
+	YW5kIHNwYW5zIG11bHRpcGxlIGxpbmVzIGZvciB0ZXN0aW5nIHB1cnBvc2Vz
+Authentication-Results: mail.example.com;
+	dkim=pass header.i=@example.test;
+	spf=pass smtp.mailfrom=example.test
+From: alice@example.test
+To: bob@example.test
+Message-ID: <test-folded-001@example.test>
+X-LiveLetters-Protocol: v1
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="liveletters-boundary"
+
+--liveletters-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Hello Bob, this message tests folded headers.
+--liveletters-boundary
+Content-Type: application/json; name="liveletters.json"
+Content-Disposition: attachment; filename="liveletters.json"
+
+{
+  "envelope": {
+    "schema_version": "1",
+    "event_type": "post_created",
+    "resource_id": "test-blog",
+    "event_id": "event-1"
+  },
+  "human_readable_body": "Test body",
+  "payload": {
+    "kind": "post_created",
+    "post_id": "post-1",
+    "resource_id": "test-blog",
+    "actor_id": "alice",
+    "created_at": 1710000000,
+    "body": "Test body text",
+    "body_format": "plain",
+    "visibility": "public"
+  }
+}
+--liveletters-boundary--

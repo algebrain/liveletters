@@ -255,7 +255,7 @@
 
 Создается через:
 
-- `ParsedEmail::new(headers, body)`
+- `ParsedEmail::new(raw, headers)`
 
 Читается через:
 

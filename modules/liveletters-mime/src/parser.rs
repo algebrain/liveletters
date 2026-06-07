@@ -2,22 +2,19 @@ use crate::{MimeError, ParsedEmail};
 
 pub fn parse_email(raw_email: &str) -> Result<ParsedEmail, MimeError> {
     let normalized = raw_email.replace("\r\n", "\n");
-    let Some((header_block, body)) = normalized.split_once("\n\n") else {
+    if !normalized.contains("\n\n") {
         return Err(MimeError::InvalidEmailFormat(
             "email must contain headers and body",
         ));
-    };
-
-    let mut headers = Vec::new();
-    for line in header_block.lines() {
-        let Some((name, value)) = line.split_once(':') else {
-            return Err(MimeError::InvalidEmailFormat(
-                "header line must contain colon",
-            ));
-        };
-
-        headers.push((name.trim().to_owned(), value.trim().to_owned()));
     }
 
-    Ok(ParsedEmail::new(headers, body.to_owned()))
+    let mail = mailparse::parse_mail(normalized.as_bytes())
+        .map_err(|_| MimeError::InvalidEmailFormat("cannot parse email"))?;
+
+    let mut headers = Vec::new();
+    for h in &mail.headers {
+        headers.push((h.get_key().to_owned(), h.get_value()));
+    }
+
+    Ok(ParsedEmail::new(normalized, headers))
 }

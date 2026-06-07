@@ -14,8 +14,8 @@ pub struct ReceivedEmail {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParsedEmail {
+    raw: String,
     headers: Vec<(String, String)>,
-    body: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,12 +25,15 @@ pub struct ExtractedMailParts {
 }
 
 impl ParsedEmail {
-    pub fn new(headers: Vec<(String, String)>, body: String) -> Self {
-        Self { headers, body }
+    pub fn new(raw: String, headers: Vec<(String, String)>) -> Self {
+        Self { raw, headers }
     }
 
     pub fn body(&self) -> &str {
-        &self.body
+        self.raw
+            .split_once("\n\n")
+            .map(|(_, body)| body)
+            .unwrap_or("")
     }
 
     pub fn header(&self, name: &str) -> Option<&str> {
@@ -42,6 +45,10 @@ impl ParsedEmail {
 
     pub fn subject(&self) -> Option<String> {
         self.header("Subject").map(ToOwned::to_owned)
+    }
+
+    pub fn raw(&self) -> &str {
+        &self.raw
     }
 }
 

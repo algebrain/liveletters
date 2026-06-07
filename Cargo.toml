@@ -49,3 +49,4 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 native-tls = "0.2"
 clap = { version = "4", features = ["derive"] }
 console = "0.15"
+mailparse = "0.16.1"

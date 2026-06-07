@@ -8,7 +8,8 @@
 
 - разбор сырого текста письма на заголовки и тело;
 - нормализация CRLF → LF;
-- извлечение `human_readable_body` и `technical_body` из `text/plain`-письма со служебным блоком LiveLetters;
+- парсинг RFC 5322-заголовков (включая folded continuation lines) через `mailparse`;
+- извлечение `human_readable_body` и `technical_body` из multipart-письма;
 - сборка `OutgoingEmail` из `ProtocolMessage`;
 - разбор `ProtocolMessage` из JSON-строки через `liveletters_protocol::decode_message` с человекочитаемой формулировкой ошибок;
 - типизированные структуры `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`.
@@ -18,7 +19,7 @@
 - реализовывать SMTP/IMAP/TCP/TLS — это `liveletters-mail`;
 - хранить письма или эвенты в SQLite — это `liveletters-store`;
 - делать retry/throttling/dedup — это `liveletters-sync`;
-- разбирать quoted-printable и MIME-вложения;
+- разбирать quoted-printable, base64, MIME-вложения; эту работу делает `mailparse`;
 - валидировать email-адреса в `From`/`To`.
 
 ## Почему выделен в отдельный крейт
@@ -29,7 +30,7 @@
 
 **Повторное использование в CLI и Tauri.** MIME-парсинг — это чистая функция от строки к структуре, без сетевых побочных эффектов. Эту функцию удобно дёргать из будущего `apps/lltt` и из Tauri-команд одинаковым образом.
 
-Зависимости при этом минимальны: `liveletters-mime` зависит только от `liveletters-protocol`. Никаких знаний про `liveletters-store`, `liveletters-app-core`, `liveletters-config`.
+Зависимости при этом минимальны: `liveletters-mime` зависит от `liveletters-protocol` и `mailparse`. Никаких знаний про `liveletters-store`, `liveletters-app-core`, `liveletters-config`. `mailparse` обрабатывает folded-заголовки, Content-Transfer-Encoding, charset-декодирование и предоставляет структурированный MIME-дерево (парсинг multipart-границ).
 
 ## Конвейер обработки входящего письма
 
@@ -81,34 +82,31 @@ Content-Disposition: attachment; filename="liveletters.json"
 
 `Content-Type` письма — `multipart/mixed` с фиксированной границей `liveletters-boundary`. Человекочитаемая часть лежит в `text/plain; charset="utf-8"` под-части, а сериализованный JSON — в `application/json` под-части с `Content-Disposition: attachment; filename="liveletters.json"`. Никакого base64url-кодирования: JSON передаётся как есть в именованной MIME-части. Это снимает проблему с антиспам-фильтрами, которые ранее флагали длинный base64url-блок внутри `text/plain` как обфускацию.
 
-## Парсинг `Content-Type` и `boundary`
+## Парсинг MIME через `mailparse`
 
-`extract_boundary` в `src/mime.rs` парсит `Content-Type` очень простым способом:
+Вместо ручного разбора заголовков и MIME-границ `liveletters-mime` использует библиотеку [`mailparse`](https://crates.io/crates/mailparse). Она берёт на себя:
 
-- ищет подстроку `boundary=`;
-- берёт всё после неё;
-- триммит пробелы и снимает внешние кавычки.
+- парсинг RFC 5322-заголовков (включая continuation lines с пробелом/табуляцией);
+- декодирование `Content-Transfer-Encoding` (quoted-printable, base64);
+- charset-декодирование тела (`text/plain; charset=utf-8` → UTF-8);
+- извлечение structured MIME-дерева (`ParsedMail.subparts`) из multipart-писем.
 
-Это покрывает канонические случаи `boundary="liveletters-boundary"` и `boundary=liveletters-boundary`, но не покрывает:
+`parse_email` в `src/parser.rs` вызывает `mailparse::parse_mail` для разбора заголовков и сохраняет нормализованный сырой email в `ParsedEmail.raw`. Это позволяет `extract_liveletters_parts` в `src/mime.rs` повторно вызывать `mailparse::parse_mail` для навигации по MIME-дереву без хранения дополнительных структур.
 
-- `boundary` с пробелами внутри значения (RFC 2046 не разрешает, но некоторые кривые MTA могут генерировать);
-- `boundary*0*` / `boundary*1*` (RFC 2231 encoded continuation);
-- экранированные кавычки внутри значения.
-
-Эти краевые случаи считаются «битым MIME» и приводят к `MimeError::InvalidEmailFormat`. Для LiveLetters это приемлемо, потому что отправитель — это тот же код, что и получатель, и несовместимые MTA не используются.
+Для `text/plain`-части используется `get_body()` (учёт charset), для `application/json` — `get_body_raw()` + `String::from_utf8` (JSON всегда UTF-8, без charset-преобразования).
 
 ## Нормализация CRLF → LF
 
-`parse_email` первой строкой делает `raw_email.replace("\r\n", "\n")`. Это означает, что в `body()` всегда лежит текст с LF-окончаниями строк, и весь дальнейший разбор (`\n\n` как разделитель заголовков и тела, `header_block.lines()`) работает в одной нотации.
+`parse_email` первой строкой делает `raw_email.replace("\r\n", "\n")`. Нормализованный текст сохраняется в `ParsedEmail.raw`. Метод `body()` возвращает всё, что находится после первого `\n\n` (разделитель заголовков и тела). `mailparse::parse_mail` работает как с `\n`, так и с `\r\n` — нормализация нужна только для нашего `body()`.
 
-Побочный эффект: если внутри тела письма есть символы `\r`, не привязанные к `\n`, они остаются как есть. Текущая реализация не пытается их вычищать.
+Побочный эффект: если внутри тела письма есть символы `\r`, не привязанные к `\n`, они остаются как есть. Никакого дополнительного вычищения не производится.
 
 ## Формат ошибок
 
 `MimeError`:
 
 - `Protocol(String)` — сбой `liveletters_protocol`: `BlankEnvelopeField(field)` / `BlankHumanReadableBody` / `MalformedJson(message)`. Содержит человекочитаемую формулировку, а не Debug-строку.
-- `InvalidEmailFormat(&'static str)` — структурная проблема MIME. Сообщение фиксировано в коде, без пользовательских данных, чтобы не давать потенциальному атакующему лишних подсказок о содержимом письма.
+- `InvalidEmailFormat(&'static str)` — структурная проблема MIME или ошибка `mailparse`. Сообщение фиксировано в коде, без пользовательских данных, чтобы не давать потенциальному атакующему лишних подсказок о содержимом письма.
 - `MissingHumanReadablePart` — в multipart-теле не нашлась `text/plain` под-часть.
 - `MissingTechnicalPart` — в multipart-теле не нашлась `application/json` под-часть.
 
@@ -122,7 +120,7 @@ Content-Disposition: attachment; filename="liveletters.json"
 - `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`;
 - `MimeError` с четырьмя вариантами;
 - `crate_name() -> &'static str` для диагностики;
-- integration-тесты в `tests/parse.rs`: разбор заголовков и тела, наличие `X-LiveLetters-Protocol`, извлечение human+technical, round-trip build→parse→extract→decode, отсутствие JSON-вложения, отказ на письме без `\n\n`, отказ на письме без служебного блока;
+- integration-тесты в `tests/parse.rs` (7 тестов): разбор заголовков и тела, наличие `X-LiveLetters-Protocol`, извлечение human+technical, round-trip build→parse→extract→decode, отсутствие JSON-вложения, отказ на письме без `\n\n`, отказ на письме без multipart, письма с folded-заголовками;
 - 1 lib-test `exposes_crate_name`.
 
 ## Требования к структуре каталога
@@ -147,9 +145,11 @@ Content-Disposition: attachment; filename="liveletters.json"
 - `parses_human_and_protocol_from_multipart_with_filename` — `extract_liveletters_parts` достаёт human+technical из multipart с `filename="liveletters.json"`;
 - `build_and_decode_round_trip_preserves_payload` — round-trip `build → parse → extract → decode` сохраняет `DomainEventPayload::PostCreated { post_id, .. }`;
 - `parse_email_rejects_message_without_blank_line_separator` — без `\n\n` между заголовками и телом возвращается `MimeError::InvalidEmailFormat`;
-- `extract_liveletters_parts_rejects_non_multipart_email` — на `text/plain`-письме возвращается `MimeError::InvalidEmailFormat`.
+- `extract_liveletters_parts_rejects_non_multipart_email` — на `text/plain`-письме возвращается `MimeError::InvalidEmailFormat`;
+- `parse_email_handles_folded_headers_without_crashing` — `parse_email` не падает на письме с folded-заголовками (Received, DKIM-Signature с continuation lines);
+- `extract_parts_from_email_with_folded_headers` — `extract_liveletters_parts` извлекает human+technical из письма с folded-заголовками, `decode_protocol_message` корректно парсит payload.
 
-Тесты намеренно идут через настоящие строки, а не через in-memory fakes. `sample_protocol_mime()` собирает «сырое» письмо через `build_protocol_email`, а потом прогоняет его через парсер.
+Тесты намеренно идут через настоящие строки, а не через in-memory fakes. `sample_protocol_mime()` собирает «сырое» письмо через `build_protocol_email`, а потом прогоняет его через парсер. `folded-headers.eml` в `tests/fixtures/` — синтетическое письмо с folded-заголовками (Received из 3 цепочек, многострочная DKIM-Signature, Authentication-Results) и тестовыми адресами (@example.test).
 
 ## Требования к документации
 
@@ -163,11 +163,11 @@ Content-Disposition: attachment; filename="liveletters.json"
 
 ## Критерии готовности
 
-- `parse_email` разбирает любой RFC 5322-текст с `\n\n` между заголовками и телом;
-- `extract_liveletters_parts` достаёт человекочитаемый текст и служебный блок LiveLetters из `text/plain`-письма;
-- `build_protocol_email` собирает `text/plain`-письмо со служебным блоком LiveLetters;
+- `parse_email` разбирает любой RFC 5322-текст с `\n\n` между заголовками и телом, включая письма с folded-заголовками (Received, DKIM-Signature с continuation lines);
+- `extract_liveletters_parts` достаёт человекочитаемый текст и JSON-часть из multipart-письма;
+- `build_protocol_email` собирает multipart-письмо с `text/plain` и `application/json` частями;
 - round-trip `build → parse → extract → decode` сохраняет `ProtocolMessage` побитово;
-- 5 integration-тестов и 1 lib-test зелёные.
+- 7 integration-тестов и 1 lib-test зелёные.
 
 Свойства реализации:
 
@@ -177,11 +177,9 @@ Content-Disposition: attachment; filename="liveletters.json"
 
 Ограничения:
 
-- нет поддержки base64-encoded body;
-- нет поддержки quoted-printable;
-- нет поддержки вложений и `multipart/alternative`/`multipart/related`;
-- нет нормализации `Content-Transfer-Encoding`;
-- нет строгой валидации email-адресов в `From`/`To`.
+- нет поддержки `multipart/alternative`/`multipart/related` — крейт работает только с `multipart/mixed`;
+- нет строгой валидации email-адресов в `From`/`To` — это работа SMTP-слоя;
+- ошибки `mailparse` маппятся в `MimeError::InvalidEmailFormat` со статической строкой; детализованное сообщение `MailParseError` не сохраняется (безопасность: не давать атакующему подсказок о содержимом письма).
 
 Эти направления не входят в границы модуля.
 

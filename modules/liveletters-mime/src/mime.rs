@@ -1,47 +1,29 @@
 use crate::{ExtractedMailParts, MimeError, ParsedEmail};
 
 pub fn extract_liveletters_parts(parsed: &ParsedEmail) -> Result<ExtractedMailParts, MimeError> {
-    let Some(content_type) = parsed.header("Content-Type") else {
-        return Err(MimeError::InvalidEmailFormat("missing Content-Type header"));
-    };
-    if !content_type.contains("multipart/") {
-        return Err(MimeError::InvalidEmailFormat(
-            "expected multipart Content-Type",
-        ));
-    }
+    let mail = mailparse::parse_mail(parsed.raw().as_bytes())
+        .map_err(|_| MimeError::InvalidEmailFormat("cannot parse email as MIME"))?;
 
-    let boundary = extract_boundary(content_type)?;
-    let boundary_marker = format!("--{boundary}");
+    if !mail.ctype.mimetype.starts_with("multipart/") {
+        return Err(MimeError::InvalidEmailFormat("expected multipart message"));
+    }
 
     let mut human_readable_body = None;
     let mut technical_body = None;
 
-    for chunk in parsed.body().split(&boundary_marker).skip(1) {
-        let part = chunk.trim();
-        if part.is_empty() || part == "--" {
-            continue;
-        }
-
-        let part = part.strip_suffix("--").unwrap_or(part).trim();
-        let Some((header_block, body)) = part.split_once("\n\n") else {
-            continue;
-        };
-
-        let body = body.trim();
-        let part_content_type = header_block
-            .lines()
-            .find_map(|line| line.split_once(':'))
-            .filter(|(name, _)| name.trim().eq_ignore_ascii_case("Content-Type"))
-            .map(|(_, value)| value.trim().to_owned());
-
-        match part_content_type.as_deref() {
-            Some(value) if value.contains("text/plain") => {
-                human_readable_body = Some(body.to_owned());
-            }
-            Some(value) if value.contains("application/json") => {
-                technical_body = Some(body.to_owned());
-            }
-            _ => {}
+    for part in &mail.subparts {
+        if part.ctype.mimetype.contains("text/plain") {
+            let body = part
+                .get_body()
+                .map_err(|_| MimeError::InvalidEmailFormat("cannot decode text body"))?;
+            human_readable_body = Some(body);
+        } else if part.ctype.mimetype.contains("application/json") {
+            let raw = part
+                .get_body_raw()
+                .map_err(|_| MimeError::InvalidEmailFormat("cannot decode json body"))?;
+            let body = String::from_utf8(raw.to_vec())
+                .map_err(|_| MimeError::InvalidEmailFormat("json body is not valid utf-8"))?;
+            technical_body = Some(body);
         }
     }
 
@@ -49,14 +31,4 @@ pub fn extract_liveletters_parts(parsed: &ParsedEmail) -> Result<ExtractedMailPa
         human_readable_body.ok_or(MimeError::MissingHumanReadablePart)?,
         technical_body.ok_or(MimeError::MissingTechnicalPart)?,
     ))
-}
-
-fn extract_boundary(content_type: &str) -> Result<String, MimeError> {
-    let Some((_, tail)) = content_type.split_once("boundary=") else {
-        return Err(MimeError::InvalidEmailFormat(
-            "multipart Content-Type must include boundary",
-        ));
-    };
-
-    Ok(tail.trim().trim_matches('"').to_owned())
 }
