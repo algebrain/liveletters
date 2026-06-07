@@ -108,6 +108,7 @@ impl Store {
                 nickname TEXT NOT NULL,
                 email_address TEXT NOT NULL,
                 avatar_url TEXT,
+                language TEXT NOT NULL DEFAULT 'ru',
                 setup_completed INTEGER NOT NULL
             );
 
@@ -141,6 +142,7 @@ impl Store {
         )?;
 
         self.ensure_mail_settings_security_columns()?;
+        self.ensure_user_settings_language_column()?;
         self.ensure_subscriptions_use_delivery_address_key()?;
 
         Ok(())
@@ -152,6 +154,13 @@ impl Store {
         )?;
         self.add_column_if_missing(
             "ALTER TABLE mail_settings ADD COLUMN imap_security TEXT NOT NULL DEFAULT 'starttls'",
+        )?;
+        Ok(())
+    }
+
+    fn ensure_user_settings_language_column(&self) -> Result<(), StoreError> {
+        self.add_column_if_missing(
+            "ALTER TABLE user_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'ru'",
         )?;
         Ok(())
     }

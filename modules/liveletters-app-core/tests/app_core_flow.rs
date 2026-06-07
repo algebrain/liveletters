@@ -17,6 +17,7 @@ fn creates_post_and_exposes_it_in_current_user_posts() {
 
     let created = app
         .create_post(CreatePostCommand {
+            profile_id: "default",
             post_id: "post-1",
             resource_id: "blog-1",
             author_id: "alice",
@@ -50,9 +51,9 @@ fn creates_post_and_exposes_it_in_current_user_posts() {
         .expect("outbox should load");
 
     assert_eq!(outbox.entries().len(), 1);
-    assert_eq!(outbox.entries()[0].event_type, "post_created");
 
     let decoded = decode_message(&outbox.entries()[0].message_body).expect("message should decode");
+    assert_eq!(decoded.envelope().event_type(), "post_created");
     assert!(matches!(
         decoded.payload(),
         DomainEventPayload::PostCreated { post_id, .. } if post_id == "post-1"
@@ -65,6 +66,7 @@ fn creates_comment_and_exposes_thread_for_post() {
     let app = AppCore::new(&store);
 
     app.create_post(CreatePostCommand {
+        profile_id: "default",
         post_id: "post-1",
         resource_id: "blog-1",
         author_id: "alice",
@@ -76,6 +78,7 @@ fn creates_comment_and_exposes_thread_for_post() {
 
     let created = app
         .create_comment(CreateCommentCommand {
+            profile_id: "default",
             comment_id: "comment-1",
             post_id: "post-1",
             parent_comment_id: None,
@@ -123,7 +126,8 @@ fn creates_comment_and_exposes_thread_for_post() {
         .expect("outbox should load");
 
     assert_eq!(outbox.entries().len(), 2);
-    assert_eq!(outbox.entries()[1].event_type, "comment_created");
+    let decoded = decode_message(&outbox.entries()[1].message_body).expect("message should decode");
+    assert_eq!(decoded.envelope().event_type(), "comment_created");
 }
 
 #[test]
@@ -133,6 +137,7 @@ fn rejects_comment_for_missing_post() {
 
     let error = app
         .create_comment(CreateCommentCommand {
+            profile_id: "default",
             comment_id: "comment-1",
             post_id: "missing-post",
             parent_comment_id: None,
@@ -156,6 +161,7 @@ fn hides_post_and_keeps_hidden_state_in_current_user_posts() {
     let app = AppCore::new(&store);
 
     app.create_post(CreatePostCommand {
+        profile_id: "default",
         post_id: "post-1",
         resource_id: "blog-1",
         author_id: "alice",
@@ -167,6 +173,7 @@ fn hides_post_and_keeps_hidden_state_in_current_user_posts() {
 
     let hidden = app
         .hide_post(liveletters_app_core::HidePostCommand {
+            profile_id: "default",
             post_id: "post-1",
             actor_id: "alice",
             created_at: 2,
@@ -184,7 +191,8 @@ fn hides_post_and_keeps_hidden_state_in_current_user_posts() {
     let outbox = app
         .get_pending_outbox(GetPendingOutboxQuery)
         .expect("outbox should load");
-    assert_eq!(outbox.entries()[1].event_type, "post_hidden");
+    let decoded = decode_message(&outbox.entries()[1].message_body).expect("message should decode");
+    assert_eq!(decoded.envelope().event_type(), "post_hidden");
 }
 
 #[test]
@@ -193,6 +201,7 @@ fn edits_comment_and_returns_updated_thread() {
     let app = AppCore::new(&store);
 
     app.create_post(CreatePostCommand {
+        profile_id: "default",
         post_id: "post-1",
         resource_id: "blog-1",
         author_id: "alice",
@@ -203,6 +212,7 @@ fn edits_comment_and_returns_updated_thread() {
     .expect("post should be created");
 
     app.create_comment(CreateCommentCommand {
+        profile_id: "default",
         comment_id: "comment-1",
         post_id: "post-1",
         parent_comment_id: None,
@@ -215,6 +225,7 @@ fn edits_comment_and_returns_updated_thread() {
 
     let edited = app
         .edit_comment(liveletters_app_core::EditCommentCommand {
+            profile_id: "default",
             comment_id: "comment-1",
             actor_id: "bob",
             created_at: 3,
@@ -233,9 +244,8 @@ fn edits_comment_and_returns_updated_thread() {
     let outbox = app
         .get_pending_outbox(GetPendingOutboxQuery)
         .expect("outbox should load");
-    assert_eq!(outbox.entries()[2].event_type, "comment_edited");
-
     let decoded = decode_message(&outbox.entries()[2].message_body).expect("message should decode");
+    assert_eq!(decoded.envelope().event_type(), "comment_edited");
     assert!(matches!(
         decoded.payload(),
         DomainEventPayload::CommentEdited { body, .. } if body == "Edited comment"
@@ -277,6 +287,7 @@ fn reprocesses_deferred_events_through_app_core_orchestration() {
 
     let app = AppCore::new(&store);
     app.create_post(CreatePostCommand {
+        profile_id: "default",
         post_id: "post-1",
         resource_id: "blog-1",
         author_id: "alice",

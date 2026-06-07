@@ -27,6 +27,7 @@ members = [
     "modules/liveletters-settings",
     "modules/liveletters-lltt-sync",
     "modules/liveletters-log",
+    "modules/liveletters-i18n",
     "apps/lltt",
 ]
 

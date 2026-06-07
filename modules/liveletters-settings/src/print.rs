@@ -14,6 +14,7 @@ pub fn print_settings(user: Option<&UserSettingsRecord>, mail: Option<&MailSetti
                 ("nickname", &u.nickname),
                 ("email_address", &u.email_address),
                 ("avatar_url", u.avatar_url.as_deref().unwrap_or("")),
+                ("language", &u.language),
                 ("setup_completed", &u.setup_completed.to_string()),
             ]);
         }

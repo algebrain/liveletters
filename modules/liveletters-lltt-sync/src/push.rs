@@ -87,7 +87,8 @@ pub fn send_outbox_record(
 
     let mut count = 0;
     for addr in &recipients {
-        send_one(transport, from, addr, &message).map_err(|e| SyncError::Smtp(format!("{e:?}")))?;
+        send_one(transport, from, addr, record, &message)
+            .map_err(|e| SyncError::Smtp(format!("{e:?}")))?;
         count += 1;
     }
     Ok(count)
@@ -108,10 +109,10 @@ fn send_one(
     transport: &ConfiguredSmtpTransport,
     from: &str,
     to: &str,
+    record: &OutboxRecord,
     message: &ProtocolMessage,
 ) -> Result<SendStatus, TransportError> {
-    let outgoing: OutgoingEmail =
-        build_protocol_email(from, to, message.envelope().event_type(), message)?;
+    let outgoing: OutgoingEmail = build_protocol_email(from, to, &record.event_type, message)?;
     transport.send(&outgoing)
 }
 

@@ -14,6 +14,7 @@ fn open() -> (tempfile::TempDir, Store) {
 fn create_with(store: &Store, visibility: Visibility) -> CreatePostResult {
     let core = AppCore::new(store);
     core.create_post(CreatePostCommand {
+        profile_id: "default",
         post_id: "post-1",
         resource_id: "blog-1",
         author_id: "acct_alice",
@@ -43,7 +44,7 @@ fn create_post_with_friends_only_persists_visibility() {
     assert_eq!(envelope["payload"]["body_format"], "plain");
     assert_eq!(
         envelope["human_readable_body"],
-        "acct_alice написал:\n\nПривет, мир"
+        "acct_alice написал(а) новую запись в blog-1:\n\nПривет, мир\n\n— LiveLetters"
     );
 }
 

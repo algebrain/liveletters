@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use liveletters_config::{load_global, save_global};
+use liveletters_i18n::{detect_system_locale, parse_locale};
 use liveletters_store::{MailSettingsRecord, Store, UserSettingsRecord};
 
 use crate::error::SettingsError;
@@ -9,6 +10,7 @@ const ALLOWED_DB_FIELDS: &[&str] = &[
     "nickname",
     "email_address",
     "avatar_url",
+    "language",
     "setup_completed",
     "smtp.host",
     "smtp.port",
@@ -56,6 +58,12 @@ pub fn run_db_field(
         return Err(SettingsError::InvalidKey(key.to_owned()));
     }
 
+    if key == "language"
+        && let Err(error) = parse_locale(value)
+    {
+        return Err(SettingsError::InvalidValue(format!("language: {error}")));
+    }
+
     let store = Store::open_for_home_dir(state_home)?;
     ensure_records_exist(&store, identity_name)?;
     if is_user_field(key) {
@@ -89,7 +97,7 @@ pub fn run_directly(
 fn is_user_field(key: &str) -> bool {
     matches!(
         key,
-        "nickname" | "email_address" | "avatar_url" | "setup_completed"
+        "nickname" | "email_address" | "avatar_url" | "language" | "setup_completed"
     )
 }
 
@@ -100,6 +108,7 @@ fn ensure_records_exist(store: &Store, profile_id: &str) -> Result<(), SettingsE
             nickname: String::new(),
             email_address: String::new(),
             avatar_url: None,
+            language: detect_system_locale().as_str().to_owned(),
             setup_completed: false,
         })?;
     }

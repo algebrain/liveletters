@@ -74,6 +74,7 @@ fn print_doctor_with_handcrafted_snapshot() {
         nickname: String::new(),
         email_address: String::new(),
         avatar_url: None,
+        language: "ru".into(),
         setup_completed: false,
     };
     let _: &Store = &Store::open_for_home_dir(tmpfile_path()).unwrap();

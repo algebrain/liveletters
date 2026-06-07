@@ -67,6 +67,7 @@ pub struct UserSettingsRecord {
     pub nickname: String,
     pub email_address: String,
     pub avatar_url: Option<String>,
+    pub language: String,
     pub setup_completed: bool,
 }
 

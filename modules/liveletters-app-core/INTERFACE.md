@@ -276,6 +276,36 @@
 если команда попыталась поставить `Direct(vec![])` (пустой список
 адресатов запрещён).
 
+## Модуль `i18n_strings`
+
+`i18n_strings` собирает subject и body письма на языке отправителя.
+
+### Что он принимает
+
+- `UserSettingsRecord` отправителя (или `None`, тогда подразумевается `Locale::Ru`);
+- значения плейсхолдеров шаблона (`%sender%`, `%resource%`, `%body%`, `%post_id%`, `%actor%`, `%subscriber%`).
+
+### Что он возвращает
+
+`SubjectAndBody { subject, body }` — готовые строки для SMTP-заголовка `Subject` и тела письма.
+
+### Публичные функции
+
+- `post_created(record, sender, resource, body)` — новая запись;
+- `comment_created(record, sender, post_id, body)` — новый комментарий;
+- `comment_edited(record, sender, post_id, body)` — правка комментария;
+- `post_hidden(record, actor, post_id)` — скрытие записи;
+- `subscription_changed_active(record, subscriber, resource)` — подписка;
+- `subscription_changed_inactive(record, subscriber, resource)` — отписка;
+- `locale_for(record)` — выбирает локаль по `record.language`; если записи нет или значение не парсится, возвращает `detect_system_locale()` (см. `liveletters-i18n`).
+
+### Где используется
+
+- `commands::create_post`, `create_comment`, `hide_post`, `edit_comment`, `subscribe`, `unsubscribe` — читают `UserSettingsRecord` и кладут subject/body в outbox и `human_readable_body`;
+- `OutboxRecord.event_type` хранит уже локализованный subject (subject письма, не машинный идентификатор);
+- машинный идентификатор (`post_created`, `comment_created`, …) остаётся внутри `ProtocolMessage.envelope.event_type` для служебных нужд;
+- `liveletters-lltt-sync::send_one` подставляет `record.event_type` в SMTP-заголовок `Subject`.
+
 ## `ReprocessDeferredEventsCommand`
 
 ### Зачем нужна эта команда
@@ -631,3 +661,5 @@
 ## Связанные документы
 
 - [TECHNICAL_SPEC.md](./TECHNICAL_SPEC.md)
+- [`liveletters-i18n/INTERFACE.md`](../liveletters-i18n/INTERFACE.md) — шаблоны и локали для subject/body писем.
+- [`liveletters-store/INTERFACE.md`](../liveletters-store/INTERFACE.md) — `UserSettingsRecord.language`, `get_user_settings_record`.

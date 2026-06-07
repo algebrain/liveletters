@@ -48,6 +48,7 @@ profile_id:        <id>
 nickname:          <text>
 email_address:     <адрес>
 avatar_url:        <url>
+language:          <ru|en>
 setup_completed:   <true|false>
 
 [mail_settings]
@@ -82,11 +83,12 @@ include_bodies:    <true|false>
 lltt settings set <ключ> <значение>
 ```
 
-Допустимые ключи (21 штука, жёсткий список в `set::ALLOWED_KEYS`):
+Допустимые ключи (22 штуки, жёсткий список в `set::ALLOWED_KEYS`):
 
 - `nickname` — `user_settings.nickname`;
 - `email_address` — `user_settings.email_address`;
 - `avatar_url` — `user_settings.avatar_url` (пустая строка → `NULL`);
+- `language` — `user_settings.language` (`ru` или `en`; иное значение отвергается `SettingsError::InvalidValue`);
 - `setup_completed` — `user_settings.setup_completed` (`true` / `1` → 1, иначе 0);
 - `smtp.host`, `smtp.port`, `smtp.security`, `smtp.username`,
   `smtp.password`, `smtp.hello_domain` — `mail_settings.smtp_*`;
@@ -110,9 +112,12 @@ lltt settings set <ключ> <значение>
 `log.include_bodies` — `true`/`false` (`1`/`0`, `yes`/`no`, `да`/`нет`).
 
 При первом `set` запись в соответствующей таблице БД создаётся с
-дефолтными значениями (через `ensure_records_exist`), затем
-перезаписывается одно поле. Для `log.*` запись создаётся/обновляется
-в `config.toml` целиком (`load_global` → мутация → `save_global`).
+дефолтными значениями (через `ensure_records_exist`): для `user_settings`
+язык `language` берётся из `liveletters_i18n::detect_system_locale()`,
+то есть из переменных окружения `LC_ALL`/`LC_MESSAGES`/`LANG`
+(поддерживается `ru` или `en`, иначе `en`). Затем перезаписывается одно
+поле. Для `log.*` запись создаётся/обновляется в `config.toml` целиком
+(`load_global` → мутация → `save_global`).
 
 ## `SettingsError`
 
@@ -127,6 +132,8 @@ pub enum SettingsError {
     InvalidKey(String),
     #[error("неверные аргументы: {0}")]
     InvalidArgs(String),
+    #[error("некорректное значение настройки: {field}: {message}")]
+    InvalidValue { field: String, message: String },
     #[error("некорректное значение журнала: {0}")]
     InvalidLogValue(String),
 }
@@ -139,6 +146,7 @@ pub enum SettingsError {
 ## Связанные документы
 
 - [`liveletters-store/INTERFACE.md`](../../modules/liveletters-store/INTERFACE.md) — `get_user_settings_record`, `get_mail_settings_record`, `update_user_settings_field`, `update_mail_settings_field`.
+- [`liveletters-i18n/INTERFACE.md`](../../modules/liveletters-i18n/INTERFACE.md) — `parse_locale` (используется для валидации `language`).
 - [`liveletters-config/INTERFACE.md`](../../modules/liveletters-config/INTERFACE.md) — `load_global`, `save_global`, `GlobalConfig.log`.
 - [`liveletters-log/INTERFACE.md`](../../modules/liveletters-log/INTERFACE.md) — `LogConfig::set_field`, `LogLevel`, `LogDestination`.
 - [`liveletters-output/INTERFACE.md`](../../modules/liveletters-output/INTERFACE.md) — `print_kv`, `mask_password`.

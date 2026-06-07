@@ -28,7 +28,7 @@ fn outbox_list_empty_store_succeeds() {
 }
 
 #[test]
-fn outbox_list_after_post_creation_contains_post_created() {
+fn outbox_list_after_post_creation_contains_localized_subject() {
     let tmp = TempDir::new().unwrap();
     common::init_user(tmp.path(), "alice");
 
@@ -45,7 +45,7 @@ fn outbox_list_after_post_creation_contains_post_created() {
         .args(["outbox", "list"])
         .assert()
         .success()
-        .stdout(contains("post_created"));
+        .stdout(contains("Новая запись"));
 }
 
 #[test]
@@ -74,5 +74,5 @@ fn outbox_list_does_not_show_other_users_queue() {
         .assert()
         .success()
         .stdout(contains("неотправленные события: 0"))
-        .stdout(contains("post_created").not());
+        .stdout(contains("Новая запись").not());
 }

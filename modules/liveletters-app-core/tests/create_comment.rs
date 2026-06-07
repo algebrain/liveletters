@@ -14,6 +14,7 @@ fn open() -> (tempfile::TempDir, Store) {
 fn setup_post(store: &Store) {
     let core = AppCore::new(store);
     core.create_post(CreatePostCommand {
+        profile_id: "default",
         post_id: "post-1",
         resource_id: "blog-1",
         author_id: "acct_alice",
@@ -27,6 +28,7 @@ fn setup_post(store: &Store) {
 fn create_with(store: &Store, visibility: Visibility) {
     let core = AppCore::new(store);
     core.create_comment(CreateCommentCommand {
+        profile_id: "default",
         comment_id: "comment-1",
         post_id: "post-1",
         parent_comment_id: None,
@@ -50,9 +52,10 @@ fn create_comment_with_friends_only_persists_visibility() {
     let outbox = store.list_outbox_records().unwrap();
     let comment_event = outbox
         .iter()
-        .find(|r| r.event_type == "comment_created")
+        .find(|r| r.event_id == "comment-created:comment-1")
         .expect("comment_created outbox row should exist");
     let envelope: Value = serde_json::from_str(&comment_event.message_body).unwrap();
+    assert_eq!(envelope["envelope"]["event_type"], "comment_created");
     assert_eq!(envelope["payload"]["visibility"], "friends_only");
 }
 
@@ -68,7 +71,7 @@ fn create_comment_with_public_persists_visibility() {
     let outbox = store.list_outbox_records().unwrap();
     let comment_event = outbox
         .iter()
-        .find(|r| r.event_type == "comment_created")
+        .find(|r| r.event_id == "comment-created:comment-1")
         .expect("comment_created outbox row should exist");
     let envelope: Value = serde_json::from_str(&comment_event.message_body).unwrap();
     assert_eq!(envelope["payload"]["visibility"], "public");

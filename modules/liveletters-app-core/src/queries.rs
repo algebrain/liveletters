@@ -92,6 +92,7 @@ pub fn get_settings(store: &Store, _query: GetSettingsQuery) -> Result<AppSettin
         settings.nickname = user.nickname;
         settings.email_address = user.email_address;
         settings.avatar_url = user.avatar_url;
+        settings.language = user.language;
         settings.setup_completed = user.setup_completed;
     }
 

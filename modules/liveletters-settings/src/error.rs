@@ -16,4 +16,7 @@ pub enum SettingsError {
 
     #[error("некорректное значение настройки журнала: {0}")]
     InvalidLogValue(String),
+
+    #[error("некорректное значение настройки: {0}")]
+    InvalidValue(String),
 }

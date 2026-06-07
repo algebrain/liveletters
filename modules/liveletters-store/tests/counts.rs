@@ -100,10 +100,12 @@ fn user_settings_roundtrip_via_save() {
             nickname: "Алиса".into(),
             email_address: "alice@example.org".into(),
             avatar_url: None,
+            language: "ru".into(),
             setup_completed: false,
         })
         .unwrap();
     let record = store.get_user_settings_record("default").unwrap().unwrap();
     assert_eq!(record.nickname, "Алиса");
+    assert_eq!(record.language, "ru");
     assert!(!record.setup_completed);
 }

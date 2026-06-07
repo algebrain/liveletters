@@ -8,15 +8,16 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO user_settings
-                (profile_id, nickname, email_address, avatar_url, setup_completed)
+                (profile_id, nickname, email_address, avatar_url, language, setup_completed)
             VALUES
-                (?1, ?2, ?3, ?4, ?5)
+                (?1, ?2, ?3, ?4, ?5, ?6)
             "#,
             params![
                 record.profile_id,
                 record.nickname,
                 record.email_address,
                 record.avatar_url,
+                record.language,
                 record.setup_completed as i64,
             ],
         )?;
@@ -30,7 +31,7 @@ impl Store {
     ) -> Result<Option<UserSettingsRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT profile_id, nickname, email_address, avatar_url, setup_completed
+            SELECT profile_id, nickname, email_address, avatar_url, language, setup_completed
             FROM user_settings
             WHERE profile_id = ?1
             "#,
@@ -46,7 +47,8 @@ impl Store {
             nickname: row.get(1)?,
             email_address: row.get(2)?,
             avatar_url: row.get(3)?,
-            setup_completed: row.get::<_, i64>(4)? != 0,
+            language: row.get(4)?,
+            setup_completed: row.get::<_, i64>(5)? != 0,
         }))
     }
 
@@ -195,6 +197,12 @@ impl Store {
                 self.connection().execute(
                     "UPDATE user_settings SET setup_completed = ?1 WHERE profile_id = ?2",
                     rusqlite::params![v, profile_id],
+                )?;
+            }
+            "language" => {
+                self.connection().execute(
+                    "UPDATE user_settings SET language = ?1 WHERE profile_id = ?2",
+                    rusqlite::params![value, profile_id],
                 )?;
             }
             other => return Err(StoreError::InvalidColumn(other.to_owned())),

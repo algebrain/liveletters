@@ -12,10 +12,13 @@ use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
 use crate::{
     AppCoreError, AppSettings, DeferredReprocessingSummary, new_comment_id, new_post_id,
+    post_created, post_hidden, subscription_changed_active, subscription_changed_inactive,
     unix_millis_now,
 };
+use crate::{comment_created, comment_edited};
 
 pub struct CreatePostCommand<'a> {
+    pub profile_id: &'a str,
     pub post_id: &'a str,
     pub resource_id: &'a str,
     pub author_id: &'a str,
@@ -37,6 +40,7 @@ pub struct CreatePostFromIdentityCommand<'a> {
 }
 
 pub struct CreateCommentCommand<'a> {
+    pub profile_id: &'a str,
     pub comment_id: &'a str,
     pub post_id: &'a str,
     pub parent_comment_id: Option<&'a str>,
@@ -55,12 +59,14 @@ pub struct CreateCommentFromIdentityCommand<'a> {
 }
 
 pub struct HidePostCommand<'a> {
+    pub profile_id: &'a str,
     pub post_id: &'a str,
     pub actor_id: &'a str,
     pub created_at: u64,
 }
 
 pub struct EditCommentCommand<'a> {
+    pub profile_id: &'a str,
     pub comment_id: &'a str,
     pub actor_id: &'a str,
     pub created_at: u64,
@@ -212,10 +218,17 @@ pub fn create_post(
         post.visibility(),
     );
 
+    let i18n = post_created(
+        store.get_user_settings_record(command.profile_id)?.as_ref(),
+        post.author_id().as_str(),
+        post.resource_id().as_str(),
+        post.body().as_str(),
+    );
+
     enqueue_message(
         store,
         event.event_id().as_str(),
-        "post_created",
+        &i18n.subject,
         post.resource_id().as_str(),
         OutboxDelivery::ResourceSubscribers,
         ProtocolMessage::new(
@@ -225,7 +238,7 @@ pub fn create_post(
                 post.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
-            &post_created_human_body(post.author_id().as_str(), post.body().as_str()),
+            &i18n.body,
             DomainEventPayload::PostCreated {
                 post_id: post.id().as_str().to_owned(),
                 resource_id: post.resource_id().as_str().to_owned(),
@@ -239,10 +252,6 @@ pub fn create_post(
     )?;
 
     Ok(CreatePostResult { post, event })
-}
-
-fn post_created_human_body(author: &str, body: &str) -> String {
-    format!("{author} написал:\n\n{body}")
 }
 
 pub fn create_comment(
@@ -298,10 +307,17 @@ pub fn create_comment(
         visibility: comment.visibility(),
     });
 
+    let i18n = comment_created(
+        store.get_user_settings_record(command.profile_id)?.as_ref(),
+        comment.author_id().as_str(),
+        comment.post_id().as_str(),
+        comment.body().as_str(),
+    );
+
     enqueue_message(
         store,
         event.event_id().as_str(),
-        "comment_created",
+        &i18n.subject,
         event.resource_id().as_str(),
         OutboxDelivery::ResourceSubscribers,
         ProtocolMessage::new(
@@ -311,7 +327,7 @@ pub fn create_comment(
                 event.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
-            "Новый комментарий",
+            &i18n.body,
             DomainEventPayload::CommentCreated {
                 comment_id: comment.id().as_str().to_owned(),
                 post_id: comment.post_id().as_str().to_owned(),
@@ -338,6 +354,7 @@ pub fn create_post_from_identity(
     create_post(
         store,
         CreatePostCommand {
+            profile_id: default_profile_id(),
             post_id: &post_id,
             resource_id: &command.identity.publish,
             author_id: &command.identity.account_id,
@@ -357,6 +374,7 @@ pub fn create_comment_from_identity(
     create_comment(
         store,
         CreateCommentCommand {
+            profile_id: default_profile_id(),
             comment_id: &comment_id,
             post_id: command.post_id,
             parent_comment_id: command.parent_comment_id,
@@ -407,10 +425,16 @@ pub fn hide_post(
         Timestamp::from_unix_seconds(command.created_at),
     );
 
+    let i18n = post_hidden(
+        store.get_user_settings_record(command.profile_id)?.as_ref(),
+        event.actor_id().as_str(),
+        event.post_id().as_str(),
+    );
+
     enqueue_message(
         store,
         event.event_id().as_str(),
-        "post_hidden",
+        &i18n.subject,
         event.resource_id().as_str(),
         OutboxDelivery::ResourceSubscribers,
         ProtocolMessage::new(
@@ -420,7 +444,7 @@ pub fn hide_post(
                 event.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
-            "Запись скрыта",
+            &i18n.body,
             DomainEventPayload::PostHidden {
                 post_id: event.post_id().as_str().to_owned(),
                 resource_id: event.resource_id().as_str().to_owned(),
@@ -486,10 +510,17 @@ pub fn edit_comment(
         Timestamp::from_unix_seconds(command.created_at),
     );
 
+    let i18n = comment_edited(
+        store.get_user_settings_record(command.profile_id)?.as_ref(),
+        event.actor_id().as_str(),
+        event.post_id().as_str(),
+        comment.body().as_str(),
+    );
+
     enqueue_message(
         store,
         event.event_id().as_str(),
-        "comment_edited",
+        &i18n.subject,
         event.resource_id().as_str(),
         OutboxDelivery::ResourceSubscribers,
         ProtocolMessage::new(
@@ -499,7 +530,7 @@ pub fn edit_comment(
                 event.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
-            "Комментарий изменен",
+            &i18n.body,
             DomainEventPayload::CommentEdited {
                 comment_id: event.comment_id().as_str().to_owned(),
                 post_id: event.post_id().as_str().to_owned(),
@@ -556,6 +587,10 @@ pub fn save_settings(
     store: &Store,
     command: SaveSettingsCommand<'_>,
 ) -> Result<SaveSettingsResult, AppCoreError> {
+    let existing_language = store
+        .get_user_settings_record(default_profile_id())?
+        .map(|record| record.language);
+
     validate_non_blank("nickname", command.nickname)?;
     validate_email(command.email_address)?;
     validate_non_blank("smtp_host", command.smtp_host)?;
@@ -583,6 +618,8 @@ pub fn save_settings(
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(str::to_owned),
+        language: existing_language
+            .unwrap_or_else(|| liveletters_i18n::detect_system_locale().as_str().to_owned()),
         smtp_host: command.smtp_host.trim().to_owned(),
         smtp_port: command.smtp_port,
         smtp_security: command.smtp_security.trim().to_owned(),
@@ -603,6 +640,7 @@ pub fn save_settings(
         nickname: settings.nickname.clone(),
         email_address: settings.email_address.clone(),
         avatar_url: settings.avatar_url.clone(),
+        language: settings.language.clone(),
         setup_completed: settings.setup_completed,
     })?;
     store.save_mail_settings_record(&MailSettingsRecord {
@@ -718,7 +756,7 @@ fn validate_port(field: &str, value: u16) -> Result<(), AppCoreError> {
 fn enqueue_message(
     store: &Store,
     event_id: &str,
-    event_type: &str,
+    event_label: &str,
     resource_id: &str,
     delivery: OutboxDelivery,
     message: ProtocolMessage,
@@ -733,7 +771,7 @@ fn enqueue_message(
 
     store.save_outbox_record(&OutboxRecord {
         event_id: event_id.to_owned(),
-        event_type: event_type.to_owned(),
+        event_type: event_label.to_owned(),
         resource_id: resource_id.to_owned(),
         delivery,
         message_body: encode_message(&message)?,
@@ -749,6 +787,7 @@ impl From<DomainError> for AppCoreError {
 }
 
 pub struct SubscribeCommand<'a> {
+    pub profile_id: &'a str,
     pub resource_address: &'a str,
     pub subscriber_delivery_address: &'a str,
     pub created_at: u64,
@@ -782,6 +821,12 @@ pub fn subscribe(
         created_at,
     );
 
+    let i18n = subscription_changed_active(
+        store.get_user_settings_record(command.profile_id)?.as_ref(),
+        delivery.as_str(),
+        resource.as_str(),
+    );
+
     let message = ProtocolMessage::new(
         MessageEnvelope::new(
             "1",
@@ -789,7 +834,7 @@ pub fn subscribe(
             resource.as_str(),
             event.event_id().as_str(),
         )?,
-        "Подписка",
+        &i18n.body,
         DomainEventPayload::SubscriptionChanged {
             resource_address: resource.as_str().to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
@@ -801,7 +846,7 @@ pub fn subscribe(
     enqueue_message(
         store,
         event.event_id().as_str(),
-        "subscription_changed",
+        &i18n.subject,
         resource.as_str(),
         OutboxDelivery::Direct(vec![resource.as_str().to_owned()]),
         message,
@@ -815,6 +860,7 @@ pub fn subscribe(
 }
 
 pub struct UnsubscribeCommand<'a> {
+    pub profile_id: &'a str,
     pub resource_address: &'a str,
     pub subscriber_delivery_address: &'a str,
     pub created_at: u64,
@@ -851,6 +897,12 @@ pub fn unsubscribe(
         created_at,
     );
 
+    let i18n = subscription_changed_inactive(
+        store.get_user_settings_record(command.profile_id)?.as_ref(),
+        delivery.as_str(),
+        resource.as_str(),
+    );
+
     let message = ProtocolMessage::new(
         MessageEnvelope::new(
             "1",
@@ -858,7 +910,7 @@ pub fn unsubscribe(
             resource.as_str(),
             event.event_id().as_str(),
         )?,
-        "Отписка",
+        &i18n.body,
         DomainEventPayload::SubscriptionChanged {
             resource_address: resource.as_str().to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
@@ -870,7 +922,7 @@ pub fn unsubscribe(
     enqueue_message(
         store,
         event.event_id().as_str(),
-        "subscription_changed",
+        &i18n.subject,
         resource.as_str(),
         OutboxDelivery::Direct(vec![resource.as_str().to_owned()]),
         message,

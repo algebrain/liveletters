@@ -18,6 +18,7 @@ pub fn subscribe(
 
     let core = liveletters_app_core::AppCore::new(store);
     let _ = core.subscribe(liveletters_app_core::SubscribeCommand {
+        profile_id: default_profile_id(),
         resource_address,
         subscriber_delivery_address: &delivery_address,
         created_at,
@@ -47,6 +48,7 @@ pub fn unsubscribe(
 
     let core = liveletters_app_core::AppCore::new(store);
     let _ = core.unsubscribe(liveletters_app_core::UnsubscribeCommand {
+        profile_id: default_profile_id(),
         resource_address,
         subscriber_delivery_address: &delivery_address,
         created_at,
@@ -185,4 +187,8 @@ fn parse_action(tokens: &[String]) -> Result<SubAction, SubError> {
             })
         }
     }
+}
+
+fn default_profile_id() -> &'static str {
+    "default"
 }

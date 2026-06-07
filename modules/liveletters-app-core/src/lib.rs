@@ -1,5 +1,6 @@
 mod commands;
 mod errors;
+mod i18n_strings;
 mod ids;
 mod queries;
 mod read_models;
@@ -14,6 +15,10 @@ pub use commands::{
     create_post_from_identity, subscribe, unsubscribe,
 };
 pub use errors::AppCoreError;
+pub use i18n_strings::{
+    SubjectAndBody, comment_created, comment_edited, locale_for, post_created, post_hidden,
+    subscription_changed_active, subscription_changed_inactive,
+};
 pub use ids::{new_comment_id, new_post_id, unix_millis_now};
 pub use liveletters_domain::Visibility;
 pub use queries::{

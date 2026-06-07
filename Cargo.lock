@@ -486,6 +486,7 @@ name = "liveletters-app-core"
 version = "0.1.0"
 dependencies = [
  "liveletters-domain",
+ "liveletters-i18n",
  "liveletters-mail",
  "liveletters-protocol",
  "liveletters-store",
@@ -571,6 +572,13 @@ dependencies = [
  "liveletters-config",
  "liveletters-output",
  "liveletters-store",
+ "thiserror",
+]
+
+[[package]]
+name = "liveletters-i18n"
+version = "0.1.0"
+dependencies = [
  "thiserror",
 ]
 
@@ -715,6 +723,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "liveletters-config",
+ "liveletters-i18n",
  "liveletters-output",
  "liveletters-store",
  "rusqlite",

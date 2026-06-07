@@ -1,6 +1,7 @@
 use liveletters_app_core::{
     AppCore, ListSubscriptionsQuery, SubscribeCommand, SubscribeResult, UnsubscribeCommand,
 };
+use liveletters_protocol::decode_message;
 use liveletters_store::{OutboxDelivery, Store, SubscriptionRecord};
 use tempfile::tempdir;
 
@@ -17,6 +18,7 @@ fn subscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions
 
     let result: SubscribeResult = core
         .subscribe(SubscribeCommand {
+            profile_id: "default",
             resource_address: "alice-publish@example.org",
             subscriber_delivery_address: "bob-feed@example.org",
             created_at: 1_700_000_000,
@@ -28,12 +30,13 @@ fn subscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions
 
     let outbox = store.list_outbox_records().unwrap();
     assert_eq!(outbox.len(), 1);
-    assert_eq!(outbox[0].event_type, "subscription_changed");
     assert_eq!(outbox[0].resource_id, "alice-publish@example.org");
     assert_eq!(
         outbox[0].delivery,
         OutboxDelivery::Direct(vec!["alice-publish@example.org".to_owned()])
     );
+    let decoded = decode_message(&outbox[0].message_body).expect("message should decode");
+    assert_eq!(decoded.envelope().event_type(), "subscription_changed");
 
     let records = store
         .list_subscriptions_for_resource("alice-publish@example.org")
@@ -50,6 +53,7 @@ fn unsubscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptio
     let core = AppCore::new(&store);
 
     core.subscribe(SubscribeCommand {
+        profile_id: "default",
         resource_address: "alice-publish@example.org",
         subscriber_delivery_address: "bob-feed@example.org",
         created_at: 1,
@@ -58,6 +62,7 @@ fn unsubscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptio
 
     let result = core
         .unsubscribe(UnsubscribeCommand {
+            profile_id: "default",
             resource_address: "alice-publish@example.org",
             subscriber_delivery_address: "bob-feed@example.org",
             created_at: 2,
@@ -68,11 +73,10 @@ fn unsubscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptio
 
     let outbox = store.list_outbox_records().unwrap();
     assert_eq!(outbox.len(), 2);
-    assert!(
-        outbox
-            .iter()
-            .all(|r| r.event_type == "subscription_changed")
-    );
+    assert!(outbox.iter().all(|r| {
+        let decoded = decode_message(&r.message_body).expect("message should decode");
+        decoded.envelope().event_type() == "subscription_changed"
+    }));
     assert!(outbox.iter().all(|r| matches!(
         r.delivery,
         OutboxDelivery::Direct(ref addrs) if addrs == &vec!["alice-publish@example.org".to_owned()]
@@ -129,6 +133,7 @@ fn subscribe_rejects_invalid_address() {
 
     let err = core
         .subscribe(SubscribeCommand {
+            profile_id: "default",
             resource_address: "not-an-address",
             subscriber_delivery_address: "bob-feed@example.org",
             created_at: 1,

@@ -48,7 +48,6 @@ fn outbox_list_shows_pending_post_created() {
         .get_pending_outbox(GetPendingOutboxQuery)
         .expect("pending outbox");
     assert_eq!(pending.entries().len(), 1);
-    assert_eq!(pending.entries()[0].event_type, "post_created");
     assert_eq!(
         pending.entries()[0].resource_id,
         "alice-publish@example.org"

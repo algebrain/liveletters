@@ -35,7 +35,13 @@ fn subscribe_writes_local_subscriptions_and_outbox() {
     let store = home.open_store();
     let outbox = store.list_outbox_records().unwrap();
     assert_eq!(outbox.len(), 1);
-    assert_eq!(outbox[0].event_type, "subscription_changed");
+    assert!(
+        outbox[0]
+            .event_id
+            .starts_with("subscription:alice-publish@example.org:"),
+        "event_id={}",
+        outbox[0].event_id
+    );
 }
 
 #[test]
@@ -82,7 +88,8 @@ fn rm_removes_local_subscription_and_writes_unsubscribe() {
     assert!(
         outbox
             .iter()
-            .all(|r| r.event_type == "subscription_changed")
+            .all(|r| r.event_id.starts_with("subscription:")
+                || r.event_id.starts_with("unsubscription:"))
     );
 }
 

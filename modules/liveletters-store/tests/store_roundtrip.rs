@@ -322,6 +322,7 @@ fn user_and_mail_settings_can_be_saved_and_read_back() {
             nickname: "alice".into(),
             email_address: "alice@example.com".into(),
             avatar_url: Some("https://example.com/avatar.png".into()),
+            language: "ru".into(),
             setup_completed: true,
         })
         .unwrap();
@@ -370,6 +371,7 @@ fn file_store_persists_user_and_mail_settings_under_temp_home() {
                 nickname: "alice".into(),
                 email_address: "alice@example.com".into(),
                 avatar_url: None,
+                language: "ru".into(),
                 setup_completed: true,
             })
             .unwrap();
@@ -577,4 +579,47 @@ fn file_store_reports_error_when_obfuscated_password_cannot_be_recovered() {
     ));
 
     fs::remove_dir_all(home_dir).unwrap();
+}
+
+#[test]
+fn user_settings_language_column_is_added_by_migration() {
+    // Проверяет, что миграция добавляет колонку `language` со статическим
+    // SQL-дефолтом `'ru'` в legacy-БД. Это сознательно: миграция SQL не
+    // может вызвать `detect_system_locale()`, поэтому для уже существующих
+    // рядов используется фиксированная строка. Приложение при первом
+    // сохранении настроек перезаписывает значение через
+    // `liveletters_i18n::detect_system_locale()`.
+    let tmp = tempfile::tempdir().unwrap();
+    let db_path = tmp.path().join("liveletters.sqlite3");
+    {
+        let connection = Connection::open(&db_path).unwrap();
+        connection
+            .execute(
+                r#"
+                CREATE TABLE user_settings (
+                    profile_id TEXT PRIMARY KEY,
+                    nickname TEXT NOT NULL,
+                    email_address TEXT NOT NULL,
+                    avatar_url TEXT,
+                    setup_completed INTEGER NOT NULL
+                )
+                "#,
+                [],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO user_settings (profile_id, nickname, email_address, avatar_url, setup_completed) VALUES ('default', 'legacy', 'legacy@example.org', NULL, 1)",
+                [],
+            )
+            .unwrap();
+    }
+
+    let store = Store::open_for_home_dir(tmp.path()).unwrap();
+    let record = store
+        .get_user_settings_record("default")
+        .unwrap()
+        .expect("legacy user_settings row must be readable after migration");
+    assert_eq!(record.language, "ru");
+    assert_eq!(record.nickname, "legacy");
 }
