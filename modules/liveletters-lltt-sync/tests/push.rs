@@ -8,10 +8,10 @@ use liveletters_mail::{
     ConfiguredSmtpTransport, MailAuth, MailSecurity, SmtpTransportConfig, build_protocol_email,
 };
 use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message};
-use liveletters_store::{OutboxRecord, Store, SubscriptionRecord};
+use liveletters_store::{OutboxDelivery, OutboxRecord, Store, SubscriptionRecord};
 use tempfile::TempDir;
 
-use liveletters_lltt_sync::send_to_subscribers;
+use liveletters_lltt_sync::send_outbox_record;
 
 fn open_store() -> (TempDir, Store) {
     let tmp = TempDir::new().expect("tempdir");
@@ -41,6 +41,7 @@ fn outbox_record_for(message: &ProtocolMessage) -> OutboxRecord {
         event_id: message.envelope().event_id().to_owned(),
         event_type: message.envelope().event_type().to_owned(),
         resource_id: message.envelope().resource_id().to_owned(),
+        delivery: OutboxDelivery::ResourceSubscribers,
         message_body: encode_message(message).expect("protocol serializes"),
     }
 }
@@ -122,10 +123,6 @@ fn spawn_smtp_capture() -> (String, u16, mpsc::Receiver<Vec<String>>) {
     let stop_clone2 = Arc::clone(&stop);
     let tx_clone = tx;
     let _collector = thread::spawn(move || {
-        // Ждём, пока в rcpts появится нужное количество адресов или
-        // пока сервер не закончится. Для теста «returns count for each
-        // subscriber» ждём до 2 адресов; для остальных тестов
-        // собираем что есть.
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
         while std::time::Instant::now() < deadline {
             let n = rcpts_clone2.lock().expect("lock").len();
@@ -142,8 +139,18 @@ fn spawn_smtp_capture() -> (String, u16, mpsc::Receiver<Vec<String>>) {
     ("127.0.0.1".to_owned(), port, rx)
 }
 
+fn make_transport(port: u16) -> ConfiguredSmtpTransport {
+    ConfiguredSmtpTransport::new(SmtpTransportConfig::new(
+        "127.0.0.1",
+        port,
+        "local.test",
+        MailSecurity::None,
+        MailAuth::None,
+    ))
+}
+
 #[test]
-fn send_to_subscribers_returns_count_for_each_subscriber() {
+fn resource_subscribers_sends_one_email_per_subscriber() {
     let (_tmp, store) = open_store();
     let (_host, port, rx) = spawn_smtp_capture();
 
@@ -163,15 +170,8 @@ fn send_to_subscribers_returns_count_for_each_subscriber() {
     let message = sample_protocol_message("event-1");
     let record = outbox_record_for(&message);
 
-    let transport = ConfiguredSmtpTransport::new(SmtpTransportConfig::new(
-        "127.0.0.1",
-        port,
-        "local.test",
-        MailSecurity::None,
-        MailAuth::None,
-    ));
-
-    let n = send_to_subscribers(&store, &transport, "alice@example.test", &record)
+    let transport = make_transport(port);
+    let n = send_outbox_record(&store, &transport, "alice@example.test", &record)
         .expect("send to subscribers");
     assert_eq!(n, 2);
 
@@ -186,26 +186,20 @@ fn send_to_subscribers_returns_count_for_each_subscriber() {
 }
 
 #[test]
-fn send_to_subscribers_skips_when_no_subscribers() {
+fn resource_subscribers_skips_when_no_subscribers() {
     let (_tmp, store) = open_store();
     let (_host, port, _rx) = spawn_smtp_capture();
-    let transport = ConfiguredSmtpTransport::new(SmtpTransportConfig::new(
-        "127.0.0.1",
-        port,
-        "local.test",
-        MailSecurity::None,
-        MailAuth::None,
-    ));
+    let transport = make_transport(port);
 
     let message = sample_protocol_message("event-2");
     let record = outbox_record_for(&message);
-    let n = send_to_subscribers(&store, &transport, "alice@example.test", &record)
+    let n = send_outbox_record(&store, &transport, "alice@example.test", &record)
         .expect("no subs is not an error");
     assert_eq!(n, 0);
 }
 
 #[test]
-fn send_to_subscribers_propagates_smtp_error() {
+fn resource_subscribers_propagates_smtp_error() {
     let (_tmp, store) = open_store();
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let port = listener.local_addr().expect("addr").port();
@@ -220,16 +214,61 @@ fn send_to_subscribers_propagates_smtp_error() {
 
     let message = sample_protocol_message("event-3");
     let record = outbox_record_for(&message);
-    let transport = ConfiguredSmtpTransport::new(SmtpTransportConfig::new(
-        "127.0.0.1",
-        port,
-        "local.test",
-        MailSecurity::None,
-        MailAuth::None,
-    ));
+    let transport = make_transport(port);
 
-    let result = send_to_subscribers(&store, &transport, "alice@example.test", &record);
+    let result = send_outbox_record(&store, &transport, "alice@example.test", &record);
     assert!(result.is_err(), "SMTP-сбой должен пробрасываться");
+}
+
+#[test]
+fn direct_delivery_sends_only_to_declared_recipients() {
+    let (_tmp, store) = open_store();
+    let (_host, port, rx) = spawn_smtp_capture();
+
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_address: "blog-1".into(),
+            subscriber_delivery_address: "bob@example.test".into(),
+        })
+        .expect("save sub");
+
+    let message = sample_protocol_message("event-direct");
+    let record = OutboxRecord {
+        delivery: OutboxDelivery::Direct(vec!["algebrain@example.org".into()]),
+        ..outbox_record_for(&message)
+    };
+
+    let transport = make_transport(port);
+    let n =
+        send_outbox_record(&store, &transport, "alice@example.test", &record).expect("direct send");
+    assert_eq!(n, 1, "должно быть отправлено ровно одно письмо");
+
+    let collected = rx.recv().expect("rcpts collected");
+    assert_eq!(collected.len(), 1);
+    assert!(collected.contains(&"algebrain@example.org".to_owned()));
+    assert!(!collected.contains(&"bob@example.test".to_owned()));
+}
+
+#[test]
+fn direct_delivery_sends_to_multiple_addresses_in_order() {
+    let (_tmp, store) = open_store();
+    let (_host, port, rx) = spawn_smtp_capture();
+
+    let message = sample_protocol_message("event-multi");
+    let record = OutboxRecord {
+        delivery: OutboxDelivery::Direct(vec!["x@example.org".into(), "y@example.org".into()]),
+        ..outbox_record_for(&message)
+    };
+
+    let transport = make_transport(port);
+    let n = send_outbox_record(&store, &transport, "alice@example.test", &record)
+        .expect("multi direct send");
+    assert_eq!(n, 2);
+
+    let collected = rx.recv().expect("rcpts collected");
+    assert_eq!(collected.len(), 2);
+    assert!(collected.contains(&"x@example.org".to_owned()));
+    assert!(collected.contains(&"y@example.org".to_owned()));
 }
 
 #[test]

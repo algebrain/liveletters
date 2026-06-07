@@ -10,8 +10,9 @@
   пользователя liveletters и прогнать их через
   `liveletters-sync::SyncEngine::ingest_batch`;
 - `lltt sync push` — отправить каждую запись из таблицы `outbox`
-  подписчикам соответствующего ресурса через SMTP; при успешной
-  отправке запись удаляется из outbox.
+  через SMTP по её полю `delivery`
+  ([`OutboxDelivery`](../../modules/liveletters-store/INTERFACE.md#outboxdelivery));
+  при успешной отправке запись удаляется из outbox.
 
 Реальная реализация подключается под признаком `network` (см.
 `Cargo.toml`). Без признака команда возвращает
@@ -42,8 +43,11 @@
   разбор строкового значения `smtp.security` / `imap.security`;
   принимает `ssl`/`SSL` как синоним `tls`;
 - `tally(&SyncReport) -> OutcomeCounts` — подсчёт исходов;
-- `send_to_subscribers(&Store, &ConfiguredSmtpTransport, &str, &OutboxRecord) -> Result<usize, SyncError>` —
+- `send_outbox_record(&Store, &ConfiguredSmtpTransport, &str, &OutboxRecord) -> Result<usize, SyncError>` —
   низкоуровневая отправка одной outbox-записи (для `push`);
+  получатели определяются полем `OutboxRecord.delivery`
+  (`Direct` → конкретные адреса, `ResourceSubscribers` → таблица
+  `subscriptions`);
 - `CommandContext` (реэкспорт из `liveletters-output`);
 - константы `COMMAND_NAME`, `summary()`, `crate_name()`.
 
@@ -106,9 +110,29 @@ imap.host, imap.port, imap.security, imap.username, imap.password, imap.mailbox
 ошибок отправки:      <K>
 ```
 
-`<N>` — количество успешно отправленных писем подписчикам;
+`<N>` — количество успешно отправленных писем (по сумме
+всех outbox-записей: для `Direct` — по одному на адрес, для
+`ResourceSubscribers` — по одному на подписчика);
 `<K>` — количество outbox-записей, при отправке которых произошла
 ошибка (запись остаётся в outbox для повторной попытки).
+
+### Поведение `push`
+
+`sync push` не вычисляет адресацию. Для каждой записи из `outbox`
+он смотрит на её `OutboxDelivery`:
+
+- `Direct([a, b, c])` — отправляет письмо по адресу `a`, затем `b`,
+  затем `c`. Каждый адрес — отдельное SMTP-сообщение; получатели
+  не объединяются.
+- `ResourceSubscribers` — берёт всех подписчиков из таблицы
+  `subscriptions` для заданного `resource_id` и отправляет по
+  письму каждому. Если подписчиков нет, запись остаётся в `outbox`
+  и будет обработана следующим `push` (подписчики могут появиться
+  позже через `subscription_changed`).
+
+SMTP-ошибка на любом получателе считается ошибкой всей записи:
+остальные получатели этой записи не отправляются, запись остаётся
+в `outbox`, цикл продолжается со следующей записи.
 
 ### `lltt sync`
 

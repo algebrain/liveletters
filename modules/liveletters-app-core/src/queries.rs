@@ -143,6 +143,7 @@ fn outbox_entry_from_record(record: OutboxRecord) -> OutboxEntry {
         event_id: record.event_id,
         event_type: record.event_type,
         resource_id: record.resource_id,
+        delivery: record.delivery,
         message_body: record.message_body,
     }
 }

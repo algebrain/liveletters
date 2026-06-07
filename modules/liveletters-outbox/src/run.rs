@@ -2,7 +2,7 @@ use std::error::Error;
 
 use liveletters_app_core::{GetPendingOutboxQuery, OutboxEntry, PendingOutbox, get_pending_outbox};
 use liveletters_output::{CommandContext, print_kv, print_table};
-use liveletters_store::Store;
+use liveletters_store::{OutboxDelivery, Store};
 
 use crate::Args;
 use crate::args::OutboxAction;
@@ -37,7 +37,7 @@ pub fn print_summary(pending: &PendingOutbox) {
     }
 
     println!();
-    let headers = &["event_id", "event_type", "resource_id"];
+    let headers = &["event_id", "event_type", "resource_id", "delivery"];
     let rows: Vec<Vec<String>> = pending.entries().iter().map(row_from_entry).collect();
     print_table(headers, &rows);
 }
@@ -47,7 +47,15 @@ fn row_from_entry(entry: &OutboxEntry) -> Vec<String> {
         entry.event_id.clone(),
         entry.event_type.clone(),
         entry.resource_id.clone(),
+        format_delivery(&entry.delivery),
     ]
+}
+
+fn format_delivery(delivery: &OutboxDelivery) -> String {
+    match delivery {
+        OutboxDelivery::Direct(addrs) => format!("direct: {}", addrs.join(", ")),
+        OutboxDelivery::ResourceSubscribers => "resource subscribers".to_owned(),
+    }
 }
 
 #[cfg(test)]
@@ -58,5 +66,17 @@ mod tests {
     fn print_summary_handles_empty_pending() {
         let pending = PendingOutbox::new(vec![]);
         print_summary(&pending);
+    }
+
+    #[test]
+    fn format_delivery_direct() {
+        let delivery = OutboxDelivery::Direct(vec!["a@x".into(), "b@x".into()]);
+        assert_eq!(format_delivery(&delivery), "direct: a@x, b@x");
+    }
+
+    #[test]
+    fn format_delivery_resource_subscribers() {
+        let delivery = OutboxDelivery::ResourceSubscribers;
+        assert_eq!(format_delivery(&delivery), "resource subscribers");
     }
 }

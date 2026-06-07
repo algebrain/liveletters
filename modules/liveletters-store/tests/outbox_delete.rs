@@ -1,4 +1,4 @@
-use liveletters_store::{OutboxRecord, Store};
+use liveletters_store::{OutboxDelivery, OutboxRecord, Store};
 use tempfile::TempDir;
 
 fn open_store() -> (TempDir, Store) {
@@ -14,6 +14,7 @@ fn delete_removes_record() {
         event_id: "ev-1".into(),
         event_type: "post_created".into(),
         resource_id: "blog-1".into(),
+        delivery: OutboxDelivery::ResourceSubscribers,
         message_body: "{}".into(),
     };
     store.save_outbox_record(&record).expect("save");

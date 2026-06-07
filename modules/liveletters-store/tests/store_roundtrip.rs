@@ -5,8 +5,8 @@ use std::{
 };
 
 use liveletters_store::{
-    CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxRecord, PostRecord,
-    RawEventRecord, RawMessageRecord, Store, StorePaths, UserSettingsRecord,
+    CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxDelivery, OutboxRecord,
+    PostRecord, RawEventRecord, RawMessageRecord, Store, StorePaths, UserSettingsRecord,
 };
 use rusqlite::Connection;
 
@@ -231,6 +231,7 @@ fn outbox_records_can_be_saved_and_listed() {
             event_id: "event-1".into(),
             event_type: "post_created".into(),
             resource_id: "blog-1".into(),
+            delivery: OutboxDelivery::ResourceSubscribers,
             message_body: "{\"kind\":\"post_created\"}".into(),
         })
         .unwrap();
@@ -240,6 +241,7 @@ fn outbox_records_can_be_saved_and_listed() {
     assert_eq!(outbox.len(), 1);
     assert_eq!(outbox[0].event_id, "event-1");
     assert_eq!(outbox[0].event_type, "post_created");
+    assert_eq!(outbox[0].delivery, OutboxDelivery::ResourceSubscribers);
 }
 
 #[test]

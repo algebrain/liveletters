@@ -254,6 +254,28 @@
 
 То есть это прикладной сценарий редактирования комментария с обязательной постановкой соответствующего сообщения в исходящий контур.
 
+## Адресация исходящих сообщений
+
+Каждая команда, ставящая сообщение в `outbox`, явно выбирает адресацию
+через [`OutboxDelivery`](../../modules/liveletters-store/INTERFACE.md#outboxdelivery):
+
+- `create_post` / `create_comment` / `hide_post` / `edit_comment` —
+  `ResourceSubscribers(resource_id)`;
+- `subscribe` / `unsubscribe` — `Direct(vec![resource.as_str()])`,
+  чтобы доставить служебное событие `subscription_changed` ровно
+  владельцу блога.
+
+Команды `subscribe` и `unsubscribe` **не** трогают таблицу `subscriptions`
+(это «подписчики моего ресурса», а не «мои подписки»): они обновляют
+только локальный список подписок в `identities/<текущий>.toml` и пишут
+исходящее событие в `outbox`. Запись в таблицу `subscriptions` делает
+**входящий** конвейер `liveletters-lltt-sync` при приёме
+`subscription_changed` от чужого пользователя.
+
+`AppCoreError::InvalidDelivery(String)` возвращается из `enqueue_message`,
+если команда попыталась поставить `Direct(vec![])` (пустой список
+адресатов запрещён).
+
 ## `ReprocessDeferredEventsCommand`
 
 ### Зачем нужна эта команда
@@ -452,6 +474,14 @@
 ## `OutboxEntry`
 
 Это read model одной записи outbox.
+
+Содержит:
+
+- `event_id`
+- `event_type`
+- `resource_id`
+- `message_body`
+- `delivery: OutboxDelivery` — куда именно отправлять (см. [`OutboxDelivery`](../../modules/liveletters-store/INTERFACE.md#outboxdelivery))
 
 Она нужна, когда верхний слой хочет не просто знать, что outbox существует, а читать его как список нормальных элементов.
 

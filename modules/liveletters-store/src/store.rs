@@ -77,6 +77,7 @@ impl Store {
                 event_id TEXT PRIMARY KEY,
                 event_type TEXT NOT NULL,
                 resource_id TEXT NOT NULL,
+                delivery_json TEXT NOT NULL,
                 message_body TEXT NOT NULL
             );
 

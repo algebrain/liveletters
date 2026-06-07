@@ -336,11 +336,21 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 - `event_type`
 - `resource_id`
 - `message_body`
+- `delivery: OutboxDelivery` — куда именно отправлять запись
 
 Главный смысл:
 
 - приложение уже сформировало техническое сообщение;
 - его нужно держать в очереди исходящей доставки.
+
+### `OutboxDelivery`
+
+Перечисление способа адресации записи из `outbox`.
+
+- `Direct(Vec<String>)` — письмо отправляется каждому адресу из списка (в порядке списка). Пустой список запрещён на границе `AppCore` и считается ошибкой `AppCoreError::InvalidDelivery`.
+- `ResourceSubscribers` — письмо отправляется каждому подписчику ресурса, указанного в `resource_id`.
+
+В таблице `outbox` поле хранится в виде `delivery_json TEXT NOT NULL` (ручная сериализация: `{"kind":"direct","addresses":[...]}` или `{"kind":"resource_subscribers"}`).
 
 ### `RawMessageRecord`
 
@@ -465,11 +475,11 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 #### `save_outbox_record(&OutboxRecord)`
 
-Сохраняет сообщение в исходящую очередь.
+Сохраняет сообщение в исходящую очередь. Принимает `&OutboxRecord`, у которого обязательно заполнено поле `delivery: OutboxDelivery`; сериализуется в колонку `delivery_json`.
 
 Когда используется:
 
-- после того как `app-core` собрал protocol message;
+- после того как `app-core` собрал protocol message и выбрал адресацию (`Direct` или `ResourceSubscribers`);
 - когда нужно зафиксировать, что сообщение готово к дальнейшей доставке.
 
 #### `list_outbox_records()`
@@ -490,8 +500,9 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 Когда используется:
 
-- `liveletters-lltt-sync::push` после успешной SMTP-отправки письма
-  подписчикам ресурса;
+- `liveletters-lltt-sync::send_outbox_record` после успешной
+  SMTP-отправки письма каждому получателю, вычисленному по полю
+  `delivery`;
 - любые сценарии, где outbox-запись нужно убрать из очереди
   (откат, ручная очистка через `doctor`).
 

@@ -16,7 +16,7 @@ mod push;
 #[cfg(feature = "network")]
 pub use pull::{OutcomeCounts, compute_next_cursor_uid, parse_security, tally};
 #[cfg(feature = "network")]
-pub use push::send_to_subscribers;
+pub use push::send_outbox_record;
 
 pub use args::{Args, SyncAction};
 pub use error::SyncError;

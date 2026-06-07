@@ -1,5 +1,7 @@
 use liveletters_diagnostics::{DiagnosticsReader, HealthStatus};
-use liveletters_store::{DeferredEventRecord, OutboxRecord, RawEventRecord, RawMessageRecord};
+use liveletters_store::{
+    DeferredEventRecord, OutboxDelivery, OutboxRecord, RawEventRecord, RawMessageRecord,
+};
 
 mod common;
 
@@ -88,6 +90,7 @@ fn outbox_entries_are_exposed_through_stable_dto() {
             event_id: "event-1".into(),
             event_type: "post_created".into(),
             resource_id: "blog-1".into(),
+            delivery: OutboxDelivery::ResourceSubscribers,
             message_body: "{\"kind\":\"post_created\",\"actor\":\"alice@example.test\"}".into(),
         })
         .unwrap();

@@ -274,6 +274,7 @@ fn sync_without_subcommand_runs_pull_then_push() {
             event_id: "event-push-all".into(),
             event_type: "post_created".into(),
             resource_id: "blog-1".into(),
+            delivery: liveletters_store::OutboxDelivery::ResourceSubscribers,
             message_body: encode_message(&outgoing).expect("encode"),
         })
         .expect("save outbox");
@@ -343,6 +344,7 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
             event_id: "event-push-1".into(),
             event_type: "post_created".into(),
             resource_id: "blog-1".into(),
+            delivery: liveletters_store::OutboxDelivery::ResourceSubscribers,
             message_body: body,
         })
         .expect("save outbox");
@@ -431,4 +433,74 @@ fn sync_pull_advances_cursor_idempotently() {
         served.load(Ordering::SeqCst) >= 1,
         "IMAP-сервер должен был отдать как минимум 1 FETCH"
     );
+}
+
+#[test]
+fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
+    let tmp = TempDir::new().expect("tempdir");
+    init_home(&tmp);
+
+    let rcpts = Arc::new(Mutex::new(Vec::<String>::new()));
+    let (host, port) = spawn_fake_smtp(Arc::clone(&rcpts));
+    set_mail_settings(&tmp, &host, port);
+
+    let store =
+        liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).expect("store");
+
+    store
+        .save_subscription(&liveletters_store::SubscriptionRecord {
+            resource_address: "algebrain@example.org".into(),
+            subscriber_delivery_address: "alice@example.test".into(),
+        })
+        .expect("save sub");
+
+    use liveletters_protocol::{
+        DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message,
+    };
+    let outgoing = ProtocolMessage::new(
+        MessageEnvelope::new(
+            "1",
+            "subscription_changed",
+            "algebrain@example.org",
+            "event-sub-direct",
+        )
+        .unwrap(),
+        "Подписка",
+        DomainEventPayload::SubscriptionChanged {
+            resource_address: "algebrain@example.org".into(),
+            subscriber_delivery_address: "alice@example.test".into(),
+            active: true,
+            created_at: 1_710_000_000,
+        },
+    )
+    .unwrap();
+    store
+        .save_outbox_record(&liveletters_store::OutboxRecord {
+            event_id: "event-sub-direct".into(),
+            event_type: "subscription_changed".into(),
+            resource_id: "algebrain@example.org".into(),
+            delivery: liveletters_store::OutboxDelivery::Direct(vec![
+                "algebrain@example.org".into(),
+            ]),
+            message_body: encode_message(&outgoing).expect("encode"),
+        })
+        .expect("save outbox");
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["sync", "push"])
+        .assert()
+        .success();
+
+    let collected = rcpts.lock().expect("lock").clone();
+    assert!(
+        collected.contains(&"algebrain@example.org".to_owned()),
+        "RCPT TO должен содержать algebrain@example.org, got {collected:?}"
+    );
+    assert!(
+        !collected.contains(&"alice@example.test".to_owned()),
+        "RCPT TO не должен содержать alice@example.test (это подписчик, не адресат), got {collected:?}"
+    );
+
+    assert!(store.list_outbox_records().expect("outbox").is_empty());
 }

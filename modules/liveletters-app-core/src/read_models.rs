@@ -26,6 +26,7 @@ pub struct OutboxEntry {
     pub event_id: String,
     pub event_type: String,
     pub resource_id: String,
+    pub delivery: liveletters_store::OutboxDelivery,
     pub message_body: String,
 }
 

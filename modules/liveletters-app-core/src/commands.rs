@@ -1,12 +1,11 @@
 use liveletters_domain::{
     AccountId, Comment, CommentBody, CommentCreated, CommentCreatedFields, CommentEdited,
     CommentId, DomainError, EventId, Post, PostBody, PostCreated, PostHidden, PostId,
-    ResourceAddress, ResourceId, Subscription, SubscriptionAction, SubscriptionChanged, Timestamp,
-    Visibility,
+    ResourceAddress, ResourceId, SubscriptionAction, SubscriptionChanged, Timestamp, Visibility,
 };
 use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message};
 use liveletters_store::{
-    CommentRecord, MailSettingsRecord, OutboxRecord, PostRecord, Store, SubscriptionRecord,
+    CommentRecord, MailSettingsRecord, OutboxDelivery, OutboxRecord, PostRecord, Store,
     UserSettingsRecord,
 };
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
@@ -218,6 +217,7 @@ pub fn create_post(
         event.event_id().as_str(),
         "post_created",
         post.resource_id().as_str(),
+        OutboxDelivery::ResourceSubscribers,
         ProtocolMessage::new(
             MessageEnvelope::new(
                 "1",
@@ -303,6 +303,7 @@ pub fn create_comment(
         event.event_id().as_str(),
         "comment_created",
         event.resource_id().as_str(),
+        OutboxDelivery::ResourceSubscribers,
         ProtocolMessage::new(
             MessageEnvelope::new(
                 "1",
@@ -411,6 +412,7 @@ pub fn hide_post(
         event.event_id().as_str(),
         "post_hidden",
         event.resource_id().as_str(),
+        OutboxDelivery::ResourceSubscribers,
         ProtocolMessage::new(
             MessageEnvelope::new(
                 "1",
@@ -489,6 +491,7 @@ pub fn edit_comment(
         event.event_id().as_str(),
         "comment_edited",
         event.resource_id().as_str(),
+        OutboxDelivery::ResourceSubscribers,
         ProtocolMessage::new(
             MessageEnvelope::new(
                 "1",
@@ -717,12 +720,22 @@ fn enqueue_message(
     event_id: &str,
     event_type: &str,
     resource_id: &str,
+    delivery: OutboxDelivery,
     message: ProtocolMessage,
 ) -> Result<(), AppCoreError> {
+    if let OutboxDelivery::Direct(addrs) = &delivery
+        && addrs.is_empty()
+    {
+        return Err(AppCoreError::InvalidDelivery(
+            "прямая адресация требует непустой список адресатов".to_owned(),
+        ));
+    }
+
     store.save_outbox_record(&OutboxRecord {
         event_id: event_id.to_owned(),
         event_type: event_type.to_owned(),
         resource_id: resource_id.to_owned(),
+        delivery,
         message_body: encode_message(&message)?,
     })?;
 
@@ -755,7 +768,6 @@ pub fn subscribe(
     let resource = ResourceAddress::new(command.resource_address)?;
     let subscriber = AccountId::new(command.subscriber_delivery_address)?;
     let delivery = ResourceAddress::new(command.subscriber_delivery_address)?;
-    let _ = Subscription::new(resource.clone(), subscriber.clone(), delivery.clone());
 
     let event_id_str = format!("subscription:{}:{}", resource.as_str(), command.created_at);
     let event_id = EventId::new(&event_id_str)?;
@@ -786,16 +798,12 @@ pub fn subscribe(
         },
     )?;
 
-    store.save_subscription(&SubscriptionRecord {
-        resource_address: resource.as_str().to_owned(),
-        subscriber_delivery_address: delivery.as_str().to_owned(),
-    })?;
-
     enqueue_message(
         store,
         event.event_id().as_str(),
         "subscription_changed",
         resource.as_str(),
+        OutboxDelivery::Direct(vec![resource.as_str().to_owned()]),
         message,
     )?;
 
@@ -859,13 +867,12 @@ pub fn unsubscribe(
         },
     )?;
 
-    let _ = store.delete_subscription(resource.as_str(), delivery.as_str())?;
-
     enqueue_message(
         store,
         event.event_id().as_str(),
         "subscription_changed",
         resource.as_str(),
+        OutboxDelivery::Direct(vec![resource.as_str().to_owned()]),
         message,
     )?;
 

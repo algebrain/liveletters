@@ -12,6 +12,7 @@ pub enum AppCoreError {
     SettingsValidation { field: String, message: String },
     PostNotFound { post_id: String },
     CommentNotFound { comment_id: String },
+    InvalidDelivery(String),
 }
 
 impl std::fmt::Display for AppCoreError {
@@ -28,6 +29,7 @@ impl std::fmt::Display for AppCoreError {
             Self::CommentNotFound { comment_id } => {
                 write!(f, "комментарий `{comment_id}` не найден")
             }
+            Self::InvalidDelivery(message) => write!(f, "некорректная адресация: {message}"),
         }
     }
 }

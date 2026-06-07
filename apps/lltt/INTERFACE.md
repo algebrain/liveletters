@@ -31,7 +31,7 @@
 | `inbox` | `liveletters-inbox` | Управление входящей почтой. Подкоманды: `import <файл…>` — импортировать одно или несколько писем из `.eml`-файлов через `SyncEngine`; `list [--status <категория>] [--limit <N>]` — таблица последних N строк `raw_messages` с фильтром по статусу; `show <message_id>` — печать полного тела одного письма. |
 | `post` | `liveletters-post` | Создать запись в блоге. Подкоманда: `new [--body-file <path>] [--visibility <public\|friends_only>]` — тело из файла или из stdin, видимость по умолчанию `public`. |
 | `comment` | `liveletters-comment` | Создать комментарий к записи. Подкоманда: `new --post <id> [--parent <id>] [--body-file <path>] [--visibility <public\|friends_only>]`. |
-| `outbox` | `liveletters-outbox` | Показать исходящую очередь (read-only). Подкоманда: `list` — таблица `event_id \| event_type \| resource_id`. |
+| `outbox` | `liveletters-outbox` | Показать исходящую очередь (read-only). Подкоманда: `list` — таблица `event_id \| event_type \| resource_id \| delivery`. |
 | `thread` | `liveletters-thread` | Показать обсуждение (запись + дерево комментариев). Использование: `lltt thread <post_id>`. |
 | `status` | `liveletters-status` | Краткий отчёт: 5 полей (постов, комментариев, отложенных, исходящих, последняя активность). |
 | `doctor` | `liveletters-doctor` | Полная диагностика синхронизации: 9 полей (здоровье + 7 категорий входящих + размер outbox). С флагом `--verbose` (`-v`) дополнительно показывает deferred-события, identities и размеры таблиц БД. |
@@ -39,6 +39,8 @@
 | `sync` | `liveletters-lltt-sync` | Сетевая синхронизация. Без подкоманды выполняет `pull`, затем `push`; `sync pull` и `sync push` запускают только одну половину цикла. |
 
 Подкоманды `sync` работают при наличии в `mail_settings` настроек SMTP/IMAP; обычно они попадают туда из почтовых секций черновика при `lltt user add`. Если настроек нет, команда возвращает `SyncError::MailSettingsMissing` (код 1) с подсказкой заполнить почту или запустить `lltt settings set smtp.host …`.
+
+`sync push` отправляет записи из `outbox` строго по их полю `delivery` (см. [`liveletters-lltt-sync::send_outbox_record`](../../modules/liveletters-lltt-sync/src/push.rs)): `Direct([адрес…])` — поштучно на каждый адрес, `ResourceSubscribers` — по одному письму каждому подписчику соответствующего ресурса. Сам push адресацию не вычисляет.
 
 ### Подкоманды `cu`
 
@@ -73,7 +75,7 @@
 |---|---|
 | `lltt sub <адрес>` | Подписаться на блог по адресу `<адрес>` (внешний `mail.publish` другого пользователя). Адрес проверяется парсером `ResourceAddress::new()`. `delivery_address` берётся из `mail.receive[0]` текущего пользователя (если пусто — из `mail.publish`). Печатает `подписан на <адрес>: посты будут приходить на <delivery>`. |
 | `lltt sub list` | Печатает две секции: «подписан на:» (адреса внешних блогов или `(пусто)`) и «мои подписчики:» (почтовые адреса подписчиков или `(пусто)`). |
-| `lltt sub rm <адрес>` | Отписаться. Удаляет запись из `identities/<текущий>.toml` (из `meta.subscriptions`) и из таблицы `subscriptions` через `AppCore::unsubscribe`. Печатает `отписан от <адрес>`. |
+| `lltt sub rm <адрес>` | Отписаться. Удаляет запись из `identities/<текущий>.toml` (из `meta.subscriptions`) и порождает исходящее событие `subscription_changed` в `outbox` с адресацией `Direct(vec![<адрес>])`, чтобы владелец блога удалил подписку у себя. Печатает `отписан от <адрес>`. |
 
 Ошибки: невалидный адрес → `SubError::Domain` (код 1); нет `init` или отсутствует домашний каталог → ошибка контекста (код 2); `identities/<текущий>.toml` отсутствует → `SubError::Config(ConfigError::UnknownIdentity)` (код 1); неверное число токенов → `SubError::InvalidArgs` (код 1).
 

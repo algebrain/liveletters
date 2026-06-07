@@ -1,7 +1,7 @@
 use liveletters_app_core::{
     AppCore, ListSubscriptionsQuery, SubscribeCommand, SubscribeResult, UnsubscribeCommand,
 };
-use liveletters_store::Store;
+use liveletters_store::{OutboxDelivery, Store, SubscriptionRecord};
 use tempfile::tempdir;
 
 fn open() -> (tempfile::TempDir, Store) {
@@ -11,7 +11,7 @@ fn open() -> (tempfile::TempDir, Store) {
 }
 
 #[test]
-fn subscribe_writes_outbox_record_and_persists_subscription() {
+fn subscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions_table() {
     let (_dir, store) = open();
     let core = AppCore::new(&store);
 
@@ -30,19 +30,22 @@ fn subscribe_writes_outbox_record_and_persists_subscription() {
     assert_eq!(outbox.len(), 1);
     assert_eq!(outbox[0].event_type, "subscription_changed");
     assert_eq!(outbox[0].resource_id, "alice-publish@example.org");
+    assert_eq!(
+        outbox[0].delivery,
+        OutboxDelivery::Direct(vec!["alice-publish@example.org".to_owned()])
+    );
 
     let records = store
         .list_subscriptions_for_resource("alice-publish@example.org")
         .unwrap();
-    assert_eq!(records.len(), 1);
-    assert_eq!(
-        records[0].subscriber_delivery_address,
-        "bob-feed@example.org"
+    assert!(
+        records.is_empty(),
+        "локальная подписка не должна записываться в таблицу подписчиков"
     );
 }
 
 #[test]
-fn unsubscribe_removes_subscription_and_writes_outbox() {
+fn unsubscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions_table() {
     let (_dir, store) = open();
     let core = AppCore::new(&store);
 
@@ -63,13 +66,6 @@ fn unsubscribe_removes_subscription_and_writes_outbox() {
 
     assert_eq!(result.resource_address, "alice-publish@example.org");
 
-    assert!(
-        store
-            .list_subscriptions_for_resource("alice-publish@example.org")
-            .unwrap()
-            .is_empty()
-    );
-
     let outbox = store.list_outbox_records().unwrap();
     assert_eq!(outbox.len(), 2);
     assert!(
@@ -77,26 +73,38 @@ fn unsubscribe_removes_subscription_and_writes_outbox() {
             .iter()
             .all(|r| r.event_type == "subscription_changed")
     );
+    assert!(outbox.iter().all(|r| matches!(
+        r.delivery,
+        OutboxDelivery::Direct(ref addrs) if addrs == &vec!["alice-publish@example.org".to_owned()]
+    )));
+
+    let records = store
+        .list_subscriptions_for_resource("alice-publish@example.org")
+        .unwrap();
+    assert!(
+        records.is_empty(),
+        "локальная отписка не должна удалять строку чужой подписки"
+    );
 }
 
 #[test]
-fn list_subscriptions_returns_owned_and_subscribed() {
+fn list_subscriptions_returns_owned_from_table_and_subscribed_from_query() {
     let (_dir, store) = open();
+
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_address: "alice-publish@example.org".into(),
+            subscriber_delivery_address: "bob-feed@example.org".into(),
+        })
+        .unwrap();
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_address: "alice-publish@example.org".into(),
+            subscriber_delivery_address: "carol-feed@example.org".into(),
+        })
+        .unwrap();
+
     let core = AppCore::new(&store);
-
-    core.subscribe(SubscribeCommand {
-        resource_address: "alice-publish@example.org",
-        subscriber_delivery_address: "bob-feed@example.org",
-        created_at: 1,
-    })
-    .unwrap();
-    core.subscribe(SubscribeCommand {
-        resource_address: "alice-publish@example.org",
-        subscriber_delivery_address: "carol-feed@example.org",
-        created_at: 2,
-    })
-    .unwrap();
-
     let list = core
         .list_subscriptions(ListSubscriptionsQuery {
             owned_resource_address: "alice-publish@example.org",

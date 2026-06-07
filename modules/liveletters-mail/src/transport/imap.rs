@@ -289,18 +289,28 @@ fn search_liveletters_uids(
     fetch_tag: &str,
     start_uid: u64,
 ) -> Result<SearchResult, TransportError> {
-    let header_search_lines = send_command_collecting(
-        reader,
-        search_tag,
-        &format!(
-            "UID SEARCH UID {start_uid}:* HEADER {LIVELETTERS_PROTOCOL_HEADER} {LIVELETTERS_PROTOCOL_VERSION}"
-        ),
-    )?;
+    let header_command = format!(
+        "UID SEARCH UID {start_uid}:* HEADER {LIVELETTERS_PROTOCOL_HEADER} {LIVELETTERS_PROTOCOL_VERSION}"
+    );
+    let header_search_lines = send_command_collecting(reader, search_tag, &header_command)?;
     match command_status(&header_search_lines, search_tag)? {
-        CommandStatus::Ok => Ok(SearchResult {
-            uids: extract_search_uids(&header_search_lines),
-            max_seen_uid: None,
-        }),
+        CommandStatus::Ok => {
+            let matched = extract_search_uids(&header_search_lines);
+            if matched.is_empty() {
+                fallback_search_by_fetching_headers(
+                    reader,
+                    search_tag,
+                    fetch_tag,
+                    start_uid,
+                    "primary search returned 0 candidates",
+                )
+            } else {
+                Ok(SearchResult {
+                    uids: matched,
+                    max_seen_uid: None,
+                })
+            }
+        }
         CommandStatus::No | CommandStatus::Bad => fallback_search_by_fetching_headers(
             reader,
             search_tag,
@@ -321,8 +331,8 @@ fn fallback_search_by_fetching_headers(
     start_uid: u64,
     unsupported_reason: &str,
 ) -> Result<SearchResult, TransportError> {
-    let all_search_lines =
-        send_command_collecting(reader, search_tag, &format!("UID SEARCH UID {start_uid}:*"))?;
+    let all_command = format!("UID SEARCH UID {start_uid}:*");
+    let all_search_lines = send_command_collecting(reader, search_tag, &all_command)?;
     if command_status(&all_search_lines, search_tag)? != CommandStatus::Ok {
         return Err(TransportError::UnexpectedResponse(
             all_search_lines.last().cloned().unwrap_or_default(),

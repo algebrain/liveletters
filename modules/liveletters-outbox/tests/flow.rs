@@ -7,6 +7,7 @@ use liveletters_app_core::{
     PendingOutbox, Visibility,
 };
 use liveletters_outbox::{Args, OutboxAction, print_summary, run};
+use liveletters_store::OutboxDelivery;
 
 #[test]
 fn outbox_list_empty_store_succeeds() {
@@ -65,6 +66,7 @@ fn print_summary_works_with_empty_and_populated() {
         event_id: "post-created:post-1".to_owned(),
         event_type: "post_created".to_owned(),
         resource_id: "alice-publish@example.org".to_owned(),
+        delivery: OutboxDelivery::ResourceSubscribers,
         message_body: "{}".to_owned(),
     }]);
     print_summary(&populated);

@@ -22,10 +22,17 @@ pub struct CommentRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutboxDelivery {
+    Direct(Vec<String>),
+    ResourceSubscribers,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutboxRecord {
     pub event_id: String,
     pub event_type: String,
     pub resource_id: String,
+    pub delivery: OutboxDelivery,
     pub message_body: String,
 }
 
