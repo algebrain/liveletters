@@ -11,8 +11,9 @@ pub use identity::{
 };
 pub use io::{
     current_user_path, list_identities, load_global, load_identity, read_current_identity,
-    save_identity, write_current_identity,
+    save_global, save_identity, write_current_identity,
 };
+pub use liveletters_log::{LogConfig, LogDestination, LogLevel};
 pub use mapping::{map_identity_to_settings, settings_to_identity};
 
 pub fn crate_name() -> &'static str {

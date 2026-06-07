@@ -5,12 +5,14 @@ use clap::{Parser, Subcommand};
 mod context;
 
 use liveletters_comment as comment;
+use liveletters_config as config;
 use liveletters_cu as cu;
 use liveletters_doctor as doctor;
 use liveletters_feed as feed;
 use liveletters_inbox as inbox;
 use liveletters_init as init;
 use liveletters_lltt_sync as lltt_sync;
+use liveletters_log as log;
 use liveletters_outbox as outbox;
 use liveletters_output::CommandContext;
 use liveletters_post as post;
@@ -54,8 +56,18 @@ enum Command {
     Doctor(doctor::Args),
     /// Показать или изменить настройки.
     Settings(settings::Args),
+    /// Изменить одну настройку (сокращение для `lltt settings set <ключ> <значение>`).
+    Set(SetArgs),
     /// Сетевая синхронизация.
     Sync(lltt_sync::Args),
+}
+
+#[derive(Debug, clap::Args)]
+struct SetArgs {
+    /// Имя настройки (например, `log.level`, `smtp.host`).
+    key: String,
+    /// Новое значение.
+    value: String,
 }
 
 fn main() -> ExitCode {
@@ -82,21 +94,77 @@ fn main() -> ExitCode {
     }
 
     let result = match cli.command {
-        Command::Init(args) => init::run(&ctx, &args),
-        Command::Cu(args) => cu::run_current(&ctx, &args),
-        Command::User(args) => cu::run_user(&ctx, &args),
-        Command::Sub(args) => sub::run(&ctx, &args),
-        Command::Feed(args) => feed::run(&ctx, &args),
-        Command::Inbox(args) => inbox::run(&ctx, &args),
-        Command::Post(args) => post::run(&ctx, &args),
-        Command::Comment(args) => comment::run(&ctx, &args),
-        Command::Outbox(args) => outbox::run(&ctx, &args),
-        Command::Thread(args) => thread::run(&ctx, &args),
-        Command::Status(args) => status::run(&ctx, &args),
-        Command::Doctor(args) => doctor::run(&ctx, &args),
-        Command::Settings(args) => settings::run(&ctx, &args),
-        Command::Sync(args) => lltt_sync::run(&ctx, &args),
+        Command::Init(args) => {
+            let r = init::run(&ctx, &args);
+            init_logger(&ctx);
+            r
+        }
+        Command::Cu(args) => {
+            init_logger(&ctx);
+            cu::run_current(&ctx, &args)
+        }
+        Command::User(args) => {
+            init_logger(&ctx);
+            cu::run_user(&ctx, &args)
+        }
+        Command::Sub(args) => {
+            init_logger(&ctx);
+            sub::run(&ctx, &args)
+        }
+        Command::Feed(args) => {
+            init_logger(&ctx);
+            feed::run(&ctx, &args)
+        }
+        Command::Inbox(args) => {
+            init_logger(&ctx);
+            inbox::run(&ctx, &args)
+        }
+        Command::Post(args) => {
+            init_logger(&ctx);
+            post::run(&ctx, &args)
+        }
+        Command::Comment(args) => {
+            init_logger(&ctx);
+            comment::run(&ctx, &args)
+        }
+        Command::Outbox(args) => {
+            init_logger(&ctx);
+            outbox::run(&ctx, &args)
+        }
+        Command::Thread(args) => {
+            init_logger(&ctx);
+            thread::run(&ctx, &args)
+        }
+        Command::Status(args) => {
+            init_logger(&ctx);
+            status::run(&ctx, &args)
+        }
+        Command::Doctor(args) => {
+            init_logger(&ctx);
+            doctor::run(&ctx, &args)
+        }
+        Command::Settings(args) => {
+            init_logger(&ctx);
+            settings::run(&ctx, &args)
+        }
+        Command::Set(args) => {
+            init_logger(&ctx);
+            settings::set::run_directly(
+                &ctx.home,
+                &ctx.state_home,
+                &ctx.identity_name,
+                &args.key,
+                &args.value,
+            )
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+        }
+        Command::Sync(args) => {
+            init_logger(&ctx);
+            lltt_sync::run(&ctx, &args)
+        }
     };
+
+    log::shutdown();
 
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -104,6 +172,18 @@ fn main() -> ExitCode {
             eprintln!("ошибка: {error}");
             ExitCode::from(1)
         }
+    }
+}
+
+/// Инициализирует глобальный логгер, если в `GlobalConfig` указан
+/// уровень, отличный от `off`. Ошибки записи в файл журнала не мешают
+/// работе CLI — только пишутся в stderr.
+fn init_logger(ctx: &CommandContext) {
+    let log = config::load_global(&ctx.home)
+        .map(|cfg| cfg.log)
+        .unwrap_or_default();
+    if let Err(error) = log::init(&ctx.home, &log) {
+        eprintln!("предупреждение: не удалось инициализировать журнал: {error}");
     }
 }
 

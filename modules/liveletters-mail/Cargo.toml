@@ -14,4 +14,5 @@ network = ["dep:native-tls"]
 [dependencies]
 liveletters-mime = { path = "../liveletters-mime" }
 liveletters-protocol = { path = "../liveletters-protocol" }
+liveletters-log = { path = "../liveletters-log" }
 native-tls = { workspace = true, optional = true }

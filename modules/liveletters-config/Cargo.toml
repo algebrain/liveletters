@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 liveletters-app-core = { path = "../liveletters-app-core" }
 liveletters-domain = { path = "../liveletters-domain" }
+liveletters-log = { path = "../liveletters-log" }
 serde = { workspace = true }
 toml = { workspace = true }
 thiserror = { workspace = true }

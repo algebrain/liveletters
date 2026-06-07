@@ -39,15 +39,27 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
             Ok(n) if n > 0 => {
                 store.delete_outbox_record(&record.event_id)?;
                 sent += n;
+                liveletters_log::log_info(format!(
+                    "sync.push event_id={} resource_id={} sent={}",
+                    record.event_id, record.resource_id, n,
+                ));
             }
             Ok(_) => {
                 eprintln!(
                     "предупреждение: нет адресатов для {}, outbox-запись {} оставлена",
                     record.resource_id, record.event_id
                 );
+                liveletters_log::log_warn(format!(
+                    "sync.push event_id={} resource_id={} recipients=0",
+                    record.event_id, record.resource_id,
+                ));
             }
             Err(error) => {
                 eprintln!("ошибка отправки {}: {error}", record.event_id);
+                liveletters_log::log_error(format!(
+                    "sync.push event_id={} resource_id={} error={error:?}",
+                    record.event_id, record.resource_id,
+                ));
                 failed += 1;
             }
         }

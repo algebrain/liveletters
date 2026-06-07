@@ -46,7 +46,9 @@ impl<'a> SyncEngine<'a> {
         let mut outcomes = Vec::new();
 
         for message in messages {
-            outcomes.push(self.ingest_one(message)?);
+            let outcome = self.ingest_one(message)?;
+            log_outcome(&outcome);
+            outcomes.push(outcome);
         }
 
         Ok(SyncReport::new(outcomes))
@@ -670,4 +672,60 @@ fn infer_actor_id(payload: &DomainEventPayload) -> &str {
         | DomainEventPayload::CommentEdited { actor_id, .. } => actor_id,
         DomainEventPayload::SubscriptionChanged { .. } => "",
     }
+}
+
+fn log_outcome(outcome: &SyncMessageOutcome) {
+    let line = match outcome {
+        SyncMessageOutcome::Applied {
+            message_id,
+            event_id,
+        } => {
+            format!("sync.ingest outcome=applied message_id={message_id} event_id={event_id}")
+        }
+        SyncMessageOutcome::Deferred {
+            message_id,
+            event_id,
+            reason,
+        } => format!(
+            "sync.ingest outcome=deferred message_id={message_id} event_id={event_id} reason={reason}"
+        ),
+        SyncMessageOutcome::Replay {
+            message_id,
+            event_id,
+            reason,
+        } => format!(
+            "sync.ingest outcome=replay message_id={message_id} event_id={event_id} reason={reason}"
+        ),
+        SyncMessageOutcome::Unauthorized {
+            message_id,
+            event_id,
+            reason,
+        } => format!(
+            "sync.ingest outcome=unauthorized message_id={message_id} event_id={event_id} reason={reason}"
+        ),
+        SyncMessageOutcome::Invalid {
+            message_id,
+            event_id,
+            reason,
+        } => format!(
+            "sync.ingest outcome=invalid message_id={message_id} event_id={event_id} reason={reason}"
+        ),
+        SyncMessageOutcome::Filtered {
+            message_id,
+            event_id,
+            reason,
+        } => format!(
+            "sync.ingest outcome=filtered message_id={message_id} event_id={event_id} reason={reason}"
+        ),
+        SyncMessageOutcome::Malformed { message_id, reason } => {
+            format!("sync.ingest outcome=malformed message_id={message_id} reason={reason}")
+        }
+        SyncMessageOutcome::Duplicate {
+            message_id,
+            event_id,
+        } => {
+            format!("sync.ingest outcome=duplicate message_id={message_id} event_id={event_id}")
+        }
+    };
+    liveletters_log::log_info(line);
 }

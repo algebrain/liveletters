@@ -14,7 +14,8 @@
 - читает/пишет `home/config.toml` (глобальные настройки) и `home/identities/<name>.toml` (настройки конкретной идентичности);
 - типизирует формы `IdentityConfig`, `IdentityMeta`, `MailSettings`, `SmtpSettings`, `ImapSettings`, `MailSecurity`, `ResourceSubscription`, `GlobalConfig`;
 - читает и записывает имя текущего пользователя liveletters в файл `home/current-user`;
-- конвертирует `IdentityConfig` ↔ `AppSettings` для интеграции с runtime-слоем.
+- конвертирует `IdentityConfig` ↔ `AppSettings` для интеграции с runtime-слоем;
+- ре-экспортирует `LogConfig`, `LogLevel`, `LogDestination` из крейта `liveletters-log` для пользователей, которым нужно единое «конфигурационное» импортирование.
 
 Что крейт **не** делает:
 
@@ -33,9 +34,10 @@
 - структуры `IdentityConfig`, `IdentityMeta`, `MailSettings`, `SmtpSettings`, `ImapSettings`, `ResourceSubscription`, `GlobalConfig`;
 - перечисление `MailSecurity` с методами `as_str(&self) -> &'static str`;
 - `ConfigError` (включая вариант `NoCurrentUser(PathBuf)`);
-- функции ввода-вывода: `load_global`, `load_identity`, `save_identity`, `list_identities`;
+- функции ввода-вывода: `load_global`, `load_identity`, `save_identity`, `save_global`, `list_identities`;
 - функции работы с текущим пользователем liveletters: `read_current_identity`, `write_current_identity`, `current_user_path`;
 - функции моста: `map_identity_to_settings`, `settings_to_identity`;
+- ре-экспорт `LogConfig`, `LogLevel`, `LogDestination` из `liveletters-log` (для удобства импорта из `liveletters-config`);
 - функция `crate_name() -> &'static str` для диагностики.
 
 Внутренние модули `error`, `global`, `identity`, `io`, `mapping` не публикуются.
@@ -46,25 +48,28 @@
 
 1. формы `IdentityConfig` / `IdentityMeta` / `MailSettings` / `SmtpSettings` / `ImapSettings` / `ResourceSubscription` для парсинга/сериализации TOML;
 2. `MailSecurity` с гарантированной сериализацией в lowercase;
-3. четыре функции ввода-вывода: `load_global`, `load_identity`, `save_identity`, `list_identities`;
+3. пять функций ввода-вывода: `load_global`, `load_identity`, `save_identity`, `save_global`, `list_identities`;
 4. три функции работы с текущим пользователем: `read_current_identity`, `write_current_identity`, `current_user_path`;
 5. две функции моста к `AppSettings`: `map_identity_to_settings` / `settings_to_identity`;
-6. `ConfigError` как единый тип ошибок конфигурации (включая вариант `NoCurrentUser`).
+6. `ConfigError` как единый тип ошибок конфигурации (включая вариант `NoCurrentUser`);
+7. `LogConfig` / `LogLevel` / `LogDestination` (ре-экспорт из `liveletters-log`).
 
-Именно этим API пользуется CLI `apps/lltt` (команды `lltt user …`, `lltt cu …`, `lltt init`) и integration-тесты `tests/parse.rs` / `tests/io.rs` / `tests/smoke.rs` / `tests/current_user.rs`.
+Именно этим API пользуется CLI `apps/lltt` (команды `lltt user …`, `lltt cu …`, `lltt init`, `lltt settings …`) и integration-тесты `tests/parse.rs` / `tests/io.rs` / `tests/smoke.rs` / `tests/current_user.rs`.
 
 ## Раскладка файлов в home-каталоге
 
 ```
 <home>/
-├── config.toml              ← load_global / save_global (сейчас только чтение с дефолтом)
+├── config.toml              ← load_global / save_global
+├── logs/
+│   └── liveletters.log      ← журнал, см. liveletters-log
 ├── current-user             ← read_current_identity / write_current_identity
 └── identities/
     ├── alice.toml           ← save_identity(home, "alice", …)
     └── bob.toml             ← save_identity(home, "bob", …)
 ```
 
-- `config.toml` сейчас содержит только `schema_version: u32`; при отсутствии файла `load_global` возвращает `GlobalConfig::default()` с `schema_version = 1`;
+- `config.toml` содержит `schema_version: u32` и опциональную секцию `[log]`; при отсутствии файла `load_global` возвращает `GlobalConfig::default()`;
 - `current-user` — текстовый файл, одна строка, имя текущего пользователя liveletters без расширения; при отсутствии файла `read_current_identity` возвращает `ConfigError::NoCurrentUser(path)`;
 - каждая идентичность — отдельный файл в `identities/`; имя файла — это имя идентичности плюс расширение `.toml`;
 - `save_identity` создаёт каталог `identities/` через `fs::create_dir_all` при первом сохранении;
@@ -255,10 +260,14 @@ impl ResourceSubscription {
 pub struct GlobalConfig {
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
+    #[serde(default)]
+    pub log: LogConfig,
 }
 ```
 
-`GlobalConfig` сейчас хранит только `schema_version: u32` со значением по умолчанию `1`. Используется для будущих миграций формата конфигурации.
+`schema_version: u32` со значением по умолчанию `1` — зарезервировано для будущих миграций формата.
+
+`log: LogConfig` — настройки журнала (см. ниже). При отсутствии секции `[log]` в TOML используется `LogConfig::default()`.
 
 `load_global(home)`:
 
@@ -266,7 +275,24 @@ pub struct GlobalConfig {
 - иначе парсит TOML и возвращает полученный `GlobalConfig`;
 - при ошибке парсинга возвращает `ConfigError::Toml(_)`.
 
-`save_global` пока не реализован: глобальный конфиг в текущей версии read-only (его меняет только миграционная утилита, которая ещё не написана).
+`save_global(home, &GlobalConfig)` — атомарно записывает глобальный конфиг в `home/config.toml`; используется командой `lltt settings set log.*`.
+
+### Секция `[log]`: `LogConfig`
+
+`LogConfig` живёт в `liveletters-log` (а не в `liveletters-config`, чтобы разорвать цикл зависимостей между этими двумя крейтами); `liveletters-config` ре-экспортирует тип под именем `liveletters_config::LogConfig`. Полная документация — в `modules/liveletters-log/INTERFACE.md`.
+
+TOML-пример:
+
+```toml
+[log]
+destination = "file"        # file | stderr | none
+level = "info"              # off | error | warn | info | debug | trace
+max_size_bytes = 5242880    # 5 МиБ, минимум 1024
+keep_files = 3              # количество архивов
+include_bodies = false      # true => писать payload через `liveletters_log::log_payload`
+```
+
+Из CLI секция управляется командой `lltt settings set log.level info` (и аналогично для остальных полей). По умолчанию журнал выключен (`level = "off"`) и не пишет никуда.
 
 ## Имя текущего пользователя liveletters: `read_current_identity` / `write_current_identity`
 

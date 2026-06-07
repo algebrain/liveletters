@@ -6,7 +6,9 @@
 
 1. разбирает аргументы командной строки через `clap`;
 2. строит [`CommandContext`](../../modules/liveletters-output/src/context.rs) (общий домашний каталог, каталог состояния текущего пользователя и имя текущего пользователя liveletters, если он требуется команде);
-3. диспетчеризует вызов в `run(...)` соответствующего командного крейта из [`modules/`](../../modules).
+3. инициализирует глобальный логгер из `GlobalConfig.log` (по умолчанию выключен);
+4. диспетчеризует вызов в `run(...)` соответствующего командного крейта из [`modules/`](../../modules);
+5. вызывает `liveletters_log::shutdown()` перед выходом (сбрасывает буфер).
 
 Содержательной логики в самом `apps/lltt` нет — она разнесена по независимым крейтам (`liveletters-init`, `liveletters-cu`, `liveletters-sub`, `liveletters-feed`, `liveletters-inbox`, `liveletters-post`, `liveletters-comment`, `liveletters-outbox`, `liveletters-thread`, `liveletters-status`, `liveletters-doctor`, `liveletters-settings`, `liveletters-lltt-sync`, плюс общий `liveletters-output`). Каждый из них реализует свою подкоманду и документирован отдельно.
 
@@ -35,7 +37,8 @@
 | `thread` | `liveletters-thread` | Показать обсуждение (запись + дерево комментариев). Использование: `lltt thread <post_id>`. |
 | `status` | `liveletters-status` | Краткий отчёт: 5 полей (постов, комментариев, отложенных, исходящих, последняя активность). |
 | `doctor` | `liveletters-doctor` | Полная диагностика синхронизации: 9 полей (здоровье + 7 категорий входящих + размер outbox). С флагом `--verbose` (`-v`) дополнительно показывает deferred-события, identities и размеры таблиц БД. |
-| `settings` | `liveletters-settings` | Показать или изменить настройки `user_settings`/`mail_settings`. Подкоманды: `show` (по умолчанию) — сводка; `set <ключ> <значение>` — изменить одно поле. |
+| `settings` | `liveletters-settings` | Показать или изменить настройки `user_settings`/`mail_settings` (БД) и `GlobalConfig.log` (TOML). Подкоманды: `show` (по умолчанию) — сводка (включая секцию `[логирование]`, если она отличается от дефолта); `set <ключ> <значение>` — изменить одно поле; допустимы `log.destination`, `log.level`, `log.max_size_bytes`, `log.keep_files`, `log.include_bodies` для включения/выключения журнала. |
+| `set` | `liveletters-settings` | Сокращение для `settings set <ключ> <значение>` без вложенной подкоманды: `lltt set <ключ> <значение>`. Делает ровно то же, что `lltt settings set`, в том числе для `log.*`. |
 | `sync` | `liveletters-lltt-sync` | Сетевая синхронизация. Без подкоманды выполняет `pull`, затем `push`; `sync pull` и `sync push` запускают только одну половину цикла. |
 
 Подкоманды `sync` работают при наличии в `mail_settings` настроек SMTP/IMAP; обычно они попадают туда из почтовых секций черновика при `lltt user add`. Если настроек нет, команда возвращает `SyncError::MailSettingsMissing` (код 1) с подсказкой заполнить почту или запустить `lltt settings set smtp.host …`.
@@ -101,6 +104,7 @@
 |---|---|
 | `lltt settings` (или `lltt settings show`) | Печатает содержимое обеих таблиц через `print_kv`. Если запись отсутствует — печатает `[user_settings] отсутствует` с подсказкой использовать `set`. Пароли маскируются как `********` (`--reveal` не предусмотрен). |
 | `lltt settings set <ключ> <значение>` | Записывает одно поле. Допустимые 16 ключей: `nickname`, `email_address`, `avatar_url`, `setup_completed` (поле `user_settings`); `smtp.host`, `smtp.port`, `smtp.security`, `smtp.username`, `smtp.password`, `smtp.hello_domain`, `imap.host`, `imap.port`, `imap.security`, `imap.username`, `imap.password`, `imap.mailbox` (поля `mail_settings`). Пароли (`smtp.password`, `imap.password`) сохраняются в форме `obf:v1:…` через `SecretBox::obfuscate`. |
+| `lltt set <ключ> <значение>` | Короткая форма той же команды верхнего уровня. Ведёт себя идентично `lltt settings set`, включая маршрутизацию `log.*` в `<home>/config.toml` и валидацию через `LogConfig::set_field`. |
 
 Ошибки: неизвестный ключ → `SettingsError::InvalidKey` (код 1); неверное число аргументов → `SettingsError::InvalidArgs` (код 1); нет `init` → ошибка контекста (код 2).
 

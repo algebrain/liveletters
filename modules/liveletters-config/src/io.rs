@@ -19,6 +19,13 @@ pub fn load_global(home: &Path) -> Result<GlobalConfig, ConfigError> {
     Ok(config)
 }
 
+pub fn save_global(home: &Path, config: &GlobalConfig) -> Result<(), ConfigError> {
+    let path = home.join(GLOBAL_CONFIG_FILENAME);
+    let raw = toml::to_string_pretty(config)?;
+    fs::write(path, raw)?;
+    Ok(())
+}
+
 pub fn load_identity(home: &Path, name: &str) -> Result<IdentityConfig, ConfigError> {
     let path = identity_path(home, name);
     if !path.exists() {

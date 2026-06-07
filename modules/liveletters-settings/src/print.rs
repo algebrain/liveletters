@@ -1,3 +1,4 @@
+use liveletters_config::LogConfig;
 use liveletters_output::{mask_password, print_kv};
 use liveletters_store::{MailSettingsRecord, UserSettingsRecord};
 
@@ -37,5 +38,27 @@ pub fn print_settings(user: Option<&UserSettingsRecord>, mail: Option<&MailSetti
                 ("imap.mailbox", &m.imap_mailbox),
             ]);
         }
+    }
+}
+
+/// Печатает секцию журнала, только если хотя бы одно поле отличается от дефолта.
+pub fn print_log_config(log: &LogConfig) {
+    let defaults = LogConfig::default();
+    if log == &defaults {
+        return;
+    }
+    println!();
+    println!("[логирование]");
+    print_kv(&[
+        ("log.destination", &log.destination.to_string()),
+        ("log.level", &log.level.to_string()),
+        ("log.max_size_bytes", &log.max_size_bytes.to_string()),
+        ("log.keep_files", &log.keep_files.to_string()),
+        ("log.include_bodies", &log.include_bodies.to_string()),
+    ]);
+    if log.level == liveletters_config::LogLevel::Off {
+        println!(
+            "(сейчас журнал выключен; используйте `lltt settings set log.level info` чтобы включить)"
+        );
     }
 }

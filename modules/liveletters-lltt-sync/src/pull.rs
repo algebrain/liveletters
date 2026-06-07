@@ -37,6 +37,10 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
     let received = batch.into_emails();
 
     println!("получено писем:       {}", received.len());
+    liveletters_log::log_info(format!(
+        "sync.pull profile={profile_id} received={}",
+        received.len()
+    ));
 
     let next_uid = compute_next_cursor_uid(cursor_uid, &received);
 
@@ -47,6 +51,10 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
     println!("применено событий:    {}", counts.applied);
     println!("дубликатов:           {}", counts.duplicates);
     println!("некорректных писем:   {}", counts.malformed);
+    liveletters_log::log_info(format!(
+        "sync.pull summary profile={profile_id} applied={} duplicates={} malformed={}",
+        counts.applied, counts.duplicates, counts.malformed,
+    ));
 
     store.save_sync_cursor(&profile_id, next_uid)?;
 

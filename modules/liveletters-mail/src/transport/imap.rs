@@ -27,8 +27,16 @@ impl ConfiguredImapMailbox {
 
     pub fn fetch_new(&self, cursor: &MailboxCursor) -> Result<FetchBatch, TransportError> {
         let address = format!("{}:{}", self.config.server(), self.config.port());
-        let stream = TcpStream::connect(&address)
-            .map_err(|error| TransportError::Network(error.to_string()))?;
+        liveletters_log::log_info(format!(
+            "imap.connect host={} port={} security={}",
+            self.config.server(),
+            self.config.port(),
+            self.config.security().as_str(),
+        ));
+        let stream = TcpStream::connect(&address).map_err(|error| {
+            liveletters_log::log_error(format!("imap.connect error={error}"));
+            TransportError::Network(error.to_string())
+        })?;
         let mut reader = match self.config.security() {
             MailSecurity::Tls => {
                 BufReader::new(ImapStream::Tls(connect_tls(stream, self.config.server())?))
@@ -40,6 +48,7 @@ impl ConfiguredImapMailbox {
 
         let greeting = read_line(&mut reader)?;
         if !greeting.starts_with("* OK") {
+            liveletters_log::log_error(format!("imap.greeting response={}", greeting.trim()));
             return Err(TransportError::UnexpectedResponse(
                 greeting.trim().to_owned(),
             ));
@@ -58,6 +67,7 @@ impl ConfiguredImapMailbox {
                 send_command(&mut reader, login_tag, "NOOP")?;
             }
             MailAuth::Password { username, password } => {
+                liveletters_log::log_info(format!("imap.login user={username}"));
                 send_command(
                     &mut reader,
                     login_tag,
@@ -75,6 +85,7 @@ impl ConfiguredImapMailbox {
             tag_at(command_offset + 1),
             &format!("SELECT {}", self.config.mailbox()),
         )?;
+        liveletters_log::log_info(format!("imap.select mailbox={}", self.config.mailbox()));
 
         let start_uid = cursor.last_seen_uid().map(|uid| uid + 1).unwrap_or(1);
         let search_result = search_liveletters_uids(
@@ -83,6 +94,10 @@ impl ConfiguredImapMailbox {
             tag_at(command_offset + 3),
             start_uid,
         )?;
+        liveletters_log::log_info(format!(
+            "imap.search.result start_uid={start_uid} matched={}",
+            search_result.uids.len(),
+        ));
         let uids = search_result.uids;
 
         let mut emails = Vec::new();

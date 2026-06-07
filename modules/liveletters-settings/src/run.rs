@@ -13,9 +13,13 @@ pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send
 fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), SettingsError> {
     let action = parse_action(&args.tokens)?;
     match action {
-        SettingsAction::Show => show::run(&ctx.state_home, &ctx.identity_name),
+        SettingsAction::Show => show::run(&ctx.home, &ctx.state_home, &ctx.identity_name),
         SettingsAction::Set { key, value } => {
-            set::run(&ctx.state_home, &ctx.identity_name, &key, &value)
+            if let Some(field) = key.strip_prefix("log.") {
+                set::run_log_field(&ctx.home, field, &value)
+            } else {
+                set::run_db_field(&ctx.state_home, &ctx.identity_name, &key, &value)
+            }
         }
     }
 }

@@ -13,4 +13,7 @@ pub enum SettingsError {
 
     #[error("неверные аргументы: {0}")]
     InvalidArgs(String),
+
+    #[error("некорректное значение настройки журнала: {0}")]
+    InvalidLogValue(String),
 }

@@ -12,6 +12,7 @@ path = "src/main.rs"
 clap = { workspace = true, features = ["derive"] }
 liveletters-output = { path = "../../modules/liveletters-output" }
 liveletters-config = { path = "../../modules/liveletters-config" }
+liveletters-log = { path = "../../modules/liveletters-log" }
 liveletters-store = { path = "../../modules/liveletters-store" }
 liveletters-init = { path = "../../modules/liveletters-init" }
 liveletters-cu = { path = "../../modules/liveletters-cu" }

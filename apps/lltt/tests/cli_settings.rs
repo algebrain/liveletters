@@ -90,3 +90,65 @@ fn settings_set_password_obfuscates_via_binary() {
         "plaintext виден: {stored}"
     );
 }
+
+#[test]
+fn set_alias_writes_log_level_to_global_config() {
+    let tmp = TempDir::new().expect("tempdir");
+    let home = tmp.path().to_path_buf();
+    common::init_user(&home, "alice");
+
+    // `lltt set log.level info` — короткая форма, должна попасть в <home>/config.toml.
+    lltt()
+        .env("LIVELETTERS_HOME", &home)
+        .args(["set", "log.level", "info"])
+        .assert()
+        .success();
+
+    let config =
+        std::fs::read_to_string(home.join("config.toml")).expect("config.toml должен быть создан");
+    assert!(
+        config.contains("level = \"info\""),
+        "ожидалось `level = \"info\"` в config.toml, получили: {config}"
+    );
+    // Убедиться, что НЕ создался per-user файл.
+    assert!(
+        !home.join("users/alice/config.toml").exists(),
+        "per-user config.toml не должен создаваться для log.*"
+    );
+}
+
+#[test]
+fn set_alias_writes_db_field() {
+    let tmp = TempDir::new().expect("tempdir");
+    let home = tmp.path().to_path_buf();
+    common::init_user(&home, "alice");
+
+    // `lltt set nickname …` — короткая форма для пользовательского поля.
+    lltt()
+        .env("LIVELETTERS_HOME", &home)
+        .args(["set", "nickname", "alice-nick"])
+        .assert()
+        .success();
+
+    let assert = lltt()
+        .env("LIVELETTERS_HOME", &home)
+        .arg("settings")
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(stdout.contains("nickname: alice-nick"), "stdout = {stdout}");
+}
+
+#[test]
+fn set_alias_rejects_unknown_key() {
+    let tmp = TempDir::new().expect("tempdir");
+    let home = tmp.path().to_path_buf();
+    common::init_user(&home, "alice");
+
+    lltt()
+        .env("LIVELETTERS_HOME", &home)
+        .args(["set", "bogus.key", "value"])
+        .assert()
+        .failure()
+        .code(1);
+}

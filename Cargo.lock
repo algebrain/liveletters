@@ -513,6 +513,7 @@ version = "0.1.0"
 dependencies = [
  "liveletters-app-core",
  "liveletters-domain",
+ "liveletters-log",
  "serde",
  "tempfile",
  "thiserror",
@@ -605,6 +606,7 @@ name = "liveletters-lltt-sync"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "liveletters-log",
  "liveletters-mail",
  "liveletters-mime",
  "liveletters-output",
@@ -616,9 +618,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "liveletters-log"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "liveletters-mail"
 version = "0.1.0"
 dependencies = [
+ "liveletters-log",
  "liveletters-mime",
  "liveletters-protocol",
  "native-tls",
@@ -751,6 +763,7 @@ name = "liveletters-sync"
 version = "0.1.0"
 dependencies = [
  "liveletters-domain",
+ "liveletters-log",
  "liveletters-mail",
  "liveletters-protocol",
  "liveletters-store",
@@ -784,6 +797,7 @@ dependencies = [
  "liveletters-inbox",
  "liveletters-init",
  "liveletters-lltt-sync",
+ "liveletters-log",
  "liveletters-mail",
  "liveletters-mime",
  "liveletters-outbox",

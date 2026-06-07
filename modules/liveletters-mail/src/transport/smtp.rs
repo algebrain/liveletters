@@ -23,8 +23,16 @@ impl ConfiguredSmtpTransport {
 
     pub fn send(&self, email: &OutgoingEmail) -> Result<SendStatus, TransportError> {
         let address = format!("{}:{}", self.config.server(), self.config.port());
-        let stream = TcpStream::connect(&address)
-            .map_err(|error| TransportError::Network(error.to_string()))?;
+        liveletters_log::log_info(format!(
+            "smtp.connect host={} port={} security={}",
+            self.config.server(),
+            self.config.port(),
+            self.config.security().as_str(),
+        ));
+        let stream = TcpStream::connect(&address).map_err(|error| {
+            liveletters_log::log_error(format!("smtp.connect error={error}"));
+            TransportError::Network(error.to_string())
+        })?;
         let mut reader = match self.config.security() {
             MailSecurity::Tls => {
                 BufReader::new(SmtpStream::Tls(connect_tls(stream, self.config.server())?))
@@ -34,12 +42,24 @@ impl ConfiguredSmtpTransport {
             }
         };
 
-        read_response(&mut reader, 220)?;
-        send_command(
+        match read_response(&mut reader, 220) {
+            Ok(_) => {}
+            Err(e) => {
+                liveletters_log::log_error(format!("smtp.banner error={e}"));
+                return Err(e);
+            }
+        }
+        match send_command(
             &mut reader,
             &format!("EHLO {}\r\n", self.config.hello_domain()),
             250,
-        )?;
+        ) {
+            Ok(_) => {}
+            Err(e) => {
+                liveletters_log::log_error(format!("smtp.ehlo error={e}"));
+                return Err(e);
+            }
+        }
 
         if self.config.security() == MailSecurity::StartTls {
             send_command(&mut reader, "STARTTLS\r\n", 220)?;
@@ -54,14 +74,28 @@ impl ConfiguredSmtpTransport {
         match self.config.auth() {
             MailAuth::None => {}
             MailAuth::Password { username, password } => {
+                liveletters_log::log_info(format!("smtp.auth user={username}"));
                 let token = base64_encode(&format!("\u{0}{username}\u{0}{password}"));
-                send_command(&mut reader, &format!("AUTH PLAIN {token}\r\n"), 235)?;
+                if let Err(e) = send_command(&mut reader, &format!("AUTH PLAIN {token}\r\n"), 235) {
+                    liveletters_log::log_error(format!("smtp.auth error={e}"));
+                    return Err(e);
+                }
             }
         }
 
-        send_command(&mut reader, &format!("MAIL FROM:<{}>\r\n", email.from), 250)?;
-        send_command(&mut reader, &format!("RCPT TO:<{}>\r\n", email.to), 250)?;
-        send_command(&mut reader, "DATA\r\n", 354)?;
+        if let Err(e) = send_command(&mut reader, &format!("MAIL FROM:<{}>\r\n", email.from), 250) {
+            liveletters_log::log_error(format!("smtp.mail_from error={e}"));
+            return Err(e);
+        }
+        if let Err(e) = send_command(&mut reader, &format!("RCPT TO:<{}>\r\n", email.to), 250) {
+            liveletters_log::log_error(format!("smtp.rcpt_to error={e}"));
+            return Err(e);
+        }
+        if let Err(e) = send_command(&mut reader, "DATA\r\n", 354) {
+            liveletters_log::log_error(format!("smtp.data error={e}"));
+            return Err(e);
+        }
+        liveletters_log::log_info(format!("smtp.send from={} to={}", email.from, email.to));
 
         let data = normalize_data_block(&email.raw_message);
         reader
@@ -77,7 +111,10 @@ impl ConfiguredSmtpTransport {
             .flush()
             .map_err(|error| TransportError::Network(error.to_string()))?;
 
-        read_response(&mut reader, 250)?;
+        if let Err(e) = read_response(&mut reader, 250) {
+            liveletters_log::log_error(format!("smtp.accepted error={e}"));
+            return Err(e);
+        }
         send_command(&mut reader, "QUIT\r\n", 221)?;
 
         Ok(SendStatus::Sent)
