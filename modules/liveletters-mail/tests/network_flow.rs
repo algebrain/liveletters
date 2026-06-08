@@ -70,7 +70,8 @@ fn configured_smtp_transport_sends_message_over_tcp() {
             }
         }
         let raw_message = String::from_utf8(data).expect("SMTP data should be UTF-8");
-        assert!(raw_message.contains("Subject: Новая запись\r\n"));
+        assert!(raw_message.contains("Subject: =?utf-8?B?"));
+        assert!(raw_message.contains("\r\n"));
         assert!(
             raw_message
                 .contains("Content-Type: multipart/mixed; boundary=\"liveletters-boundary\"")
@@ -228,7 +229,7 @@ fn configured_imap_mailbox_fetches_messages_with_cursor() {
     assert!(
         batch.emails()[0]
             .raw_message
-            .contains("Subject: IMAP письмо")
+            .contains("Subject: =?utf-8?B?")
     );
 
     server.join().expect("IMAP server thread should finish");

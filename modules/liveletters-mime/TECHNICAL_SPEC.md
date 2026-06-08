@@ -82,6 +82,8 @@ Content-Disposition: attachment; filename="liveletters.json"
 
 `Content-Type` письма — `multipart/mixed` с фиксированной границей `liveletters-boundary`. Человекочитаемая часть лежит в `text/plain; charset="utf-8"` под-части, а сериализованный JSON — в `application/json` под-части с `Content-Disposition: attachment; filename="liveletters.json"`. Никакого base64url-кодирования: JSON передаётся как есть в именованной MIME-части. Это снимает проблему с антиспам-фильтрами, которые ранее флагали длинный base64url-блок внутри `text/plain` как обфускацию.
 
+Заголовок `Subject` кодируется через `encode_rfc2047`: если строка содержит не-ASCII символы (например, кириллицу), она оборачивается в `=?utf-8?B?<base64>?=`. Чистый ASCII передаётся без изменений. Это нужно, потому что RFC 5322 требует ASCII в заголовках — несоблюдение приводит к тому, что SMTP-серверы (например, Яндекса) удаляют не-ASCII заголовки из письма. `mailparse` на стороне получателя автоматически декодирует RFC 2047-строку обратно в исходный текст через `MailHeader::get_value()`, поэтому round-trip прозрачен.
+
 ## Парсинг MIME через `mailparse`
 
 Вместо ручного разбора заголовков и MIME-границ `liveletters-mime` использует библиотеку [`mailparse`](https://crates.io/crates/mailparse). Она берёт на себя:

@@ -70,8 +70,8 @@ pub fn write_post_eml(dir: &std::path::Path, post_id: &str, body: &str) -> PathB
             .expect("raw email builds");
 
     let with_id = outgoing.raw_message.replacen(
-        "Subject: Запись\n",
-        &format!("Subject: Запись\nMessage-ID: <{post_id}@example.test>\n"),
+        "Subject: =?utf-8?B?0JfQsNC/0LjRgdGM?=\n",
+        &format!("Subject: =?utf-8?B?0JfQsNC/0LjRgdGM?=\nMessage-ID: <{post_id}@example.test>\n"),
         1,
     );
     let path = dir.join(format!("{post_id}.eml"));

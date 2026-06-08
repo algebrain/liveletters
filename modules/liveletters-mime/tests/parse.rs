@@ -196,3 +196,55 @@ fn extract_parts_from_email_with_folded_headers() {
         DomainEventPayload::PostCreated { post_id, .. } if post_id == "post-1"
     ));
 }
+
+#[test]
+fn build_protocol_email_encodes_cyrillic_subject_with_rfc2047() {
+    let message = sample_message();
+    let outgoing = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Новая запись от alice",
+        &message,
+    )
+    .expect("raw email should be built");
+    assert!(
+        !outgoing
+            .raw_message
+            .contains("Subject: Новая запись от alice\n"),
+        "raw Cyrillic should NOT appear in Subject header (must be RFC 2047-encoded)"
+    );
+    assert!(
+        outgoing.raw_message.contains("Subject: =?utf-8?B?"),
+        "Subject should be RFC 2047-encoded with base64"
+    );
+}
+
+#[test]
+fn build_protocol_email_keeps_ascii_subject_unchanged() {
+    let message = sample_message();
+    let outgoing = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "New post",
+        &message,
+    )
+    .expect("raw email should be built");
+    assert!(
+        outgoing.raw_message.contains("Subject: New post\n"),
+        "ASCII subject should appear as-is"
+    );
+}
+
+#[test]
+fn encoded_subject_round_trips_through_parse() {
+    let message = sample_message();
+    let outgoing = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Новая запись",
+        &message,
+    )
+    .expect("raw email should be built");
+    let parsed = parse_email(&outgoing.raw_message).expect("should parse");
+    assert_eq!(parsed.subject().as_deref(), Some("Новая запись"));
+}
