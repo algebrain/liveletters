@@ -3,13 +3,27 @@
 use liveletters_app_core::{
     AppCore, CreateCommentFromIdentityCommand, CreatePostFromIdentityCommand, Identity, Visibility,
 };
-use liveletters_store::Store;
+use liveletters_store::{Store, UserSettingsRecord};
 use tempfile::tempdir;
 
 fn open() -> (tempfile::TempDir, Store) {
     let dir = tempdir().unwrap();
     let store = Store::open_for_home_dir(dir.path()).unwrap();
+    save_user(&store);
     (dir, store)
+}
+
+fn save_user(store: &Store) {
+    store
+        .save_user_settings_record(&UserSettingsRecord {
+            profile_id: "alice".into(),
+            nickname: "alice".into(),
+            email_address: "alice@example.test".into(),
+            avatar_url: None,
+            language: "ru".into(),
+            setup_completed: true,
+        })
+        .unwrap();
 }
 
 fn identity() -> Identity {
@@ -27,6 +41,7 @@ fn create_comment_from_identity_derives_fields_and_persists_comment() {
 
     let post = core
         .create_post_from_identity(CreatePostFromIdentityCommand {
+            profile_id: "alice",
             identity: &ident,
             body: "Запись",
             visibility: Visibility::Public,
@@ -35,6 +50,7 @@ fn create_comment_from_identity_derives_fields_and_persists_comment() {
 
     let result = core
         .create_comment_from_identity(CreateCommentFromIdentityCommand {
+            profile_id: "alice",
             identity: &ident,
             post_id: post.post().id().as_str(),
             parent_comment_id: None,
@@ -66,6 +82,7 @@ fn create_comment_from_identity_uses_parent_when_provided() {
 
     let post = core
         .create_post_from_identity(CreatePostFromIdentityCommand {
+            profile_id: "alice",
             identity: &ident,
             body: "Запись",
             visibility: Visibility::Public,
@@ -74,6 +91,7 @@ fn create_comment_from_identity_uses_parent_when_provided() {
 
     let parent = core
         .create_comment_from_identity(CreateCommentFromIdentityCommand {
+            profile_id: "alice",
             identity: &ident,
             post_id: post.post().id().as_str(),
             parent_comment_id: None,
@@ -84,6 +102,7 @@ fn create_comment_from_identity_uses_parent_when_provided() {
 
     let child = core
         .create_comment_from_identity(CreateCommentFromIdentityCommand {
+            profile_id: "alice",
             identity: &ident,
             post_id: post.post().id().as_str(),
             parent_comment_id: Some(parent.comment().id().as_str()),

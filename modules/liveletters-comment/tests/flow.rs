@@ -4,7 +4,7 @@ mod common;
 
 use liveletters_app_core::{AppCore, CreatePostFromIdentityCommand, Identity, Visibility};
 use liveletters_comment::{Args, CommentAction, NewArgs, run};
-use liveletters_store::Store;
+use liveletters_store::{Store, UserSettingsRecord};
 
 fn post_id_from(store: &Store) -> String {
     let posts = store.list_posts().expect("list posts");
@@ -14,12 +14,23 @@ fn post_id_from(store: &Store) -> String {
 
 fn make_post(home: &common::TestHome) -> String {
     let store = home.open_store();
+    store
+        .save_user_settings_record(&UserSettingsRecord {
+            profile_id: "alice".into(),
+            nickname: "alice".into(),
+            email_address: "alice@example.test".into(),
+            avatar_url: None,
+            language: "ru".into(),
+            setup_completed: true,
+        })
+        .unwrap();
     let core = AppCore::new(&store);
     let ident = Identity {
         account_id: "alice".to_owned(),
         publish: "alice-publish@example.org".to_owned(),
     };
     core.create_post_from_identity(CreatePostFromIdentityCommand {
+        profile_id: "alice",
         identity: &ident,
         body: "Запись для комментариев",
         visibility: Visibility::Public,

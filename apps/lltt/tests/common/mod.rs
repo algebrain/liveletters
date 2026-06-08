@@ -25,6 +25,11 @@ pub fn init_user(home: &std::path::Path, name: &str) {
         .args(["cu", name])
         .assert()
         .success();
+    lltt()
+        .env("LIVELETTERS_HOME", home)
+        .args(["set", "language", "ru"])
+        .assert()
+        .success();
 }
 
 pub fn write_identity(home: &std::path::Path, name: &str) {

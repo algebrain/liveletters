@@ -18,12 +18,11 @@ pub fn locale_for(record: Option<&UserSettingsRecord>) -> Locale {
 
 pub fn post_created(
     record: Option<&UserSettingsRecord>,
-    sender: &str,
     resource: &str,
     body: &str,
 ) -> SubjectAndBody {
     let loc = locale_for(record);
-    let vars = Vars(&[("sender", sender), ("resource", resource), ("body", body)]);
+    let vars = Vars(&[("resource", resource), ("body", body)]);
     SubjectAndBody {
         subject: translate("post_created.subject", loc, vars)
             .expect("шаблон post_created.subject присутствует в таблице"),

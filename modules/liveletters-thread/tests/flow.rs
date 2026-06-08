@@ -17,12 +17,14 @@ fn identity(name: &str) -> Identity {
 #[test]
 fn thread_for_existing_post_prints_post_and_no_comments_marker() {
     let home = common::TestHome::new();
+    home.init();
     let ctx = home.ctx("alice");
 
     let store = home.open_store();
     let core = AppCore::new(&store);
     let post = core
         .create_post_from_identity(CreatePostFromIdentityCommand {
+            profile_id: "alice",
             identity: &identity("alice"),
             body: "Текст поста",
             visibility: Visibility::Public,
@@ -39,12 +41,14 @@ fn thread_for_existing_post_prints_post_and_no_comments_marker() {
 #[test]
 fn thread_for_post_with_root_and_reply_prints_tree() {
     let home = common::TestHome::new();
+    home.init();
     let ctx = home.ctx("alice");
 
     let store = home.open_store();
     let core = AppCore::new(&store);
     let post = core
         .create_post_from_identity(CreatePostFromIdentityCommand {
+            profile_id: "alice",
             identity: &identity("alice"),
             body: "Запись",
             visibility: Visibility::Public,
@@ -53,6 +57,7 @@ fn thread_for_post_with_root_and_reply_prints_tree() {
 
     let root = core
         .create_comment_from_identity(CreateCommentFromIdentityCommand {
+            profile_id: "alice",
             identity: &identity("bob"),
             post_id: post.post().id().as_str(),
             parent_comment_id: None,
@@ -62,6 +67,7 @@ fn thread_for_post_with_root_and_reply_prints_tree() {
         .unwrap();
 
     core.create_comment_from_identity(CreateCommentFromIdentityCommand {
+        profile_id: "alice",
         identity: &identity("alice"),
         post_id: post.post().id().as_str(),
         parent_comment_id: Some(root.comment().id().as_str()),

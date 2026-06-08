@@ -1,7 +1,7 @@
 //! Тесты команды `create_comment` с фокусом на видимость (`public` / `friends_only`).
 
 use liveletters_app_core::{AppCore, CreateCommentCommand, CreatePostCommand, Visibility};
-use liveletters_store::Store;
+use liveletters_store::{Store, UserSettingsRecord};
 use serde_json::Value;
 use tempfile::tempdir;
 
@@ -9,6 +9,19 @@ fn open() -> (tempfile::TempDir, Store) {
     let dir = tempdir().unwrap();
     let store = Store::open_for_home_dir(dir.path()).unwrap();
     (dir, store)
+}
+
+fn save_user(store: &Store) {
+    store
+        .save_user_settings_record(&UserSettingsRecord {
+            profile_id: "default".into(),
+            nickname: "alice".into(),
+            email_address: "alice@example.test".into(),
+            avatar_url: None,
+            language: "ru".into(),
+            setup_completed: true,
+        })
+        .unwrap();
 }
 
 fn setup_post(store: &Store) {
@@ -43,6 +56,7 @@ fn create_with(store: &Store, visibility: Visibility) {
 #[test]
 fn create_comment_with_friends_only_persists_visibility() {
     let (_dir, store) = open();
+    save_user(&store);
     setup_post(&store);
     create_with(&store, Visibility::FriendsOnly);
 
@@ -62,6 +76,7 @@ fn create_comment_with_friends_only_persists_visibility() {
 #[test]
 fn create_comment_with_public_persists_visibility() {
     let (_dir, store) = open();
+    save_user(&store);
     setup_post(&store);
     create_with(&store, Visibility::Public);
 

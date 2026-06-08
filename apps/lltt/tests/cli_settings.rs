@@ -22,7 +22,7 @@ fn settings_show_then_set_round_trip() {
         .success();
     let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
     assert!(
-        stdout.contains("[user_settings] отсутствует"),
+        stdout.contains("nickname:") || stdout.contains("language:"),
         "stdout = {stdout}"
     );
 

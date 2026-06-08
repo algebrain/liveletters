@@ -34,6 +34,7 @@ pub struct Identity {
 }
 
 pub struct CreatePostFromIdentityCommand<'a> {
+    pub profile_id: &'a str,
     pub identity: &'a Identity,
     pub body: &'a str,
     pub visibility: Visibility,
@@ -51,6 +52,7 @@ pub struct CreateCommentCommand<'a> {
 }
 
 pub struct CreateCommentFromIdentityCommand<'a> {
+    pub profile_id: &'a str,
     pub identity: &'a Identity,
     pub post_id: &'a str,
     pub parent_comment_id: Option<&'a str>,
@@ -218,9 +220,11 @@ pub fn create_post(
         post.visibility(),
     );
 
+    let record = store.get_user_settings_record(command.profile_id)?;
+    let author_name = display_author(record.as_ref())?;
+
     let i18n = post_created(
-        store.get_user_settings_record(command.profile_id)?.as_ref(),
-        post.author_id().as_str(),
+        record.as_ref(),
         post.resource_id().as_str(),
         post.body().as_str(),
     );
@@ -242,7 +246,7 @@ pub fn create_post(
             DomainEventPayload::PostCreated {
                 post_id: post.id().as_str().to_owned(),
                 resource_id: post.resource_id().as_str().to_owned(),
-                actor_id: post.author_id().as_str().to_owned(),
+                actor_id: author_name.to_owned(),
                 created_at: post.created_at().as_unix_seconds(),
                 body: post.body().as_str().to_owned(),
                 body_format: "plain".to_owned(),
@@ -307,9 +311,12 @@ pub fn create_comment(
         visibility: comment.visibility(),
     });
 
+    let record = store.get_user_settings_record(command.profile_id)?;
+    let author_name = display_author(record.as_ref())?;
+
     let i18n = comment_created(
-        store.get_user_settings_record(command.profile_id)?.as_ref(),
-        comment.author_id().as_str(),
+        record.as_ref(),
+        &author_name,
         comment.post_id().as_str(),
         comment.body().as_str(),
     );
@@ -335,7 +342,7 @@ pub fn create_comment(
                     .parent_comment_id()
                     .map(|parent_id| parent_id.as_str().to_owned()),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: comment.author_id().as_str().to_owned(),
+                actor_id: author_name.to_owned(),
                 created_at: comment.created_at().as_unix_seconds(),
                 visibility: encode_visibility(comment.visibility()),
             },
@@ -354,7 +361,7 @@ pub fn create_post_from_identity(
     create_post(
         store,
         CreatePostCommand {
-            profile_id: default_profile_id(),
+            profile_id: command.profile_id,
             post_id: &post_id,
             resource_id: &command.identity.publish,
             author_id: &command.identity.account_id,
@@ -374,7 +381,7 @@ pub fn create_comment_from_identity(
     create_comment(
         store,
         CreateCommentCommand {
-            profile_id: default_profile_id(),
+            profile_id: command.profile_id,
             comment_id: &comment_id,
             post_id: command.post_id,
             parent_comment_id: command.parent_comment_id,
@@ -425,11 +432,10 @@ pub fn hide_post(
         Timestamp::from_unix_seconds(command.created_at),
     );
 
-    let i18n = post_hidden(
-        store.get_user_settings_record(command.profile_id)?.as_ref(),
-        event.actor_id().as_str(),
-        event.post_id().as_str(),
-    );
+    let record = store.get_user_settings_record(command.profile_id)?;
+    let author_name = display_author(record.as_ref())?;
+
+    let i18n = post_hidden(record.as_ref(), &author_name, event.post_id().as_str());
 
     enqueue_message(
         store,
@@ -448,7 +454,7 @@ pub fn hide_post(
             DomainEventPayload::PostHidden {
                 post_id: event.post_id().as_str().to_owned(),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: event.actor_id().as_str().to_owned(),
+                actor_id: author_name.to_owned(),
                 created_at: event.created_at().as_unix_seconds(),
             },
         )?,
@@ -510,9 +516,12 @@ pub fn edit_comment(
         Timestamp::from_unix_seconds(command.created_at),
     );
 
+    let record = store.get_user_settings_record(command.profile_id)?;
+    let author_name = display_author(record.as_ref())?;
+
     let i18n = comment_edited(
-        store.get_user_settings_record(command.profile_id)?.as_ref(),
-        event.actor_id().as_str(),
+        record.as_ref(),
+        &author_name,
         event.post_id().as_str(),
         comment.body().as_str(),
     );
@@ -535,7 +544,7 @@ pub fn edit_comment(
                 comment_id: event.comment_id().as_str().to_owned(),
                 post_id: event.post_id().as_str().to_owned(),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: event.actor_id().as_str().to_owned(),
+                actor_id: author_name.to_owned(),
                 created_at: event.created_at().as_unix_seconds(),
                 body: comment.body().as_str().to_owned(),
                 visibility: encode_visibility(comment.visibility()),
@@ -660,6 +669,31 @@ pub fn save_settings(
     })?;
 
     Ok(SaveSettingsResult { settings })
+}
+
+fn display_author(record: Option<&UserSettingsRecord>) -> Result<String, AppCoreError> {
+    record
+        .and_then(|r| {
+            if r.nickname.is_empty() {
+                None
+            } else {
+                Some(r.nickname.clone())
+            }
+        })
+        .or_else(|| {
+            record.and_then(|r| {
+                if r.email_address.is_empty() {
+                    None
+                } else {
+                    Some(r.email_address.clone())
+                }
+            })
+        })
+        .ok_or_else(|| {
+            AppCoreError::ProfileIncomplete(
+                "nickname и email_address пусты — задайте их: lltt set nickname \"Имя\"".into(),
+            )
+        })
 }
 
 fn encode_visibility(visibility: Visibility) -> String {

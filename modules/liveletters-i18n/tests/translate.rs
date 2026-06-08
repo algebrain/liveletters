@@ -11,10 +11,10 @@ fn translate_fills_known_variables() {
     let s = translate(
         "post_created.subject",
         Locale::Ru,
-        Vars(&[("sender", "alice"), ("resource", "blog-1")]),
+        Vars(&[("resource", "blog-1")]),
     )
     .expect("translation should succeed");
-    assert_eq!(s, "Новая запись от alice в blog-1");
+    assert_eq!(s, "Новая запись в журнале blog-1");
 }
 
 #[test]
@@ -116,11 +116,11 @@ fn translate_supports_long_cyrillic_body() {
     let s = translate(
         "post_created.body",
         Locale::Ru,
-        Vars(&[("sender", "alice"), ("resource", "blog-1"), ("body", body)]),
+        Vars(&[("resource", "blog-1"), ("body", body)]),
     )
     .unwrap();
     assert!(s.contains(body));
-    assert!(s.starts_with("alice написал(а)"));
+    assert!(s.starts_with("Новая запись в журнале blog-1"));
     assert!(s.ends_with("— LiveLetters"));
 }
 

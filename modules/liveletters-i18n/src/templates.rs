@@ -3,12 +3,12 @@ use crate::Locale;
 pub(super) fn template(key: &str, locale: Locale) -> Option<&'static str> {
     let (ru, en): (&'static str, &'static str) = match key {
         "post_created.subject" => (
-            "Новая запись от %sender% в %resource%",
-            "New post by %sender% in %resource%",
+            "Новая запись в журнале %resource%",
+            "New post in journal %resource%",
         ),
         "post_created.body" => (
-            "%sender% написал(а) новую запись в %resource%:\n\n%body%\n\n— LiveLetters",
-            "%sender% has created a new post in %resource%:\n\n%body%\n\n— LiveLetters",
+            "Новая запись в журнале %resource%:\n\n%body%\n\n— LiveLetters",
+            "New post in journal %resource%:\n\n%body%\n\n— LiveLetters",
         ),
         "comment_created.subject" => ("Новый комментарий от %sender%", "New comment by %sender%"),
         "comment_created.body" => (

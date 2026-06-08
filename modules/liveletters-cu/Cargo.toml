@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 liveletters-config = { path = "../liveletters-config" }
+liveletters-i18n = { path = "../liveletters-i18n" }
 liveletters-output = { path = "../liveletters-output" }
 liveletters-posts = { path = "../liveletters-posts" }
 liveletters-store = { path = "../liveletters-store" }

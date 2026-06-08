@@ -35,6 +35,7 @@ fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), CommentError> {
 
     let core = AppCore::new(&store);
     let result = core.create_comment_from_identity(CreateCommentFromIdentityCommand {
+        profile_id: &ctx.identity_name,
         identity: &identity,
         post_id: &args.post,
         parent_comment_id: args.parent.as_deref(),

@@ -18,7 +18,7 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), SettingsError> {
             if let Some(field) = key.strip_prefix("log.") {
                 set::run_log_field(&ctx.home, field, &value)
             } else {
-                set::run_db_field(&ctx.state_home, &ctx.identity_name, &key, &value)
+                set::run_db_field(&ctx.home, &ctx.state_home, &ctx.identity_name, &key, &value)
             }
         }
     }

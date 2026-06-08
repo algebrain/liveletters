@@ -1,7 +1,8 @@
 use std::path::Path;
 
 use liveletters_config::IdentityConfig;
-use liveletters_store::{MailSettingsRecord, Store};
+use liveletters_i18n::detect_system_locale;
+use liveletters_store::{MailSettingsRecord, Store, UserSettingsRecord};
 
 use crate::{
     error::CuError,
@@ -31,6 +32,7 @@ pub fn run(
     }
     liveletters_config::save_identity(&ctx.home, name, &cfg)?;
     save_mail_settings_from_identity(ctx, name, &cfg)?;
+    save_user_settings_from_identity(ctx, name, &cfg)?;
     println!("добавлен identities/{name}.toml");
     Ok(())
 }
@@ -69,5 +71,22 @@ fn save_mail_settings_from_identity(
             .unwrap_or_else(|| "INBOX".to_owned()),
     };
     store.save_mail_settings_record(&record)?;
+    Ok(())
+}
+
+fn save_user_settings_from_identity(
+    ctx: &liveletters_output::CommandContext,
+    name: &str,
+    cfg: &IdentityConfig,
+) -> Result<(), CuError> {
+    let store = Store::open_for_home_dir(ctx.home.join("users").join(name))?;
+    store.save_user_settings_record(&UserSettingsRecord {
+        profile_id: name.to_owned(),
+        nickname: cfg.display_name.clone(),
+        email_address: cfg.mail.publish.clone(),
+        avatar_url: None,
+        language: detect_system_locale().as_str().to_owned(),
+        setup_completed: true,
+    })?;
     Ok(())
 }

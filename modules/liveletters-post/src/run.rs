@@ -35,6 +35,7 @@ fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), PostError> {
 
     let core = AppCore::new(&store);
     let result = core.create_post_from_identity(CreatePostFromIdentityCommand {
+        profile_id: &ctx.identity_name,
         identity: &identity,
         body: &body,
         visibility,

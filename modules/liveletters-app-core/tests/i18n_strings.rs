@@ -62,10 +62,10 @@ fn post_created_subject_switches_with_language() {
         .unwrap();
     let (subject_en, body_en) = outbox_subject_and_body(&store_en, "post-created:post-1");
     assert!(
-        subject_en.contains("New post by alice"),
+        subject_en.contains("New post in journal"),
         "subject={subject_en}"
     );
-    assert!(body_en.contains("has created a new post"), "body={body_en}");
+    assert!(body_en.contains("New post in journal"), "body={body_en}");
 
     let (_dir_ru, store_ru) = open();
     save_user(&store_ru, "ru");
@@ -83,10 +83,13 @@ fn post_created_subject_switches_with_language() {
         .unwrap();
     let (subject_ru, body_ru) = outbox_subject_and_body(&store_ru, "post-created:post-2");
     assert!(
-        subject_ru.contains("Новая запись от Алиса"),
+        subject_ru.contains("Новая запись в журнале"),
         "subject_ru={subject_ru}"
     );
-    assert!(body_ru.contains("написал(а)"), "body_ru={body_ru}");
+    assert!(
+        body_ru.contains("Новая запись в журнале"),
+        "body_ru={body_ru}"
+    );
 }
 
 #[test]
@@ -109,7 +112,7 @@ fn comment_created_subject_uses_localized_template() {
         comment_id: "comment-1",
         post_id: "post-1",
         parent_comment_id: None,
-        author_id: "bob",
+        author_id: "alice",
         created_at: 2,
         body: "Первый",
         visibility: Visibility::Public,
@@ -118,7 +121,7 @@ fn comment_created_subject_uses_localized_template() {
 
     let (subject, body) = outbox_subject_and_body(&store, "comment-created:comment-1");
     assert!(
-        subject.contains("Новый комментарий от bob"),
+        subject.contains("Новый комментарий от alice"),
         "subject={subject}"
     );
     assert!(body.contains("оставил(а) комментарий"), "body={body}");
@@ -144,7 +147,7 @@ fn comment_edited_subject_uses_localized_template() {
         comment_id: "comment-1",
         post_id: "post-1",
         parent_comment_id: None,
-        author_id: "bob",
+        author_id: "alice",
         created_at: 2,
         body: "Original",
         visibility: Visibility::Public,
@@ -153,14 +156,17 @@ fn comment_edited_subject_uses_localized_template() {
     app.edit_comment(EditCommentCommand {
         profile_id: "default",
         comment_id: "comment-1",
-        actor_id: "bob",
+        actor_id: "alice",
         created_at: 3,
         body: "Edited",
     })
     .unwrap();
 
     let (subject, _body) = outbox_subject_and_body(&store, "comment-edited:comment-1");
-    assert!(subject.contains("Comment edited: bob"), "subject={subject}");
+    assert!(
+        subject.contains("Comment edited: alice"),
+        "subject={subject}"
+    );
 }
 
 #[test]

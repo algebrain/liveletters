@@ -13,6 +13,7 @@ pub enum AppCoreError {
     PostNotFound { post_id: String },
     CommentNotFound { comment_id: String },
     InvalidDelivery(String),
+    ProfileIncomplete(String),
 }
 
 impl std::fmt::Display for AppCoreError {
@@ -30,6 +31,7 @@ impl std::fmt::Display for AppCoreError {
                 write!(f, "комментарий `{comment_id}` не найден")
             }
             Self::InvalidDelivery(message) => write!(f, "некорректная адресация: {message}"),
+            Self::ProfileIncomplete(message) => write!(f, "{message}"),
         }
     }
 }

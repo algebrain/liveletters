@@ -1,13 +1,27 @@
 //! Тесты `create_post_from_identity`: автоподстановка `post_id`, `resource_id`, `author_id`, `created_at`.
 
 use liveletters_app_core::{AppCore, CreatePostFromIdentityCommand, Identity, Visibility};
-use liveletters_store::Store;
+use liveletters_store::{Store, UserSettingsRecord};
 use tempfile::tempdir;
 
 fn open() -> (tempfile::TempDir, Store) {
     let dir = tempdir().unwrap();
     let store = Store::open_for_home_dir(dir.path()).unwrap();
+    save_user(&store);
     (dir, store)
+}
+
+fn save_user(store: &Store) {
+    store
+        .save_user_settings_record(&UserSettingsRecord {
+            profile_id: "alice".into(),
+            nickname: "alice".into(),
+            email_address: "alice@example.test".into(),
+            avatar_url: None,
+            language: "ru".into(),
+            setup_completed: true,
+        })
+        .unwrap();
 }
 
 fn identity() -> Identity {
@@ -25,6 +39,7 @@ fn create_post_from_identity_derives_fields_and_persists_post() {
 
     let result = core
         .create_post_from_identity(CreatePostFromIdentityCommand {
+            profile_id: "alice",
             identity: &ident,
             body: "Привет из identity",
             visibility: Visibility::FriendsOnly,
@@ -54,6 +69,7 @@ fn create_post_from_identity_generates_unique_ids_across_calls() {
 
     let first = core
         .create_post_from_identity(CreatePostFromIdentityCommand {
+            profile_id: "alice",
             identity: &ident,
             body: "Первый",
             visibility: Visibility::Public,
@@ -62,6 +78,7 @@ fn create_post_from_identity_generates_unique_ids_across_calls() {
     std::thread::sleep(std::time::Duration::from_millis(2));
     let second = core
         .create_post_from_identity(CreatePostFromIdentityCommand {
+            profile_id: "alice",
             identity: &ident,
             body: "Второй",
             visibility: Visibility::Public,
