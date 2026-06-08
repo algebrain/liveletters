@@ -228,11 +228,10 @@ fn parse_rm(rest: &[String]) -> Result<CuAction, CuError> {
 }
 
 pub fn ensure_name_exists(home: &std::path::Path, name: &str) -> Result<(), crate::error::CuError> {
-    let path = home.join("identities").join(format!("{name}.toml"));
-    if !path.exists() {
-        return Err(crate::error::CuError::Config(
-            liveletters_config::ConfigError::UnknownIdentity(name.to_owned()),
-        ));
+    let db_path = home.join("users").join(name).join("liveletters.sqlite3");
+    let toml_path = home.join("identities").join(format!("{name}.toml"));
+    if !db_path.exists() && !toml_path.exists() {
+        return Err(crate::error::CuError::UnknownIdentity(name.to_owned()));
     }
     Ok(())
 }

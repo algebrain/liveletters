@@ -107,8 +107,9 @@ receive = ["comments+carol@example.com"]
         &tokens(&["add", "carol", "--from", from.to_str().unwrap()]),
     )
     .unwrap();
-    let created = home.path().join("identities/carol.toml");
-    assert!(created.exists());
+    let store =
+        liveletters_store::Store::open_for_home_dir(home.path().join("users/carol")).unwrap();
+    assert!(store.get_user_settings_record("carol").unwrap().is_some());
 }
 
 #[test]
@@ -139,7 +140,7 @@ fn rm_action_deletes_with_yes() {
     fs::write(home.path().join("current-user"), "default").unwrap();
     let ctx = home.ctx("default");
     run_user(&ctx, &tokens(&["rm", "alice", "--yes"])).unwrap();
-    assert!(!home.path().join("identities/alice.toml").exists());
+    assert!(!home.path().join("users/alice/liveletters.sqlite3").exists());
 }
 
 #[test]

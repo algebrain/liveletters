@@ -12,7 +12,7 @@ mod io;
 pub mod time;
 
 pub use context::CommandContext;
-pub use format::{mask_password, print_identity, print_kv, print_table};
+pub use format::{mask_password, print_identity, print_identity_from_db, print_kv, print_table};
 pub use io::{body_was_empty, parse_visibility, read_body, read_body_io};
 pub use time::format_unix_iso8601_utc;
 

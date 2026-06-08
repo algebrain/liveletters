@@ -26,4 +26,7 @@ pub enum CommentError {
 
     #[error("тело комментария пустое")]
     EmptyBody,
+
+    #[error("идентичность `{0}` не найдена в базе")]
+    IdentityNotFound(String),
 }

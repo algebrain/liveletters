@@ -26,7 +26,7 @@ fn init_creates_expected_layout() -> Result<(), Box<dyn Error + Send + Sync>> {
         !home.join("current-user").exists(),
         "init не должен выбирать текущего пользователя"
     );
-    for sub in ["identities", "drafts", "inbox", "outbox-staged", "logs"] {
+    for sub in ["drafts", "inbox", "outbox-staged", "logs"] {
         assert!(home.join(sub).is_dir(), "каталог {sub} не создан");
     }
     Ok(())

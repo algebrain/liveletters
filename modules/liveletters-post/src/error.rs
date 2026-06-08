@@ -26,4 +26,7 @@ pub enum PostError {
 
     #[error("тело записи пустое")]
     EmptyBody,
+
+    #[error("идентичность `{0}` не найдена в базе")]
+    IdentityNotFound(String),
 }

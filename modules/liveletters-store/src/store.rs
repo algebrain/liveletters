@@ -138,6 +138,24 @@ impl Store {
                 profile_id TEXT PRIMARY KEY,
                 last_imap_uid INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS receive_addresses (
+                profile_id TEXT NOT NULL,
+                address TEXT NOT NULL,
+                PRIMARY KEY (profile_id, address)
+            );
+
+            CREATE TABLE IF NOT EXISTS resources_owned (
+                profile_id TEXT NOT NULL,
+                resource_address TEXT NOT NULL,
+                PRIMARY KEY (profile_id, resource_address)
+            );
+
+            CREATE TABLE IF NOT EXISTS local_subscriptions (
+                profile_id TEXT NOT NULL,
+                resource_address TEXT NOT NULL,
+                PRIMARY KEY (profile_id, resource_address)
+            );
             "#,
         )?;
 

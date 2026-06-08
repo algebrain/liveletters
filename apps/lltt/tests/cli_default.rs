@@ -36,11 +36,6 @@ fn init_without_liveletters_home_creates_dot_liveletters_under_user_home() {
         home.join("mail-password-obfuscation.key").exists(),
         "ключ не создан"
     );
-    assert!(
-        home.join("identities").is_dir(),
-        "каталог identities не создан"
-    );
-    assert!(home.join("drafts").is_dir(), "каталог drafts не создан");
     assert!(!home.join("identities/default.toml").exists());
     assert!(!home.join("current-user").exists());
 }

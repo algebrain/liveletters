@@ -1,9 +1,9 @@
 //! Интеграционные тесты команды `lltt sub` через бинарь.
 
-use std::fs;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
+use liveletters_store::Store;
 use predicates::str::contains;
 use tempfile::TempDir;
 
@@ -11,6 +11,13 @@ mod common;
 
 fn lltt() -> Command {
     Command::cargo_bin("lltt").expect("бинарь lltt")
+}
+
+fn local_subscriptions(tmp: &TempDir, name: &str) -> Vec<String> {
+    Store::open_for_home_dir(tmp.path().join("users").join(name))
+        .unwrap()
+        .list_local_subscriptions(name)
+        .unwrap()
 }
 
 #[test]
@@ -25,9 +32,9 @@ fn sub_subscribe_writes_toml_and_outbox() {
         .assert()
         .success();
 
-    let text = fs::read_to_string(tmp.path().join("identities/bob.toml")).unwrap();
-    assert!(text.contains("alice-publish@example.org"));
-    assert!(tmp.path().join("liveletters.sqlite3").exists());
+    let subs = local_subscriptions(&tmp, "bob");
+    assert!(subs.contains(&"alice-publish@example.org".to_owned()));
+    assert!(tmp.path().join("users/bob/liveletters.sqlite3").exists());
 }
 
 #[test]
@@ -84,6 +91,6 @@ fn sub_rm_removes_subscription() {
         .assert()
         .success();
 
-    let text = fs::read_to_string(tmp.path().join("identities/bob.toml")).unwrap();
-    assert!(!text.contains("alice-publish@example.org"));
+    let subs = local_subscriptions(&tmp, "bob");
+    assert!(!subs.contains(&"alice-publish@example.org".to_owned()));
 }

@@ -19,3 +19,4 @@ toml = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+liveletters-i18n = { path = "../liveletters-i18n" }

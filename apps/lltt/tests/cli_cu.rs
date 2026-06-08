@@ -9,6 +9,8 @@ use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 use tempfile::TempDir;
 
+mod common;
+
 fn lltt() -> Command {
     Command::cargo_bin("lltt").expect("бинарь lltt")
 }
@@ -22,6 +24,7 @@ fn init_home(tmp: &TempDir) {
 }
 
 fn write_identity(home: &TempDir, name: &str) {
+    fs::create_dir_all(home.path().join("identities")).unwrap();
     fs::write(
         home.path().join("identities").join(format!("{name}.toml")),
         format!(
@@ -41,7 +44,11 @@ receive = ["comments+{name}@example.com"]
 #[test]
 fn user_list_is_empty_after_init() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("init")
+        .assert()
+        .success();
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
         .arg("user")
@@ -53,7 +60,11 @@ fn user_list_is_empty_after_init() {
 #[test]
 fn cu_with_no_args_errors_before_current_user_selected() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("init")
+        .assert()
+        .success();
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
         .arg("cu")
@@ -66,14 +77,7 @@ fn cu_with_no_args_errors_before_current_user_selected() {
 #[test]
 fn cu_switch_writes_current_user_file() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
-    write_identity(&tmp, "alice");
-    lltt()
-        .env("LIVELETTERS_HOME", tmp.path())
-        .arg("cu")
-        .arg("alice")
-        .assert()
-        .success();
+    common::init_user(tmp.path(), "alice");
     let cu = fs::read_to_string(tmp.path().join("current-user")).unwrap();
     assert_eq!(cu.trim(), "alice");
 }
@@ -81,7 +85,11 @@ fn cu_switch_writes_current_user_file() {
 #[test]
 fn cu_switch_errors_on_unknown_identity() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("init")
+        .assert()
+        .success();
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
         .arg("cu")
@@ -93,14 +101,7 @@ fn cu_switch_errors_on_unknown_identity() {
 #[test]
 fn cu_show_prints_identity() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
-    write_identity(&tmp, "alice");
-    lltt()
-        .env("LIVELETTERS_HOME", tmp.path())
-        .arg("cu")
-        .arg("alice")
-        .assert()
-        .success();
+    common::init_user(tmp.path(), "alice");
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
         .arg("cu")
@@ -112,37 +113,97 @@ fn cu_show_prints_identity() {
 #[test]
 fn cu_show_masks_smtp_password_in_stdout() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
     let password = "supersecretpw9";
+    common::init_user(tmp.path(), "alice");
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store
+        .save_user_settings_record(&liveletters_store::UserSettingsRecord {
+            profile_id: "alice".into(),
+            nickname: "Alice".into(),
+            email_address: "https://example.com/alice/".into(),
+            avatar_url: None,
+            language: "ru".into(),
+            setup_completed: true,
+        })
+        .unwrap();
+    store
+        .save_mail_settings_record(&liveletters_store::MailSettingsRecord {
+            profile_id: "alice".into(),
+            smtp_host: "smtp.example.com".into(),
+            smtp_port: 465,
+            smtp_security: "tls".into(),
+            smtp_username: "alice@example.com".into(),
+            smtp_password: password.into(),
+            smtp_hello_domain: "example.com".into(),
+            imap_host: "imap.example.com".into(),
+            imap_port: 993,
+            imap_security: "tls".into(),
+            imap_username: "alice@example.com".into(),
+            imap_password: password.into(),
+            imap_mailbox: "INBOX".into(),
+        })
+        .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("user")
+        .arg("show")
+        .arg("alice")
+        .assert()
+        .success()
+        .stdout(contains("********"))
+        .stdout(contains(password).not());
+}
+
+#[test]
+fn cu_user_add_show_masks_passwords() {
+    let tmp = TempDir::new().unwrap();
+    let password = "topsecret42";
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["init", "--force"])
+        .assert()
+        .success();
+    fs::create_dir_all(tmp.path().join("drafts")).unwrap();
     fs::write(
-        tmp.path().join("identities").join("alice.toml"),
+        tmp.path().join("drafts/alice.toml"),
         format!(
             r#"
-account_id = "alice"
+account_id = "acct_alice"
 display_name = "Alice"
 
 [mail]
-publish = "https://example.com/alice/"
-receive = ["comments+alice@example.com"]
+publish = "alice@example.org"
+receive = ["alice@example.org"]
 
 [mail.smtp]
-host = "smtp.example.com"
-port = 465
-security = "tls"
-username = "alice@example.com"
+host = "smtp.example.org"
+port = 587
+security = "starttls"
+username = "alice@example.org"
 password = "{password}"
+hello_domain = "example.org"
+pwd_obfuscate = false
 
 [mail.imap]
-host = "imap.example.com"
+host = "imap.example.org"
 port = 993
 security = "tls"
-username = "alice@example.com"
+username = "alice@example.org"
 password = "{password}"
 mailbox = "INBOX"
+pwd_obfuscate = false
 "#
         ),
     )
     .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["user", "add", "alice"])
+        .assert()
+        .success();
+
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
         .arg("user")
@@ -157,7 +218,11 @@ mailbox = "INBOX"
 #[test]
 fn cu_add_creates_identity_file() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("init")
+        .assert()
+        .success();
     let from = tmp.path().join("source.toml");
     fs::write(
         &from,
@@ -179,14 +244,14 @@ publish = "https://example.com/carol/"
         .arg(&from)
         .assert()
         .success();
-    assert!(tmp.path().join("identities/carol.toml").exists());
+    let store = Store::open_for_home_dir(tmp.path().join("users/carol")).unwrap();
+    assert!(store.get_user_settings_record("carol").unwrap().is_some());
 }
 
 #[test]
 fn cu_rm_requires_yes() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
-    write_identity(&tmp, "alice");
+    common::init_user(tmp.path(), "alice");
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
         .arg("user")
@@ -194,14 +259,24 @@ fn cu_rm_requires_yes() {
         .arg("alice")
         .assert()
         .failure();
-    assert!(tmp.path().join("identities/alice.toml").exists());
+    assert!(tmp.path().join("users/alice/liveletters.sqlite3").exists());
 }
 
 #[test]
 fn cu_rm_with_yes_deletes_identity() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
-    write_identity(&tmp, "alice");
+    common::init_user(tmp.path(), "alice");
+    write_identity(&tmp, "bob");
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["cu", "bob"])
+        .assert()
+        .success();
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["set", "language", "ru"])
+        .assert()
+        .success();
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
         .arg("user")
@@ -210,13 +285,17 @@ fn cu_rm_with_yes_deletes_identity() {
         .arg("--yes")
         .assert()
         .success();
-    assert!(!tmp.path().join("identities/alice.toml").exists());
+    assert!(!tmp.path().join("users/alice/liveletters.sqlite3").exists());
 }
 
 #[test]
 fn old_cu_management_commands_are_rejected_with_user_hint() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("init")
+        .assert()
+        .success();
 
     for args in [
         vec!["cu", "list"],

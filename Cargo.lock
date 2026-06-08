@@ -698,6 +698,7 @@ version = "0.1.0"
 dependencies = [
  "liveletters-config",
  "liveletters-domain",
+ "liveletters-store",
  "tempfile",
 ]
 
@@ -789,6 +790,7 @@ dependencies = [
  "liveletters-app-core",
  "liveletters-config",
  "liveletters-domain",
+ "liveletters-i18n",
  "liveletters-output",
  "liveletters-store",
  "tempfile",

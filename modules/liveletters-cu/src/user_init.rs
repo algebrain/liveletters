@@ -28,6 +28,7 @@ pub fn run(
 
 fn draft_toml(name: &str) -> String {
     let display = capitalize_ascii(name);
+    let lang = liveletters_i18n::detect_system_locale().as_str();
     format!(
         r#"account_id = "acct_{name}"
 display_name = "{display}"
@@ -57,6 +58,9 @@ mailbox = "INBOX"
 [meta]
 resources_owned = ["{name}@example.org"]
 subscriptions = []
+
+[settings]
+language = "{lang}"
 "#
     )
 }

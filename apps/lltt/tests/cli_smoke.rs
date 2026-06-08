@@ -2,6 +2,7 @@
 //! и сообщает об ошибке при обращении к неинициализированному домашнему каталогу
 //! или при отсутствии файла `<home>/current-user`.
 
+use std::fs;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
@@ -73,6 +74,7 @@ fn command_when_current_user_file_removed_returns_error() {
         .arg("init")
         .assert()
         .success();
+    fs::create_dir_all(tmp.path().join("identities")).expect("create identities");
     std::fs::write(
         tmp.path().join("identities").join("alice.toml"),
         r#"

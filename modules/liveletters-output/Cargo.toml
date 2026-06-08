@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 liveletters-config = { path = "../liveletters-config" }
 liveletters-domain = { path = "../liveletters-domain" }
+liveletters-store = { path = "../liveletters-store" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

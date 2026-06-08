@@ -6,14 +6,7 @@ use liveletters_store::Store;
 use crate::{Args, CommandContext, InitError};
 
 /// Каталоги, которые `init` создаёт внутри `home`.
-const SUBDIRS: &[&str] = &[
-    "identities",
-    "drafts",
-    "inbox",
-    "outbox-staged",
-    "logs",
-    "users",
-];
+const SUBDIRS: &[&str] = &["drafts", "inbox", "outbox-staged", "logs", "users"];
 
 pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send + Sync>> {
     run_inner(ctx.home.as_path(), args.force)
@@ -38,7 +31,6 @@ fn run_inner(home: &Path, force: bool) -> Result<(), InitError> {
     println!("инициализирован {}", home.display());
     println!("создан lltt.db");
     println!("создан mail-password-obfuscation.key");
-    println!("создан каталог identities");
     println!("создан каталог drafts");
 
     Ok(())

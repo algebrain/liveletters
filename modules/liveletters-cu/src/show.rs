@@ -1,11 +1,28 @@
 use crate::error::CuError;
+use liveletters_output::print_identity_from_db;
 
 pub fn run(
     ctx: &liveletters_output::CommandContext,
     name: &str,
     reveal: bool,
 ) -> Result<(), CuError> {
-    let cfg = liveletters_config::load_identity(&ctx.home, name)?;
-    liveletters_output::print_identity(&cfg, reveal);
+    let store = liveletters_store::Store::open_for_home_dir(ctx.home.join("users").join(name))?;
+    let user = store
+        .get_user_settings_record(name)?
+        .ok_or_else(|| CuError::UnknownIdentity(name.to_owned()))?;
+    let mail = store.get_mail_settings_record(name)?;
+    let receive = store.list_receive_addresses(name)?;
+    let resources = store.list_resources_owned(name)?;
+    let local_subs = store.list_local_subscriptions(name)?;
+
+    print_identity_from_db(
+        name,
+        &user,
+        mail.as_ref(),
+        &receive,
+        &resources,
+        &local_subs,
+        reveal,
+    );
     Ok(())
 }

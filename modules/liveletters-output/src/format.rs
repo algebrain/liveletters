@@ -118,6 +118,78 @@ pub fn print_identity(cfg: &liveletters_config::IdentityConfig, reveal: bool) {
     }
 }
 
+pub fn print_identity_from_db(
+    name: &str,
+    user: &liveletters_store::UserSettingsRecord,
+    mail: Option<&liveletters_store::MailSettingsRecord>,
+    receive: &[String],
+    resources: &[String],
+    local_subs: &[String],
+    reveal: bool,
+) {
+    println!("[identity]");
+    print_kv(&[
+        ("account_id", &format!("acct_{name}")),
+        ("display_name", &user.nickname),
+        ("language", &user.language),
+    ]);
+
+    println!();
+    println!("[mail]");
+    print_kv(&[("publish", &user.email_address)]);
+    if receive.is_empty() {
+        print_kv(&[("receive", "-")]);
+    } else {
+        for (i, r) in receive.iter().enumerate() {
+            let label = format!("[{i}] {r}");
+            let kv: [(&str, &str); 1] = [("receive", &label)];
+            print_kv(&kv);
+        }
+    }
+
+    if let Some(mail) = mail {
+        if !mail.smtp_host.is_empty() {
+            println!();
+            println!("[mail.smtp]");
+            print_kv(&[
+                ("host", &mail.smtp_host),
+                ("port", &mail.smtp_port.to_string()),
+                ("security", &mail.smtp_security),
+                ("username", &mail.smtp_username),
+                ("password", &mask_password(&mail.smtp_password, reveal)),
+            ]);
+        }
+        if !mail.imap_host.is_empty() {
+            println!();
+            println!("[mail.imap]");
+            print_kv(&[
+                ("host", &mail.imap_host),
+                ("port", &mail.imap_port.to_string()),
+                ("security", &mail.imap_security),
+                ("username", &mail.imap_username),
+                ("password", &mask_password(&mail.imap_password, reveal)),
+                ("mailbox", &mail.imap_mailbox),
+            ]);
+        }
+    }
+
+    if !resources.is_empty() {
+        println!();
+        println!("[resources_owned]");
+        for r in resources {
+            println!("- {r}");
+        }
+    }
+
+    if !local_subs.is_empty() {
+        println!();
+        println!("[local_subscriptions]");
+        for s in local_subs {
+            println!("- {s}");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

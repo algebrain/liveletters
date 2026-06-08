@@ -101,7 +101,6 @@ mailbox = "INBOX"
         .assert()
         .success();
 
-    assert!(tmp.path().join("identities/alice.toml").exists());
     assert!(!tmp.path().join("current-user").exists());
 
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
@@ -135,7 +134,6 @@ fn user_add_uses_default_draft_path_when_from_is_omitted() {
         .assert()
         .success();
 
-    assert!(tmp.path().join("identities/alice.toml").exists());
     assert!(!tmp.path().join("current-user").exists());
 }
 

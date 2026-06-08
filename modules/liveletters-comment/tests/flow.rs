@@ -65,7 +65,7 @@ fn comment_new_creates_persisted_comment_with_default_visibility() {
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].body, "Первый комментарий");
     assert_eq!(comments[0].visibility, "public");
-    assert_eq!(comments[0].author_id, "bob");
+    assert_eq!(comments[0].author_id, "acct_bob");
 }
 
 #[test]

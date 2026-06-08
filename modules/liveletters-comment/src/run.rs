@@ -2,7 +2,6 @@ use std::error::Error;
 use std::io::{self};
 
 use liveletters_app_core::{AppCore, CreateCommentFromIdentityCommand, Identity};
-use liveletters_config::{MailSettings, load_identity};
 use liveletters_output::{CommandContext, parse_visibility, read_body};
 use liveletters_store::Store;
 
@@ -22,8 +21,13 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), CommentError> {
 
 fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), CommentError> {
     let store = Store::open_for_home_dir(&ctx.state_home)?;
-    let identity_cfg = load_identity(&ctx.home, &ctx.identity_name)?;
-    let identity = identity_from_config(&identity_cfg.mail, &identity_cfg.account_id);
+    let user = store
+        .get_user_settings_record(&ctx.identity_name)?
+        .ok_or_else(|| CommentError::IdentityNotFound(ctx.identity_name.clone()))?;
+    let identity = Identity {
+        account_id: format!("acct_{}", &ctx.identity_name),
+        publish: user.email_address,
+    };
 
     let body = read_body(args.body_file.as_deref(), &mut io::stdin().lock())
         .map_err(CommentError::IoFromOutput)?;
@@ -45,11 +49,4 @@ fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), CommentError> {
 
     print_created(result.comment().id().as_str());
     Ok(())
-}
-
-fn identity_from_config(mail: &MailSettings, account_id: &str) -> Identity {
-    Identity {
-        account_id: account_id.to_owned(),
-        publish: mail.publish().to_owned(),
-    }
 }

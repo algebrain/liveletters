@@ -309,4 +309,118 @@ impl Store {
         )?;
         Ok(plaintext)
     }
+
+    pub fn save_receive_addresses(
+        &self,
+        profile_id: &str,
+        addresses: &[String],
+    ) -> Result<(), StoreError> {
+        self.connection().execute(
+            "DELETE FROM receive_addresses WHERE profile_id = ?1",
+            params![profile_id],
+        )?;
+        for addr in addresses {
+            self.connection().execute(
+                "INSERT INTO receive_addresses (profile_id, address) VALUES (?1, ?2)",
+                params![profile_id, addr],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn list_receive_addresses(&self, profile_id: &str) -> Result<Vec<String>, StoreError> {
+        let mut stmt = self
+            .connection()
+            .prepare("SELECT address FROM receive_addresses WHERE profile_id = ?1")?;
+        let rows = stmt.query_map(params![profile_id], |r| r.get::<_, String>(0))?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
+    }
+
+    pub fn save_resources_owned(
+        &self,
+        profile_id: &str,
+        resources: &[String],
+    ) -> Result<(), StoreError> {
+        self.connection().execute(
+            "DELETE FROM resources_owned WHERE profile_id = ?1",
+            params![profile_id],
+        )?;
+        for r in resources {
+            self.connection().execute(
+                "INSERT INTO resources_owned (profile_id, resource_address) VALUES (?1, ?2)",
+                params![profile_id, r],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn list_resources_owned(&self, profile_id: &str) -> Result<Vec<String>, StoreError> {
+        let mut stmt = self
+            .connection()
+            .prepare("SELECT resource_address FROM resources_owned WHERE profile_id = ?1")?;
+        let rows = stmt.query_map(params![profile_id], |r| r.get::<_, String>(0))?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
+    }
+
+    pub fn save_local_subscriptions(
+        &self,
+        profile_id: &str,
+        subscriptions: &[String],
+    ) -> Result<(), StoreError> {
+        self.connection().execute(
+            "DELETE FROM local_subscriptions WHERE profile_id = ?1",
+            params![profile_id],
+        )?;
+        for s in subscriptions {
+            self.connection().execute(
+                "INSERT INTO local_subscriptions (profile_id, resource_address) VALUES (?1, ?2)",
+                params![profile_id, s],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn list_local_subscriptions(&self, profile_id: &str) -> Result<Vec<String>, StoreError> {
+        let mut stmt = self
+            .connection()
+            .prepare("SELECT resource_address FROM local_subscriptions WHERE profile_id = ?1")?;
+        let rows = stmt.query_map(params![profile_id], |r| r.get::<_, String>(0))?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
+    }
+
+    pub fn add_local_subscription(
+        &self,
+        profile_id: &str,
+        address: &str,
+    ) -> Result<(), StoreError> {
+        self.connection().execute(
+            "INSERT OR IGNORE INTO local_subscriptions (profile_id, resource_address) VALUES (?1, ?2)",
+            params![profile_id, address],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_local_subscription(
+        &self,
+        profile_id: &str,
+        address: &str,
+    ) -> Result<(), StoreError> {
+        self.connection().execute(
+            "DELETE FROM local_subscriptions WHERE profile_id = ?1 AND resource_address = ?2",
+            params![profile_id, address],
+        )?;
+        Ok(())
+    }
 }

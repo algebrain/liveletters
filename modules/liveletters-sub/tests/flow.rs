@@ -10,15 +10,9 @@ fn tokens(args: &[&str]) -> liveletters_sub::Args {
         tokens: args.iter().map(|s| s.to_string()).collect(),
     }
 }
-
-fn read_identity_subscriptions(home: &std::path::Path, name: &str) -> Vec<String> {
-    let path = home.join("identities").join(format!("{name}.toml"));
-    let text = std::fs::read_to_string(&path).expect("identity file");
-    let cfg: liveletters_config::IdentityConfig = toml::from_str(&text).expect("identity parses");
-    cfg.subscriptions()
-        .iter()
-        .map(|a| a.as_str().to_owned())
-        .collect()
+fn read_local_subscriptions(home: &std::path::Path, name: &str) -> Vec<String> {
+    let store = liveletters_store::Store::open_for_home_dir(home).unwrap();
+    store.list_local_subscriptions(name).unwrap()
 }
 
 #[test]
@@ -29,7 +23,7 @@ fn subscribe_writes_local_subscriptions_and_outbox() {
 
     run(&ctx, &tokens(&["alice-publish@example.org"])).unwrap();
 
-    let subs = read_identity_subscriptions(home.path(), "bob");
+    let subs = read_local_subscriptions(home.path(), "bob");
     assert_eq!(subs, vec!["alice-publish@example.org"]);
 
     let store = home.open_store();
@@ -66,7 +60,6 @@ fn list_shows_subscribed_and_owned() {
 
     run(&ctx, &tokens(&["alice-publish@example.org"])).unwrap();
 
-    // output goes to stdout; we just check it doesn't panic and store is consistent
     run(&ctx, &tokens(&["list"])).unwrap();
 }
 
@@ -79,7 +72,7 @@ fn rm_removes_local_subscription_and_writes_unsubscribe() {
     run(&ctx, &tokens(&["alice-publish@example.org"])).unwrap();
     run(&ctx, &tokens(&["rm", "alice-publish@example.org"])).unwrap();
 
-    let subs = read_identity_subscriptions(home.path(), "bob");
+    let subs = read_local_subscriptions(home.path(), "bob");
     assert!(subs.is_empty());
 
     let store = home.open_store();
@@ -110,7 +103,6 @@ fn empty_args_errors() {
 #[test]
 fn no_init_errors_when_store_missing() {
     let home = common::TestHome::new();
-    // Note: no add_identity, no init
     let ctx = CommandContext {
         home: home.path().to_path_buf(),
         state_home: home.path().to_path_buf(),

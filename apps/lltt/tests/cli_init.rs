@@ -20,9 +20,8 @@ fn init_creates_liveletters_sqlite3() {
 
     assert!(tmp.path().join("liveletters.sqlite3").exists());
     assert!(tmp.path().join("mail-password-obfuscation.key").exists());
-    assert!(tmp.path().join("identities").is_dir());
     assert!(tmp.path().join("drafts").is_dir());
-    assert!(!tmp.path().join("identities").join("default.toml").exists());
+    assert!(!tmp.path().join("identities/default.toml").exists());
     assert!(!tmp.path().join("current-user").exists());
 }
 

@@ -34,4 +34,7 @@ pub enum CuError {
 
     #[error("нельзя совмещать подкоманду и имя переключения")]
     ConflictingArgs,
+
+    #[error("идентичность `{0}` не найдена в базе")]
+    UnknownIdentity(String),
 }

@@ -16,27 +16,15 @@ fn lltt() -> Command {
 
 fn init_home(tmp: &TempDir) {
     common::init_user(tmp.path(), "alice");
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store
+        .save_resources_owned("alice", &["alice@example.org".to_owned()])
+        .unwrap();
 }
 
 fn subscribe_alice_to(tmp: &TempDir, resource: &str) {
-    std::fs::write(
-        tmp.path().join("identities/alice.toml"),
-        format!(
-            r#"
-account_id = "acct_alice"
-display_name = "alice"
-
-[mail]
-publish = "alice@example.org"
-receive = ["alice@example.org"]
-
-[meta]
-resources_owned = ["alice@example.org"]
-subscriptions = ["{resource}"]
-"#
-        ),
-    )
-    .unwrap();
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store.add_local_subscription("alice", resource).unwrap();
 }
 
 fn save_post(tmp: &TempDir, post_id: &str, resource_id: &str, author_id: &str, created_at: u64) {
@@ -147,19 +135,26 @@ fn feed_shows_subscribed_posts_and_hides_unsubscribed_posts() {
 fn feed_does_not_read_posts_from_shared_home_database() {
     let tmp = TempDir::new().unwrap();
     common::init_user(tmp.path(), "algebrain");
+    // create austin identity via DB
     common::write_identity(tmp.path(), "austin");
-    subscribe_alice_to(&tmp, "algebrain@example.org");
-    std::fs::rename(
-        tmp.path().join("identities/alice.toml"),
-        tmp.path().join("identities/austin.toml"),
-    )
-    .unwrap();
-
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
         .args(["cu", "austin"])
         .assert()
         .success();
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["set", "language", "ru"])
+        .assert()
+        .success();
+    // subscribe austin to algebrain
+    let austin_store = Store::open_for_home_dir(tmp.path().join("users/austin")).unwrap();
+    austin_store
+        .add_local_subscription("austin", "algebrain@example.org")
+        .unwrap();
+    austin_store
+        .save_resources_owned("austin", &["austin@example.org".to_owned()])
+        .unwrap();
 
     let shared_store = Store::open_for_home_dir(tmp.path()).unwrap();
     shared_store

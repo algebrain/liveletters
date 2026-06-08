@@ -1,4 +1,3 @@
-use liveletters_config::{IdentityConfig, save_identity};
 use liveletters_store::Store;
 
 use crate::{Args, SubError, args::SubAction};
@@ -8,8 +7,7 @@ pub fn subscribe(
     store: &Store,
     resource_address: &str,
 ) -> Result<(), SubError> {
-    let mut identity = load_current_identity(ctx)?;
-    let delivery_address = derive_delivery_address(&identity);
+    let delivery_address = delivery_address_for(store, &ctx.identity_name)?;
 
     let created_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -18,15 +16,13 @@ pub fn subscribe(
 
     let core = liveletters_app_core::AppCore::new(store);
     let _ = core.subscribe(liveletters_app_core::SubscribeCommand {
-        profile_id: default_profile_id(),
+        profile_id: &ctx.identity_name,
         resource_address,
         subscriber_delivery_address: &delivery_address,
         created_at,
     })?;
 
-    add_to_local_subscriptions(&mut identity, resource_address)?;
-    save_identity(&ctx.home, &ctx.identity_name, &identity)?;
-
+    store.add_local_subscription(&ctx.identity_name, resource_address)?;
     println!(
         "подписан на {}: посты будут приходить на {}",
         resource_address, delivery_address
@@ -39,8 +35,7 @@ pub fn unsubscribe(
     store: &Store,
     resource_address: &str,
 ) -> Result<(), SubError> {
-    let mut identity = load_current_identity(ctx)?;
-    let delivery_address = derive_delivery_address(&identity);
+    let delivery_address = delivery_address_for(store, &ctx.identity_name)?;
     let created_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -48,15 +43,13 @@ pub fn unsubscribe(
 
     let core = liveletters_app_core::AppCore::new(store);
     let _ = core.unsubscribe(liveletters_app_core::UnsubscribeCommand {
-        profile_id: default_profile_id(),
+        profile_id: &ctx.identity_name,
         resource_address,
         subscriber_delivery_address: &delivery_address,
         created_at,
     })?;
 
-    remove_from_local_subscriptions(&mut identity, resource_address);
-    save_identity(&ctx.home, &ctx.identity_name, &identity)?;
-
+    store.remove_local_subscription(&ctx.identity_name, resource_address)?;
     println!("отписан от {}", resource_address);
     Ok(())
 }
@@ -65,15 +58,14 @@ pub fn list_subscriptions(
     ctx: &liveletters_output::CommandContext,
     store: &Store,
 ) -> Result<(), SubError> {
-    let identity = load_current_identity(ctx)?;
-    let subscribed: Vec<String> = identity
-        .subscriptions()
-        .iter()
-        .map(|a| a.as_str().to_owned())
-        .collect();
+    let publish = store
+        .get_user_settings_record(&ctx.identity_name)?
+        .map(|r| r.email_address)
+        .unwrap_or_default();
+    let subscribed: Vec<String> = store.list_local_subscriptions(&ctx.identity_name)?;
     let core = liveletters_app_core::AppCore::new(store);
     let list = core.list_subscriptions(liveletters_app_core::ListSubscriptionsQuery {
-        owned_resource_address: identity.mail().publish(),
+        owned_resource_address: &publish,
         subscribed_addresses: &subscribed,
     })?;
 
@@ -97,42 +89,16 @@ pub fn list_subscriptions(
     Ok(())
 }
 
-fn load_current_identity(
-    ctx: &liveletters_output::CommandContext,
-) -> Result<IdentityConfig, SubError> {
-    Ok(liveletters_config::load_identity(
-        &ctx.home,
-        &ctx.identity_name,
-    )?)
-}
-
-fn derive_delivery_address(identity: &IdentityConfig) -> String {
-    identity
-        .mail()
-        .receive()
-        .first()
-        .map(String::as_str)
-        .unwrap_or(identity.mail().publish())
-        .to_owned()
-}
-
-fn add_to_local_subscriptions(
-    identity: &mut IdentityConfig,
-    address: &str,
-) -> Result<(), SubError> {
-    let new_address = liveletters_domain::ResourceAddress::new(address)?;
-    if !identity.subscriptions().iter().any(|a| a == &new_address) {
-        let mut updated = identity.subscriptions().to_vec();
-        updated.push(new_address);
-        identity.meta.subscriptions = updated;
+fn delivery_address_for(store: &Store, profile_id: &str) -> Result<String, SubError> {
+    let receive = store.list_receive_addresses(profile_id)?;
+    if let Some(addr) = receive.first() {
+        return Ok(addr.clone());
     }
-    Ok(())
-}
-
-fn remove_from_local_subscriptions(identity: &mut IdentityConfig, address: &str) {
-    if let Ok(target) = liveletters_domain::ResourceAddress::new(address) {
-        identity.meta.subscriptions.retain(|a| a != &target);
-    }
+    let email = store
+        .get_user_settings_record(profile_id)?
+        .map(|r| r.email_address)
+        .unwrap_or_default();
+    Ok(email)
 }
 
 pub fn ensure_subscription_address_valid(address: &str) -> Result<(), SubError> {
@@ -142,7 +108,7 @@ pub fn ensure_subscription_address_valid(address: &str) -> Result<(), SubError> 
 
 pub fn run(ctx: &liveletters_output::CommandContext, args: &Args) -> Result<(), SubError> {
     let action = parse_action(&args.tokens)?;
-    let store = liveletters_store::Store::open_for_home_dir(&ctx.state_home)?;
+    let store = Store::open_for_home_dir(&ctx.state_home)?;
     match action {
         SubAction::Subscribe { resource_address } => subscribe(ctx, &store, &resource_address)?,
         SubAction::Rm { resource_address } => unsubscribe(ctx, &store, &resource_address)?,
@@ -187,8 +153,4 @@ fn parse_action(tokens: &[String]) -> Result<SubAction, SubError> {
             })
         }
     }
-}
-
-fn default_profile_id() -> &'static str {
-    "default"
 }
