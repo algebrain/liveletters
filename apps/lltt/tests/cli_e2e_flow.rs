@@ -36,6 +36,16 @@ fn setup_user(home: &std::path::Path, name: &str) {
         .args(["set", "language", "ru"])
         .assert()
         .success();
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home)
+        .args(["set", "nickname", name])
+        .assert()
+        .success();
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home)
+        .args(["set", "email_address", &format!("{name}@example.org")])
+        .assert()
+        .success();
 }
 
 fn outbox_eml_files(home: &std::path::Path, user: &str) -> Vec<std::path::PathBuf> {

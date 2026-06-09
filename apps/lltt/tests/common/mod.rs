@@ -30,6 +30,16 @@ pub fn init_user(home: &std::path::Path, name: &str) {
         .args(["set", "language", "ru"])
         .assert()
         .success();
+    lltt()
+        .env("LIVELETTERS_HOME", home)
+        .args(["set", "nickname", name])
+        .assert()
+        .success();
+    lltt()
+        .env("LIVELETTERS_HOME", home)
+        .args(["set", "email_address", &format!("{name}@example.org")])
+        .assert()
+        .success();
 }
 
 pub fn write_identity(home: &std::path::Path, name: &str) {
