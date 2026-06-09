@@ -43,6 +43,8 @@ fn comment_created_round_trip_keeps_parent_comment_link() {
             resource_id: "blog-1".into(),
             actor_id: "alice".into(),
             created_at: 1_710_000_100,
+            body: "Текст комментария".into(),
+            body_format: "plain".into(),
             visibility: "friends_only".into(),
         },
     )

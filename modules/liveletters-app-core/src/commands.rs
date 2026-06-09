@@ -321,12 +321,18 @@ pub fn create_comment(
         comment.body().as_str(),
     );
 
+    let delivery = if author_id.as_str() == post_record.author_id.as_str() {
+        OutboxDelivery::ResourceSubscribers
+    } else {
+        OutboxDelivery::Direct(vec![event.resource_id().as_str().to_owned()])
+    };
+
     enqueue_message(
         store,
         event.event_id().as_str(),
         &i18n.subject,
         event.resource_id().as_str(),
-        OutboxDelivery::ResourceSubscribers,
+        delivery,
         ProtocolMessage::new(
             MessageEnvelope::new(
                 "1",
@@ -342,8 +348,13 @@ pub fn create_comment(
                     .parent_comment_id()
                     .map(|parent_id| parent_id.as_str().to_owned()),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: author_name.to_owned(),
+                actor_id: record
+                    .as_ref()
+                    .map(|r| r.email_address.clone())
+                    .unwrap_or_else(|| author_name.clone()),
                 created_at: comment.created_at().as_unix_seconds(),
+                body: comment.body().as_str().to_owned(),
+                body_format: "plain".to_owned(),
                 visibility: encode_visibility(comment.visibility()),
             },
         )?,
@@ -842,7 +853,12 @@ pub fn subscribe(
     let subscriber = AccountId::new(command.subscriber_delivery_address)?;
     let delivery = ResourceAddress::new(command.subscriber_delivery_address)?;
 
-    let event_id_str = format!("subscription:{}:{}", resource.as_str(), command.created_at);
+    let event_id_str = format!(
+        "subscription:{}:{}:{}",
+        resource.as_str(),
+        command.subscriber_delivery_address,
+        command.created_at,
+    );
     let event_id = EventId::new(&event_id_str)?;
     let created_at = Timestamp::from_unix_seconds(command.created_at);
 
@@ -916,8 +932,9 @@ pub fn unsubscribe(
     let created_at = Timestamp::from_unix_seconds(command.created_at);
 
     let event_id_str = format!(
-        "unsubscription:{}:{}",
+        "unsubscription:{}:{}:{}",
         resource.as_str(),
+        command.subscriber_delivery_address,
         command.created_at
     );
     let event_id = EventId::new(&event_id_str)?;

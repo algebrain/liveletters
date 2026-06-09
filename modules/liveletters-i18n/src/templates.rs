@@ -15,6 +15,14 @@ pub(super) fn template(key: &str, locale: Locale) -> Option<&'static str> {
             "%sender% оставил(а) комментарий к записи %post_id%:\n\n%body%\n\n— LiveLetters",
             "%sender% has commented on post %post_id%:\n\n%body%\n\n— LiveLetters",
         ),
+        "comment_created_redistribute.subject" => (
+            "Новый комментарий в %resource%",
+            "New comment in %resource%",
+        ),
+        "comment_created_redistribute.body" => (
+            "%sender% оставил(а) комментарий к записи %post_id%:\n\n%body%\n\n— LiveLetters",
+            "%sender% has commented on post %post_id%:\n\n%body%\n\n— LiveLetters",
+        ),
         "comment_edited.subject" => ("Комментарий изменён: %sender%", "Comment edited: %sender%"),
         "comment_edited.body" => (
             "%sender% отредактировал(а) комментарий к записи %post_id%:\n\n%body%\n\n— LiveLetters",

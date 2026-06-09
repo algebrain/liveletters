@@ -1,10 +1,11 @@
+use liveletters_i18n::{Locale, Vars, translate};
 use liveletters_mail::{
     ReceivedEmail, decode_protocol_message, extract_liveletters_parts, parse_email,
 };
 use liveletters_protocol::DomainEventPayload;
 use liveletters_store::{
-    CommentRecord, DeferredEventRecord, PostRecord, RawEventRecord, RawMessageRecord, Store,
-    StoreError, SubscriptionRecord,
+    CommentRecord, DeferredEventRecord, OutboxDelivery, OutboxRecord, PostRecord, RawEventRecord,
+    RawMessageRecord, Store, StoreError, SubscriptionRecord,
 };
 
 use crate::{SyncError, SyncMessageOutcome, SyncReport};
@@ -62,7 +63,16 @@ impl<'a> SyncEngine<'a> {
             let payload: DomainEventPayload = serde_json::from_str(&record.payload_json)
                 .map_err(SyncError::DeserializePayload)?;
 
-            let outcome = match self.apply_payload(&payload, infer_resource_id(&payload)) {
+            let envelope = liveletters_protocol::MessageEnvelope::new(
+                "1",
+                &record.event_type,
+                infer_resource_id(&payload),
+                &record.event_id,
+            )
+            .map_err(|e| SyncError::Invalid(format!("envelope: {e:?}")))?;
+
+            let outcome = match self.apply_payload(&payload, infer_resource_id(&payload), &envelope)
+            {
                 Ok(()) => {
                     self.store.delete_deferred_event_record(&record.event_id)?;
                     self.store.save_raw_event_record(&RawEventRecord {
@@ -240,6 +250,7 @@ impl<'a> SyncEngine<'a> {
         let apply_result = self.apply_payload(
             protocol_message.payload(),
             protocol_message.envelope().resource_id(),
+            protocol_message.envelope(),
         );
 
         match apply_result {
@@ -377,6 +388,7 @@ impl<'a> SyncEngine<'a> {
         &self,
         payload: &DomainEventPayload,
         resource_id: &str,
+        envelope: &liveletters_protocol::MessageEnvelope,
     ) -> Result<(), ApplyEventError> {
         if let Some(filter) = &self.identity_filter
             && matches!(
@@ -427,6 +439,8 @@ impl<'a> SyncEngine<'a> {
                 parent_comment_id,
                 actor_id,
                 created_at,
+                body,
+                body_format,
                 visibility,
                 ..
             } => {
@@ -448,6 +462,8 @@ impl<'a> SyncEngine<'a> {
                     return Err(ApplyEventError::Replay("comment_already_exists".into()));
                 }
 
+                let _ = body_format;
+
                 self.store
                     .save_comment_record(&CommentRecord {
                         comment_id: comment_id.clone(),
@@ -455,11 +471,22 @@ impl<'a> SyncEngine<'a> {
                         parent_comment_id: parent_comment_id.clone(),
                         author_id: actor_id.clone(),
                         created_at: *created_at,
-                        body: "Imported comment".into(),
+                        body: body.clone(),
                         visibility: visibility.clone(),
                         hidden: false,
                     })
-                    .map_err(ApplyEventError::Store)
+                    .map_err(ApplyEventError::Store)?;
+
+                self.enqueue_redistribution(
+                    resource_id,
+                    envelope,
+                    payload,
+                    actor_id,
+                    post_id,
+                    body,
+                )?;
+
+                Ok(())
             }
             DomainEventPayload::PostHidden { post_id, .. } => {
                 let Some(existing) = self
@@ -563,6 +590,67 @@ impl<'a> SyncEngine<'a> {
             }
         }
     }
+
+    fn enqueue_redistribution(
+        &self,
+        resource_id: &str,
+        envelope: &liveletters_protocol::MessageEnvelope,
+        payload: &DomainEventPayload,
+        author_id: &str,
+        post_id: &str,
+        body: &str,
+    ) -> Result<(), ApplyEventError> {
+        let subs = self
+            .store
+            .list_subscriptions_for_resource(resource_id)
+            .map_err(ApplyEventError::Store)?;
+        let recipients: Vec<String> = subs
+            .into_iter()
+            .map(|s| s.subscriber_delivery_address)
+            .filter(|addr| addr != author_id)
+            .collect();
+        if recipients.is_empty() {
+            return Ok(());
+        }
+
+        let subject = translate(
+            "comment_created_redistribute.subject",
+            Locale::Ru,
+            Vars(&[("resource", resource_id)]),
+        )
+        .expect("шаблон comment_created_redistribute.subject присутствует в таблице");
+        let human_body = translate(
+            "comment_created_redistribute.body",
+            Locale::Ru,
+            Vars(&[("sender", author_id), ("post_id", post_id), ("body", body)]),
+        )
+        .expect("шаблон comment_created_redistribute.body присутствует в таблице");
+
+        let new_event_id = format!("redistribute:{}", envelope.event_id());
+        let new_envelope = liveletters_protocol::MessageEnvelope::new(
+            "1",
+            envelope.event_type(),
+            resource_id,
+            &new_event_id,
+        )
+        .map_err(|e| ApplyEventError::Invalid(format!("envelope: {e:?}")))?;
+        let message =
+            liveletters_protocol::ProtocolMessage::new(new_envelope, &human_body, payload.clone())
+                .map_err(|e| ApplyEventError::Invalid(format!("protocol: {e:?}")))?;
+        let message_body = liveletters_protocol::encode_message(&message)
+            .map_err(|e| ApplyEventError::Invalid(format!("encode: {e:?}")))?;
+
+        let record = OutboxRecord {
+            event_id: new_event_id,
+            event_type: subject,
+            resource_id: resource_id.to_owned(),
+            delivery: OutboxDelivery::Direct(recipients),
+            message_body,
+        };
+        self.store
+            .save_outbox_record(&record)
+            .map_err(ApplyEventError::Store)
+    }
 }
 
 enum ApplyEventError {
@@ -621,22 +709,33 @@ fn validate_protocol_message(
         }
     }
 
-    if let DomainEventPayload::CommentEdited { body, .. } = payload
-        && body.trim().is_empty()
-    {
-        return Err("blank_comment_body".into());
-    }
-
-    if let DomainEventPayload::PostCreated {
-        body, body_format, ..
-    } = payload
-    {
-        if body.trim().is_empty() {
-            return Err("blank_post_body".into());
+    match payload {
+        DomainEventPayload::CommentCreated {
+            body, body_format, ..
+        } => {
+            if body.trim().is_empty() {
+                return Err("blank_comment_body".into());
+            }
+            if !matches!(body_format.as_str(), "plain" | "markdown" | "html") {
+                return Err("unknown_body_format".into());
+            }
         }
-        if !matches!(body_format.as_str(), "plain" | "markdown" | "html") {
-            return Err("unknown_body_format".into());
+        DomainEventPayload::CommentEdited { body, .. } => {
+            if body.trim().is_empty() {
+                return Err("blank_comment_body".into());
+            }
         }
+        DomainEventPayload::PostCreated {
+            body, body_format, ..
+        } => {
+            if body.trim().is_empty() {
+                return Err("blank_post_body".into());
+            }
+            if !matches!(body_format.as_str(), "plain" | "markdown" | "html") {
+                return Err("unknown_body_format".into());
+            }
+        }
+        _ => {}
     }
 
     Ok(())

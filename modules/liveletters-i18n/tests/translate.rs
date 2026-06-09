@@ -125,6 +125,41 @@ fn translate_supports_long_cyrillic_body() {
 }
 
 #[test]
+fn translate_comment_created_redistribute_subject_ru_uses_resource() {
+    let s = translate(
+        "comment_created_redistribute.subject",
+        Locale::Ru,
+        Vars(&[("resource", "blog-1")]),
+    )
+    .expect("translation should succeed");
+    assert_eq!(s, "Новый комментарий в blog-1");
+}
+
+#[test]
+fn translate_comment_created_redistribute_subject_en_uses_resource() {
+    let s = translate(
+        "comment_created_redistribute.subject",
+        Locale::En,
+        Vars(&[("resource", "blog-1")]),
+    )
+    .expect("translation should succeed");
+    assert_eq!(s, "New comment in blog-1");
+}
+
+#[test]
+fn translate_comment_created_redistribute_body_fills_sender_and_post() {
+    let s = translate(
+        "comment_created_redistribute.body",
+        Locale::Ru,
+        Vars(&[("sender", "bob"), ("post_id", "post-1"), ("body", "текст")]),
+    )
+    .expect("translation should succeed");
+    assert!(s.contains("bob"));
+    assert!(s.contains("post-1"));
+    assert!(s.contains("текст"));
+}
+
+#[test]
 fn detect_system_locale_falls_back_to_en() {
     // Если в окружении нет LC_ALL/LC_MESSAGES/LANG или они не парсятся,
     // функция возвращает En (а не паникует).

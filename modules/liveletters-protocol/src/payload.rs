@@ -18,6 +18,8 @@ pub enum DomainEventPayload {
         resource_id: String,
         actor_id: String,
         created_at: u64,
+        body: String,
+        body_format: String,
         visibility: String,
     },
     PostHidden {
@@ -64,6 +66,10 @@ enum WireDomainEventPayload {
         resource_id: String,
         actor_id: String,
         created_at: u64,
+        #[serde(default)]
+        body: String,
+        #[serde(default = "default_body_format")]
+        body_format: String,
         visibility: String,
     },
     PostHidden {
@@ -140,6 +146,8 @@ impl From<&DomainEventPayload> for WireDomainEventPayload {
                 resource_id,
                 actor_id,
                 created_at,
+                body,
+                body_format,
                 visibility,
             } => Self::CommentCreated {
                 comment_id: comment_id.clone(),
@@ -148,6 +156,8 @@ impl From<&DomainEventPayload> for WireDomainEventPayload {
                 resource_id: resource_id.clone(),
                 actor_id: actor_id.clone(),
                 created_at: *created_at,
+                body: body.clone(),
+                body_format: body_format.clone(),
                 visibility: visibility.clone(),
             },
             DomainEventPayload::PostHidden {
@@ -224,6 +234,8 @@ impl TryFrom<WireDomainEventPayload> for DomainEventPayload {
                 resource_id,
                 actor_id,
                 created_at,
+                body,
+                body_format,
                 visibility,
             } => Ok(Self::CommentCreated {
                 comment_id,
@@ -232,6 +244,8 @@ impl TryFrom<WireDomainEventPayload> for DomainEventPayload {
                 resource_id,
                 actor_id,
                 created_at,
+                body,
+                body_format,
                 visibility,
             }),
             WireDomainEventPayload::PostHidden {

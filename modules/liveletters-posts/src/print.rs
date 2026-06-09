@@ -34,10 +34,7 @@ fn print_post(post: &PostSummary, author: &str) {
     };
     let hidden_marker = if post.hidden { " (скрыт)" } else { "" };
     let created = format_unix_iso8601_utc(post.created_at);
-    println!(
-        "┌─ пост #{} от {}{hidden_marker}",
-        post.post_id, author
-    );
+    println!("┌─ пост #{} от {}{hidden_marker}", post.post_id, author);
     println!("│  visibility: {visibility}");
     println!("│  {created}");
     let body = truncate_body(&post.body, BODY_MAX);

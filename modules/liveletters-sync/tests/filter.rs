@@ -68,6 +68,39 @@ fn post_created_email(event_id: &str, post_id: &str, resource_id: &str) -> Recei
     }
 }
 
+fn comment_created_email(
+    event_id: &str,
+    comment_id: &str,
+    post_id: &str,
+    resource_id: &str,
+    author_email: &str,
+) -> ReceivedEmail {
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "comment_created", resource_id, event_id).unwrap(),
+        "Новый комментарий",
+        DomainEventPayload::CommentCreated {
+            comment_id: comment_id.into(),
+            post_id: post_id.into(),
+            parent_comment_id: None,
+            resource_id: resource_id.into(),
+            actor_id: author_email.into(),
+            created_at: 1,
+            body: "Текст комментария".into(),
+            body_format: "plain".into(),
+            visibility: "public".into(),
+        },
+    )
+    .unwrap();
+
+    let outgoing =
+        build_protocol_email(author_email, resource_id, "Sync fixture", &message).unwrap();
+
+    ReceivedEmail {
+        message_id: format!("message-{event_id}"),
+        raw_message: outgoing.raw_message,
+    }
+}
+
 #[test]
 fn apply_subscription_changed_persists_record() {
     let (store, _tmp) = open_temp_store();
@@ -259,4 +292,115 @@ fn post_created_is_applied_when_engine_has_no_identity_filter() {
         report.outcomes()[0],
         SyncMessageOutcome::Applied { .. }
     ));
+}
+
+#[test]
+fn applied_comment_created_creates_outbox_redistribution_to_other_subscribers() {
+    let (store, _tmp) = open_temp_store();
+    let engine = SyncEngine::new(&store);
+
+    // пост от alice в её блог
+    let _ = engine
+        .ingest_batch(vec![post_created_email(
+            "post-1",
+            "post-1",
+            "alice-publish@example.org",
+        )])
+        .unwrap();
+
+    // bob и eve — подписчики blog-1 (alice-publish)
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_address: "alice-publish@example.org".into(),
+            subscriber_delivery_address: "bob@example.org".into(),
+        })
+        .unwrap();
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_address: "alice-publish@example.org".into(),
+            subscriber_delivery_address: "eve@example.org".into(),
+        })
+        .unwrap();
+
+    // bob комментирует (actor_id = его email — это важно для фильтра)
+    let report = engine
+        .ingest_batch(vec![comment_created_email(
+            "comment-1",
+            "comment-1",
+            "post-1",
+            "alice-publish@example.org",
+            "bob@example.org",
+        )])
+        .unwrap();
+    assert!(matches!(
+        report.outcomes()[0],
+        SyncMessageOutcome::Applied { .. }
+    ));
+
+    // alice должна положить outbox-запись пересылки
+    let outbox = store.list_outbox_records().unwrap();
+    let redist: Vec<_> = outbox
+        .iter()
+        .filter(|r| r.event_id.starts_with("redistribute:"))
+        .collect();
+    assert_eq!(redist.len(), 1, "ожидалась ровно 1 запись пересылки");
+    match &redist[0].delivery {
+        liveletters_store::OutboxDelivery::Direct(addrs) => {
+            assert_eq!(addrs, &vec!["eve@example.org".to_owned()]);
+        }
+        other => panic!("ожидался Direct, получили {other:?}"),
+    }
+
+    // subject — локализованная строка
+    assert!(
+        redist[0].event_type.contains("Новый комментарий"),
+        "subject должен быть локализован, получили {:?}",
+        redist[0].event_type
+    );
+    // human_readable_body — локализованная строка с автором и post_id
+    let message = liveletters_protocol::decode_message(&redist[0].message_body).unwrap();
+    let body = message.human_readable_body();
+    assert!(body.contains("bob"), "body должен содержать автора: {body}");
+    assert!(
+        body.contains("post-1"),
+        "body должен содержать post_id: {body}"
+    );
+}
+
+#[test]
+fn comment_by_only_subscriber_creates_no_outbox_redistribution() {
+    let (store, _tmp) = open_temp_store();
+    let engine = SyncEngine::new(&store);
+
+    let _ = engine
+        .ingest_batch(vec![post_created_email(
+            "post-1",
+            "post-1",
+            "alice-publish@example.org",
+        )])
+        .unwrap();
+
+    // bob — единственный подписчик, и он же автор комментария
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_address: "alice-publish@example.org".into(),
+            subscriber_delivery_address: "bob@example.org".into(),
+        })
+        .unwrap();
+
+    let _ = engine
+        .ingest_batch(vec![comment_created_email(
+            "comment-1",
+            "comment-1",
+            "post-1",
+            "alice-publish@example.org",
+            "bob@example.org",
+        )])
+        .unwrap();
+
+    let outbox = store.list_outbox_records().unwrap();
+    assert!(
+        outbox.is_empty(),
+        "пересылка не нужна, если подписчик == автор: {outbox:?}"
+    );
 }

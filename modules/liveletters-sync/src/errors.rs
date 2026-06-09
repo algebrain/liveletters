@@ -3,6 +3,7 @@ pub enum SyncError {
     Store(liveletters_store::StoreError),
     SerializePayload(serde_json::Error),
     DeserializePayload(serde_json::Error),
+    Invalid(String),
 }
 
 impl From<liveletters_store::StoreError> for SyncError {
@@ -17,6 +18,7 @@ impl std::fmt::Display for SyncError {
             Self::Store(inner) => write!(f, "store: {inner}"),
             Self::SerializePayload(inner) => write!(f, "serialize payload: {inner}"),
             Self::DeserializePayload(inner) => write!(f, "deserialize payload: {inner}"),
+            Self::Invalid(inner) => write!(f, "invalid: {inner}"),
         }
     }
 }
@@ -26,6 +28,7 @@ impl std::error::Error for SyncError {
         match self {
             Self::Store(inner) => Some(inner),
             Self::SerializePayload(inner) | Self::DeserializePayload(inner) => Some(inner),
+            Self::Invalid(_) => None,
         }
     }
 }
