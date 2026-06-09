@@ -1,6 +1,6 @@
 # Модули LiveLetters
 
-Рабочее пространство `liveletters2` состоит из 25 крейтов. Десять из них — фундаментальные библиотеки. Пятнадцать — оболочки команд CLI `lltt`, каждая в виде отдельного библиотечного крейта.
+Рабочее пространство `liveletters2` состоит из 27 крейтов.
 
 Для каждого крейта ниже приведено краткое описание его назначения (без кода) и ссылки на два документа: `INTERFACE.md` с публичной поверхностью и `TECHNICAL_SPEC.md` с архитектурой и обоснованиями.
 
@@ -22,7 +22,7 @@
 
 #### [`liveletters-config`](./liveletters-config/)
 
-Чтение и запись TOML-конфигов: глобального `config.toml` в корне домашнего каталога и отдельных файлов `identities/<имя>.toml` для каждой идентичности. Содержит типы почтовых настроек и подписок.
+Чтение и запись конфигурации: глобального `config.toml` в корне домашнего каталога и структуры `IdentityConfig` для разбора TOML-черновиков идентичностей. Содержит типы почтовых настроек, метаданных и подписок.
 
 - [INTERFACE.md](./liveletters-config/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-config/TECHNICAL_SPEC.md)
@@ -50,7 +50,7 @@
 
 #### [`liveletters-protocol`](./liveletters-protocol/)
 
-Описание протокола обмена сообщениями между узлами LiveLetters: схема JSON-сообщений, сериализация событий, валидация конвертов. Не зависит от транспорта.
+Реализация протокола обмена сообщениями между узлами LiveLetters: схема JSON-сообщений, сериализация событий, валидация конвертов. Не зависит от транспорта.
 
 - [INTERFACE.md](./liveletters-protocol/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-protocol/TECHNICAL_SPEC.md)
@@ -76,6 +76,20 @@
 - [INTERFACE.md](./liveletters-diagnostics/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-diagnostics/TECHNICAL_SPEC.md)
 
+#### [`liveletters-i18n`](./liveletters-i18n/)
+
+Локализация интерфейса. Хранит шаблоны строк на русском и английском языках для всех типов событий (subject и human_readable_body), подставляет переменные через `%name%`. Определяет `Locale::Ru`/`Locale::En` и `detect_system_locale`.
+
+- [INTERFACE.md](./liveletters-i18n/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-i18n/TECHNICAL_SPEC.md)
+
+#### [`liveletters-log`](./liveletters-log/)
+
+Слой журналирования. Предоставляет функции `log_info`, `log_warn`, `log_error` для structured-логов в JSON-формате с временными метками. Не зависит от других крейтов, кроме `liveletters-config` для настроек ротации.
+
+- [INTERFACE.md](./liveletters-log/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-log/TECHNICAL_SPEC.md)
+
 ## Команды CLI
 
 #### [`liveletters-init`](./liveletters-init/)
@@ -94,7 +108,7 @@
 
 #### [`liveletters-sub`](./liveletters-sub/)
 
-Команда `lltt sub`. Управляет подписками текущего пользователя liveletters на блоги других пользователей: `subscribe` (запись в `meta.subscriptions` + таблицу `subscriptions` + событие `subscription_changed` в `outbox`), `list` (таблица текущих подписок) и `rm` (отписка с событием `unsubscribe`).
+Команда `lltt sub`. Управляет подписками текущего пользователя liveletters на блоги других пользователей: `subscribe` (добавление в локальные подписки + событие `subscription_changed` в `outbox`), `list` (список подписок) и `rm` (отписка с событием `unsubscribe`).
 
 - [INTERFACE.md](./liveletters-sub/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-sub/TECHNICAL_SPEC.md)
@@ -122,49 +136,49 @@
 
 #### [`liveletters-post`](./liveletters-post/)
 
-Команда `lltt post`. Создаёт новую запись в блоге текущего пользователя liveletters. Реализация запланирована.
+Команда `lltt post`. Создаёт новую запись в блоге текущего пользователя liveletters.
 
 - [INTERFACE.md](./liveletters-post/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-post/TECHNICAL_SPEC.md)
 
 #### [`liveletters-comment`](./liveletters-comment/)
 
-Команда `lltt comment`. Создаёт комментарий к существующему посту. Реализация запланирована.
+Команда `lltt comment`. Создаёт комментарий к существующему посту.
 
 - [INTERFACE.md](./liveletters-comment/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-comment/TECHNICAL_SPEC.md)
 
 #### [`liveletters-outbox`](./liveletters-outbox/)
 
-Команда `lltt outbox`. Показывает очередь исходящих сообщений, ожидающих отправки. Реализация запланирована.
+Команда `lltt outbox`. Показывает очередь исходящих сообщений, ожидающих отправки.
 
 - [INTERFACE.md](./liveletters-outbox/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-outbox/TECHNICAL_SPEC.md)
 
 #### [`liveletters-thread`](./liveletters-thread/)
 
-Команда `lltt thread`. Выводит дерево комментариев к указанному посту. Реализация запланирована.
+Команда `lltt thread`. Выводит дерево комментариев к указанному посту.
 
 - [INTERFACE.md](./liveletters-thread/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-thread/TECHNICAL_SPEC.md)
 
 #### [`liveletters-status`](./liveletters-status/)
 
-Команда `lltt status`. Краткий отчёт о состоянии системы: имя текущей идентичности, число постов, число непрочитанных входящих сообщений. Реализация запланирована.
+Команда `lltt status`. Краткий отчёт о состоянии системы: имя текущей идентичности, число постов, число непрочитанных входящих сообщений.
 
 - [INTERFACE.md](./liveletters-status/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-status/TECHNICAL_SPEC.md)
 
 #### [`liveletters-doctor`](./liveletters-doctor/)
 
-Команда `lltt doctor`. Запускает полную диагностику через `liveletters-diagnostics` и печатает сводный отчёт по всем проверкам. Реализация запланирована.
+Команда `lltt doctor`. Запускает полную диагностику через `liveletters-diagnostics` и печатает сводный отчёт по всем проверкам.
 
 - [INTERFACE.md](./liveletters-doctor/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-doctor/TECHNICAL_SPEC.md)
 
 #### [`liveletters-settings`](./liveletters-settings/)
 
-Команда `lltt settings`. Показывает и изменяет пользовательские настройки, такие как адреса для входящих комментариев и параметры отображения. Реализация запланирована.
+Команда `lltt settings`. Показывает и изменяет пользовательские настройки: SMTP/IMAP, язык интерфейса, параметры профиля.
 
 - [INTERFACE.md](./liveletters-settings/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-settings/TECHNICAL_SPEC.md)

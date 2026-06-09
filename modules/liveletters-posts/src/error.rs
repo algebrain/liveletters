@@ -8,4 +8,7 @@ pub enum PostsError {
 
     #[error("ошибка конфигурации: {0}")]
     Config(#[from] liveletters_config::ConfigError),
+
+    #[error("идентичность `{0}` не найдена в базе")]
+    IdentityNotFound(String),
 }

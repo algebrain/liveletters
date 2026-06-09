@@ -315,19 +315,13 @@ fn old_cu_management_commands_are_rejected_with_user_hint() {
 #[test]
 fn cu_posts_prints_current_users_posts_newest_first() {
     let tmp = TempDir::new().unwrap();
-    init_home(&tmp);
-    write_identity(&tmp, "alice");
-    lltt()
-        .env("LIVELETTERS_HOME", tmp.path())
-        .args(["cu", "alice"])
-        .assert()
-        .success();
+    common::init_user(tmp.path(), "alice");
 
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
     for (post_id, author_id, created_at) in [
-        ("old-alice", "alice", 1_710_000_000),
-        ("new-alice", "alice", 1_710_000_100),
-        ("bob-post", "bob", 1_710_000_200),
+        ("old-alice", "acct_alice", 1_710_000_000),
+        ("new-alice", "acct_alice", 1_710_000_100),
+        ("bob-post", "acct_bob", 1_710_000_200),
     ] {
         store
             .save_post_record(&PostRecord {
@@ -352,4 +346,39 @@ fn cu_posts_prints_current_users_posts_newest_first() {
     assert!(stdout.contains("new-alice"), "stdout = {stdout}");
     assert!(!stdout.contains("old-alice"), "stdout = {stdout}");
     assert!(!stdout.contains("bob-post"), "stdout = {stdout}");
+}
+
+#[test]
+fn cu_posts_works_with_db_only_identity_no_toml() {
+    let tmp = TempDir::new().unwrap();
+    common::init_user(tmp.path(), "alice");
+    // удаляем TOML — identity должна работать только из базы
+    let tom_path = tmp.path().join("identities/alice.toml");
+    if tom_path.exists() {
+        std::fs::remove_file(&tom_path).unwrap();
+    }
+
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store
+        .save_post_record(&PostRecord {
+            post_id: "post-1".into(),
+            resource_id: "alice-blog".into(),
+            author_id: "acct_alice".into(),
+            created_at: 1_710_000_000,
+            body: "Мой пост".into(),
+            visibility: "public".into(),
+            hidden: false,
+        })
+        .unwrap();
+
+    let assert = lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["cu", "posts"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        stdout.contains("Мой пост"),
+        "cu posts should show posts with DB-only identity (no TOML): {stdout}"
+    );
 }
