@@ -26,7 +26,6 @@ fn make_post(home: &common::TestHome) -> String {
         .unwrap();
     let core = AppCore::new(&store);
     let ident = Identity {
-        account_id: "alice".to_owned(),
         publish: "alice-publish@example.org".to_owned(),
     };
     core.create_post_from_identity(CreatePostFromIdentityCommand {
@@ -65,7 +64,7 @@ fn comment_new_creates_persisted_comment_with_default_visibility() {
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].body, "Первый комментарий");
     assert_eq!(comments[0].visibility, "public");
-    assert_eq!(comments[0].author_id, "acct_bob");
+    assert_eq!(comments[0].author_id, "bob-publish@example.org");
 }
 
 #[test]

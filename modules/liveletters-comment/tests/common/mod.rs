@@ -65,7 +65,6 @@ impl TestHome {
 
 pub fn sample_identity(name: &str) -> IdentityConfig {
     IdentityConfig {
-        account_id: name.to_owned(),
         display_name: format!("Тест {name}"),
         mail: MailSettings {
             publish: format!("{name}-publish@example.org"),

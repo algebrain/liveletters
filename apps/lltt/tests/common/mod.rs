@@ -48,7 +48,6 @@ pub fn write_identity(home: &std::path::Path, name: &str) {
         home.join("identities").join(format!("{name}.toml")),
         format!(
             r#"
-account_id = "acct_{name}"
 display_name = "{name}"
 
 [mail]

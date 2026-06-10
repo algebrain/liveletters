@@ -68,7 +68,6 @@ fn user_add_does_not_select_current_user_automatically() {
     fs::write(
         &source,
         r#"
-account_id = "acct_alice"
 display_name = "Алиса"
 
 [mail]
@@ -145,7 +144,6 @@ fn user_add_leaves_nickname_and_email_empty_until_settings_explicitly_set() {
     fs::write(
         &source,
         r#"
-account_id = "acct_alice"
 display_name = "Алиса"
 
 [mail]

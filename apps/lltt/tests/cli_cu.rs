@@ -15,21 +15,12 @@ fn lltt() -> Command {
     Command::cargo_bin("lltt").expect("бинарь lltt")
 }
 
-fn init_home(tmp: &TempDir) {
-    lltt()
-        .env("LIVELETTERS_HOME", tmp.path())
-        .arg("init")
-        .assert()
-        .success();
-}
-
 fn write_identity(home: &TempDir, name: &str) {
     fs::create_dir_all(home.path().join("identities")).unwrap();
     fs::write(
         home.path().join("identities").join(format!("{name}.toml")),
         format!(
             r#"
-account_id = "{name}"
 display_name = "Тест {name}"
 
 [mail]
@@ -170,7 +161,6 @@ fn cu_user_add_show_masks_passwords() {
         tmp.path().join("drafts/alice.toml"),
         format!(
             r#"
-account_id = "acct_alice"
 display_name = "Alice"
 
 [mail]
@@ -228,7 +218,6 @@ fn cu_add_creates_identity_file() {
     fs::write(
         &from,
         r#"
-account_id = "carol"
 display_name = "Каролина"
 
 [mail]
@@ -320,9 +309,9 @@ fn cu_posts_prints_current_users_posts_newest_first() {
 
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
     for (post_id, author_id, created_at) in [
-        ("old-alice", "acct_alice", 1_710_000_000),
-        ("new-alice", "acct_alice", 1_710_000_100),
-        ("bob-post", "acct_bob", 1_710_000_200),
+        ("old-alice", "alice@example.org", 1_710_000_000),
+        ("new-alice", "alice@example.org", 1_710_000_100),
+        ("bob-post", "bob@example.org", 1_710_000_200),
     ] {
         store
             .save_post_record(&PostRecord {
@@ -364,7 +353,7 @@ fn cu_posts_works_with_db_only_identity_no_toml() {
         .save_post_record(&PostRecord {
             post_id: "post-1".into(),
             resource_id: "alice-blog".into(),
-            author_id: "acct_alice".into(),
+            author_id: "alice@example.org".into(),
             created_at: 1_710_000_000,
             body: "Мой пост".into(),
             visibility: "public".into(),

@@ -63,7 +63,7 @@ fn feed_no_longer_shows_current_users_own_posts() {
         &tmp,
         "own-post",
         "alice@example.org",
-        "acct_alice",
+        "alice@example.org",
         1_710_000_000,
     );
 
@@ -82,9 +82,27 @@ fn feed_with_limit_truncates() {
     let tmp = TempDir::new().unwrap();
     init_home(&tmp);
     subscribe_alice_to(&tmp, "bob@example.org");
-    save_post(&tmp, "old", "bob@example.org", "bob", 1_710_000_000);
-    save_post(&tmp, "middle", "bob@example.org", "bob", 1_710_000_100);
-    save_post(&tmp, "new", "bob@example.org", "bob", 1_710_000_200);
+    save_post(
+        &tmp,
+        "old",
+        "bob@example.org",
+        "bob@example.org",
+        1_710_000_000,
+    );
+    save_post(
+        &tmp,
+        "middle",
+        "bob@example.org",
+        "bob@example.org",
+        1_710_000_100,
+    );
+    save_post(
+        &tmp,
+        "new",
+        "bob@example.org",
+        "bob@example.org",
+        1_710_000_200,
+    );
 
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
@@ -109,7 +127,7 @@ fn feed_shows_subscribed_posts_and_hides_unsubscribed_posts() {
         &tmp,
         "own",
         "alice@example.org",
-        "acct_alice",
+        "alice@example.org",
         1_710_000_300,
     );
     save_post(&tmp, "subscribed", "bob@example.org", "bob", 1_710_000_200);
@@ -161,7 +179,7 @@ fn feed_does_not_read_posts_from_shared_home_database() {
         .save_post_record(&PostRecord {
             post_id: "shared-db-post".into(),
             resource_id: "algebrain@example.org".into(),
-            author_id: "acct_algebrain".into(),
+            author_id: "algebrain@example.org".into(),
             created_at: 1_710_000_400,
             body: "shared-db-post".into(),
             visibility: "public".into(),

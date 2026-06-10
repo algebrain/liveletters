@@ -97,11 +97,11 @@ pub enum PostError {
 ## Алгоритм
 
 1. `Store::open_for_home_dir(&ctx.home)` — открывает БД.
-2. `liveletters_config::load_identity(&ctx.home, &ctx.identity_name)` — достаёт `account_id` и `mail.publish`.
+2. `liveletters_config::load_identity(&ctx.home, &ctx.identity_name)` — достаёт `mail.publish`.
 3. `liveletters_output::read_body(args.body_file, &mut stdin)` — читает тело (файл или stdin). Если файл указан, но не существует, возвращается `BodyFileNotFound`.
 4. Если `body.trim().is_empty()` → `PostError::EmptyBody`.
 5. `liveletters_output::parse_visibility(&args.visibility)` — принимает только `public` и `friends_only`. Иные значения → `UnknownVisibility`.
-6. `AppCore::create_post_from_identity(...)` — генерирует `post_id`, подставляет `resource_id = identity.publish`, `author_id = identity.account_id`, `created_at = unix_millis_now() / 1000`.
+6. `AppCore::create_post_from_identity(...)` — генерирует `post_id`, подставляет `resource_id = identity.publish`, `author_id = identity.publish`, `created_at = unix_millis_now() / 1000`.
 7. `print_created(post_id)` — печатает `запись создана: <post_id>`.
 
 ## Что печатает
@@ -125,7 +125,6 @@ pub enum PostError {
 
 ## Тесты
 
-- `src/run.rs::tests` (1 тест) — `identity_from_config_uses_publish_and_account_id`.
 - `tests/flow.rs` (4 теста):
   - `post_new_creates_persisted_post_with_default_visibility`
   - `post_new_with_friends_only_visibility`

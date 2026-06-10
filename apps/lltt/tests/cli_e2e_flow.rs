@@ -11,7 +11,6 @@ fn write_identity(home: &std::path::Path, name: &str) {
         home.join("identities").join(format!("{name}.toml")),
         format!(
             r#"
-account_id = "{name}"
 display_name = "{name}"
 [mail]
 publish = "{name}@example.org"

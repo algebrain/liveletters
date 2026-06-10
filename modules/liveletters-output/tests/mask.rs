@@ -54,7 +54,6 @@ fn print_table_aligns_columns() {
 
 fn sample_with_smtp(password: &str) -> IdentityConfig {
     IdentityConfig {
-        account_id: "acct_1".to_owned(),
         display_name: "Тестовый".to_owned(),
         mail: MailSettings {
             publish: "https://example.com".to_owned(),

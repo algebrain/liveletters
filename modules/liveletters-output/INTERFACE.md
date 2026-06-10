@@ -75,7 +75,6 @@ pub fn print_identity(cfg: &IdentityConfig, reveal: bool)
 
 ```
 [identity]
-account_id: <id>
 display_name: <name>
 
 [mail]

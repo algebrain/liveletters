@@ -33,7 +33,7 @@ lltt cu posts --limit 20
 
 1. открывает `Store` для домашнего каталога;
 2. загружает текущую идентичность из `identities/<current>.toml`;
-3. вызывает `get_current_user_posts` с `author_id = identity.account_id()`;
+3. вызывает `get_current_user_posts` с `author_id = user.email_address`;
 4. печатает посты через `print_posts`.
 
 Посты выводятся в обратном хронологическом порядке. Порядок задаёт `Store::list_posts()`.

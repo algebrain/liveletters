@@ -78,7 +78,6 @@ fn command_when_current_user_file_removed_returns_error() {
     std::fs::write(
         tmp.path().join("identities").join("alice.toml"),
         r#"
-account_id = "alice"
 display_name = "Alice"
 
 [mail]

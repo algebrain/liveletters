@@ -29,7 +29,6 @@ pub struct CreatePostCommand<'a> {
 
 #[derive(Debug, Clone)]
 pub struct Identity {
-    pub account_id: String,
     pub publish: String,
 }
 
@@ -375,7 +374,7 @@ pub fn create_post_from_identity(
             profile_id: command.profile_id,
             post_id: &post_id,
             resource_id: &command.identity.publish,
-            author_id: &command.identity.account_id,
+            author_id: &command.identity.publish,
             created_at,
             body: command.body,
             visibility: command.visibility,
@@ -396,7 +395,7 @@ pub fn create_comment_from_identity(
             comment_id: &comment_id,
             post_id: command.post_id,
             parent_comment_id: command.parent_comment_id,
-            author_id: &command.identity.account_id,
+            author_id: &command.identity.publish,
             created_at,
             body: command.body,
             visibility: command.visibility,

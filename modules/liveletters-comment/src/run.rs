@@ -25,7 +25,6 @@ fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), CommentError> {
         .get_user_settings_record(&ctx.identity_name)?
         .ok_or_else(|| CommentError::IdentityNotFound(ctx.identity_name.clone()))?;
     let identity = Identity {
-        account_id: format!("acct_{}", &ctx.identity_name),
         publish: user.email_address,
     };
 

@@ -32,10 +32,7 @@ pub fn map_identity_to_settings(identity: &IdentityConfig) -> AppSettings {
 
 /// Преобразует `AppSettings` (память) в `IdentityConfig` (диск).
 /// Используется при обратной записи после редактирования через CLI.
-pub fn settings_to_identity(
-    account_id: impl Into<String>,
-    settings: &AppSettings,
-) -> IdentityConfig {
+pub fn settings_to_identity(settings: &AppSettings) -> IdentityConfig {
     let smtp = if settings.smtp_host.is_empty() {
         None
     } else {
@@ -65,7 +62,6 @@ pub fn settings_to_identity(
     };
 
     IdentityConfig {
-        account_id: account_id.into(),
         display_name: settings.nickname.clone(),
         mail: crate::MailSettings {
             publish: settings.email_address.clone(),

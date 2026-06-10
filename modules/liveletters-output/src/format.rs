@@ -67,10 +67,7 @@ fn print_row(cells: &[&str], widths: &[usize]) {
 /// Печатает идентичность в человекочитаемом виде; пароли маскируются без `reveal`.
 pub fn print_identity(cfg: &liveletters_config::IdentityConfig, reveal: bool) {
     println!("[identity]");
-    print_kv(&[
-        ("account_id", cfg.account_id()),
-        ("display_name", cfg.display_name()),
-    ]);
+    print_kv(&[("display_name", cfg.display_name())]);
 
     println!();
     println!("[mail]");
@@ -119,7 +116,6 @@ pub fn print_identity(cfg: &liveletters_config::IdentityConfig, reveal: bool) {
 }
 
 pub fn print_identity_from_db(
-    name: &str,
     user: &liveletters_store::UserSettingsRecord,
     mail: Option<&liveletters_store::MailSettingsRecord>,
     receive: &[String],
@@ -129,7 +125,7 @@ pub fn print_identity_from_db(
 ) {
     println!("[identity]");
     print_kv(&[
-        ("account_id", &format!("acct_{name}")),
+        ("email", &user.email_address),
         ("display_name", &user.nickname),
         ("language", &user.language),
     ]);

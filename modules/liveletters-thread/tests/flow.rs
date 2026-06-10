@@ -9,7 +9,6 @@ use liveletters_thread::{Args, run};
 
 fn identity(name: &str) -> Identity {
     Identity {
-        account_id: name.to_owned(),
         publish: format!("{name}-publish@example.org"),
     }
 }

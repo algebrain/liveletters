@@ -169,7 +169,6 @@ mod tests {
         pwd_obfuscate: bool,
     ) -> IdentityConfig {
         IdentityConfig {
-            account_id: "acct_alice".to_owned(),
             display_name: "Alice".to_owned(),
             mail: MailSettings {
                 publish: "alice@example.org".to_owned(),

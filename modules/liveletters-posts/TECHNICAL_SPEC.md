@@ -22,7 +22,7 @@ let identity = load_identity(&ctx.home, &ctx.identity_name)?;
 let posts = get_current_user_posts(
     &store,
     GetCurrentUserPostsQuery {
-        author_id: identity.account_id(),
+        author_id: identity.publish,
     },
 )?;
 print_posts(&posts, identity.display_name(), args.limit);

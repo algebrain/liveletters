@@ -3,7 +3,6 @@ use serde::{Deserialize, Deserializer, Serialize, de};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IdentityConfig {
-    pub account_id: String,
     pub display_name: String,
     pub mail: MailSettings,
     #[serde(default)]
@@ -109,10 +108,6 @@ fn default_pwd_obfuscate() -> bool {
 }
 
 impl IdentityConfig {
-    pub fn account_id(&self) -> &str {
-        &self.account_id
-    }
-
     pub fn display_name(&self) -> &str {
         &self.display_name
     }

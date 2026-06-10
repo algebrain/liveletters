@@ -92,7 +92,6 @@ fn add_action_creates_identity_file() {
     fs::write(
         &from,
         r#"
-account_id = "carol"
 display_name = "Каролина"
 
 [mail]

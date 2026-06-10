@@ -16,7 +16,7 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), PostsError> {
     let user = store
         .get_user_settings_record(&ctx.identity_name)?
         .ok_or_else(|| PostsError::IdentityNotFound(ctx.identity_name.clone()))?;
-    let account_id = format!("acct_{}", &ctx.identity_name);
+    let account_id = user.email_address.clone();
     let posts = get_current_user_posts(
         &store,
         GetCurrentUserPostsQuery {

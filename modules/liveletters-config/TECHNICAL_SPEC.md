@@ -52,7 +52,7 @@
 
 В `IdentityConfig` поля `resources_owned` и `subscriptions` обёрнуты в `IdentityMeta` и сериализуются в подтаблицу `[meta]`. Это не стилистический выбор, а workaround под особенность `toml` 0.8: десериализатор `toml::from_str` молча отбрасывает `Vec<_>` на верхнем уровне после того, как в файле появился заголовок `[table]`.
 
-В нашем случае порядок полей такой: `account_id` и `display_name` — это плоские строки на верхнем уровне, `[mail]` — первая подтаблица. Если бы `resources_owned` и `subscriptions` остались плоскими на верхнем уровне, `toml::from_str` их бы проглотил молча, без сообщения об ошибке, и они бы десериализовались в пустые `Vec`.
+В нашем случае порядок полей такой: `display_name` — это плоская строка на верхнем уровне, `[mail]` — первая подтаблица. Если бы `resources_owned` и `subscriptions` остались плоскими на верхнем уровне, `toml::from_str` их бы проглотил молча, без сообщения об ошибке, и они бы десериализовались в пустые `Vec`.
 
 Обёртывание в `[meta]` решает эту проблему ценой чуть менее «плоского» TOML. С точки зрения пользователя крейта это прозрачно: методы `identity.resources_owned()` и `identity.subscriptions()` работают с подтаблицей внутри.
 
@@ -155,14 +155,14 @@
 
 - парсинг минимального `IdentityConfig` без SMTP/IMAP/meta;
 - парсинг полного `IdentityConfig` со SMTP/IMAP/meta и двумя подписками;
-- отказ `toml::from_str` на отсутствии обязательного `account_id`;
+- отказ `toml::from_str` на отсутствии обязательного `display_name`;
 - дефолт `meta.resources_owned = []` и `meta.subscriptions = []`, если подтаблица `[meta]` опущена;
 - round-trip `save_identity` → `load_identity` через `tempfile::TempDir`;
 - `list_identities` возвращает пустой `Vec`, если каталог `identities/` отсутствует;
 - `list_identities` возвращает имена в лексикографическом порядке;
 - `load_identity` возвращает `ConfigError::UnknownIdentity(name)` на отсутствующий файл;
 - `load_global` возвращает `GlobalConfig::default()` на отсутствующий `config.toml`;
-- round-trip `IdentityConfig` → `AppSettings` → `IdentityConfig` сохраняет `account_id`, `display_name`, `mail.publish`, `SmtpSettings.{host, port, security}`, `ImapSettings.mailbox`;
+- round-trip `IdentityConfig` → `AppSettings` → `IdentityConfig` сохраняет `display_name`, `mail.publish`, `SmtpSettings.{host, port, security}`, `ImapSettings.mailbox`;
 - `crate_name` отдаёт правильное имя;
 - 1 lib-тест `crate_name_is_set`;
 - `read_current_identity` возвращает `ConfigError::NoCurrentUser` на отсутствующий файл;

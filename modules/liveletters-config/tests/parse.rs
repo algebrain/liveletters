@@ -2,7 +2,6 @@ use liveletters_config::{IdentityConfig, MailSecurity};
 use liveletters_domain::ResourceAddress;
 
 const MINIMAL_TOML: &str = r#"
-account_id = "acct_alice_3kf"
 display_name = "Alice"
 
 [mail]
@@ -11,7 +10,6 @@ receive = ["alice-feed@example.org"]
 "#;
 
 const FULL_TOML: &str = r#"
-account_id = "acct_bob_9xz"
 display_name = "Bob"
 
 [mail]
@@ -43,7 +41,6 @@ subscriptions = ["alice-publish@example.org", "carol-publish@example.org"]
 #[test]
 fn parses_minimal_identity_toml() {
     let cfg: IdentityConfig = toml::from_str(MINIMAL_TOML).unwrap();
-    assert_eq!(cfg.account_id(), "acct_alice_3kf");
     assert_eq!(cfg.display_name(), "Alice");
     assert_eq!(cfg.mail().publish(), "alice-publish@example.org");
     assert_eq!(cfg.mail().receive(), &["alice-feed@example.org"]);
@@ -54,9 +51,21 @@ fn parses_minimal_identity_toml() {
 }
 
 #[test]
+fn parses_minimal_identity_without_account_id() {
+    let toml = r#"
+display_name = "Carol"
+
+[mail]
+publish = "carol-publish@example.org"
+"#;
+    let cfg: IdentityConfig = toml::from_str(toml).expect("должен парситься без account_id");
+    assert_eq!(cfg.display_name(), "Carol");
+    assert_eq!(cfg.mail().publish(), "carol-publish@example.org");
+}
+
+#[test]
 fn parses_full_identity_toml_with_subscriptions() {
     let cfg: IdentityConfig = toml::from_str(FULL_TOML).unwrap();
-    assert_eq!(cfg.account_id(), "acct_bob_9xz");
     assert_eq!(cfg.display_name(), "Bob");
     assert_eq!(cfg.mail().publish(), "bob-publish@example.org");
     assert_eq!(
@@ -95,7 +104,6 @@ fn parses_full_identity_toml_with_subscriptions() {
 fn pwd_obfuscate_defaults_to_true_when_omitted() {
     let cfg: IdentityConfig = toml::from_str(
         r#"
-account_id = "acct_alice"
 display_name = "Alice"
 
 [mail]
@@ -126,7 +134,6 @@ password = "secret"
 fn parses_ssl_security_alias_as_tls() {
     let cfg: IdentityConfig = toml::from_str(
         r#"
-account_id = "acct_alice"
 display_name = "Alice"
 
 [mail]
@@ -152,12 +159,10 @@ username = "alice"
 }
 
 #[test]
-fn parse_rejects_missing_required_fields() {
+fn parse_rejects_missing_display_name() {
     let toml = r#"
-        display_name = "Alice"
         [mail]
         publish = "alice@example.org"
-        receive = []
     "#;
     let err = toml::from_str::<IdentityConfig>(toml).unwrap_err();
     let _ = err;
@@ -166,7 +171,6 @@ fn parse_rejects_missing_required_fields() {
 #[test]
 fn parse_accepts_default_meta_when_omitted() {
     let toml = r#"
-        account_id = "acct_x"
         display_name = "X"
         [mail]
         publish = "x@example.org"

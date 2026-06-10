@@ -75,7 +75,7 @@ pub struct CommandContext {
 
 Алгоритм:
 
-1. секция `[identity]`: `account_id`, `display_name`;
+1. секция `[identity]`: `display_name`;
 2. пустая строка;
 3. секция `[mail]`: `publish`; для каждого адреса в `mail.receive` — отдельная строка `receive: [i] <addr>`; если список пуст — `receive: -`;
 4. если `mail.smtp.is_some()` — пустая строка + секция `[mail.smtp]` с полями `host`/`port`/`security`/`username`/`password` (пароль через `mask_password(..., reveal)`);
@@ -86,7 +86,7 @@ pub struct CommandContext {
 
 ## Зависимости
 
-- `liveletters-config` — тип `IdentityConfig` и его метод-аксессоры (`account_id()`, `display_name()`, `mail()`, `resources_owned()`, и т.д.).
+- `liveletters-config` — тип `IdentityConfig` и его метод-аксессоры (`display_name()`, `mail()`, `resources_owned()`, и т.д.).
 
 Никаких других зависимостей (ни `serde_json`, ни `clap`, ни `tokio`).
 

@@ -9,7 +9,7 @@
 - Разбор `Args` (clap-деривация).
 - Чтение тела из файла или stdin.
 - Проверка, что уровень видимости ∈ {`public`, `friends_only`}.
-- Подстановка `post_id`, `created_at`, `resource_id` (= `mail.publish`), `author_id` (= `account_id`).
+- Подстановка `post_id`, `created_at`, `resource_id` (= `mail.publish`), `author_id` (= `mail.publish`).
 - Делегирование записи в `AppCore::create_post_from_identity`.
 - Печать короткого подтверждения.
 

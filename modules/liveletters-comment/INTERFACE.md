@@ -105,11 +105,11 @@ pub enum CommentError {
 ## Алгоритм
 
 1. `Store::open_for_home_dir(&ctx.home)` — открывает БД.
-2. `liveletters_config::load_identity(...)` — `account_id`, `mail.publish`.
+2. `liveletters_config::load_identity(...)` — `mail.publish`.
 3. `liveletters_output::read_body(...)` — читает тело.
 4. Если `body.trim().is_empty()` → `CommentError::EmptyBody`.
 5. `liveletters_output::parse_visibility(...)` — `public` или `friends_only`.
-6. `AppCore::create_comment_from_identity(...)` — генерирует `comment_id`; подставляет `author_id = account_id`, `created_at = unix_millis_now() / 1000`. Если пост с `args.post` не найден, `AppCore` возвращает `PostNotFound`.
+6. `AppCore::create_comment_from_identity(...)` — генерирует `comment_id`; подставляет `author_id = identity.publish`, `created_at = unix_millis_now() / 1000`. Если пост с `args.post` не найден, `AppCore` возвращает `PostNotFound`.
 7. `print_created(comment_id)`.
 
 ## Что печатает

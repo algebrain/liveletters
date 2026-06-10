@@ -172,7 +172,6 @@ alice
 
 $ lltt cu show
 [identity]
-account_id: acct_alice
 display_name: Alice
 
 [mail]
@@ -188,7 +187,7 @@ $ lltt cu posts
 постов: 1
 
 $ lltt thread post-1717161234567
-┌─ пост #post-1717161234567 от acct_alice
+┌─ пост #post-1717161234567 от alice-publish@example.org
 │  visibility: public
 │  Привет, мир.
 └─

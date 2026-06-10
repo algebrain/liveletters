@@ -16,7 +16,6 @@ pub fn run(
     let local_subs = store.list_local_subscriptions(name)?;
 
     print_identity_from_db(
-        name,
         &user,
         mail.as_ref(),
         &receive,

@@ -80,7 +80,6 @@
 
 ```rust
 pub struct IdentityConfig {
-    pub account_id: String,
     pub display_name: String,
     pub mail: MailSettings,
     #[serde(default)]
@@ -91,7 +90,6 @@ pub struct IdentityConfig {
 Минимальный валидный TOML-файл:
 
 ```toml
-account_id = "acct_alice_3kf"
 display_name = "Alice"
 
 [mail]
@@ -102,7 +100,6 @@ receive = ["alice-feed@example.org"]
 Полный TOML-файл с SMTP/IMAP/метаданными:
 
 ```toml
-account_id = "acct_bob_9xz"
 display_name = "Bob"
 
 [mail]
@@ -139,8 +136,6 @@ resource_id = "carol-blog"
 delivery_address = "bob-feed2@example.org"
 ```
 
-`account_id` — обязательный, непустой идентификатор учётной записи. Используется в `MessageEnvelope` исходящих `ProtocolMessage` и в путях материализованного состояния.
-
 `display_name` — обязательный, непустой никнейм, отображаемый в UI.
 
 `mail` — обязательная вложенная таблица с настройками почты (см. ниже).
@@ -149,7 +144,7 @@ delivery_address = "bob-feed2@example.org"
 
 ### Подтаблица `[meta]`: зачем она
 
-`meta` намеренно выделена в отдельный подраздел TOML, а не лежит «в плоскости» рядом с `account_id` / `display_name`. Это workaround под особенность `toml` 0.8: десериализатор `toml::from_str` молча отбрасывает `Vec<_>` на верхнем уровне после заголовка `[table]`. После того как в файле появилась первая подтаблица (`[mail]`), верхнеуровневый `Vec` теряется.
+`meta` намеренно выделена в отдельный подраздел TOML, а не лежит «в плоскости» рядом с `display_name`. Это workaround под особенность `toml` 0.8: десериализатор `toml::from_str` молча отбрасывает `Vec<_>` на верхнем уровне после заголовка `[table]`. После того как в файле появилась первая подтаблица (`[mail]`), верхнеуровневый `Vec` теряется.
 
 Обёртывание `resources_owned` и `subscriptions` в `[meta]` решает эту проблему ценой чуть менее «плоского» TOML. С точки зрения API это прозрачно: пользователь крейта работает с `identity.resources_owned()` и `identity.subscriptions()`, не задумываясь о подтаблице.
 
@@ -330,12 +325,11 @@ pub fn current_user_path(home: &Path) -> PathBuf
 6. если задан `ImapSettings`, копирует host/port/security/username/password/mailbox в `imap_*` поля;
 7. **не копирует** `resources_owned` и `subscriptions` — у `AppSettings` нет для них полей. Это сознательное усечение: `AppSettings` используется для UI/транспорта, а список ресурсов и подписок хранится исключительно в `IdentityConfig` и читается напрямую.
 
-### `settings_to_identity(account_id, settings: &AppSettings) -> IdentityConfig`
+### `settings_to_identity(settings: &AppSettings) -> IdentityConfig`
 
 Обратное преобразование:
 
-1. `account_id` берётся из аргумента (в CLI это `account_id` текущей идентичности);
-2. `settings.nickname` → `display_name`;
+1. `settings.nickname` → `display_name`;
 3. `settings.email_address` → `mail.publish`;
 4. `receive` заполняется пустым `Vec` (в `AppSettings` нет списка receive-адресов);
 5. `smtp` создаётся только если `settings.smtp_host` не пуст; иначе `None`; `pwd_obfuscate` ставится в `true`;
@@ -382,7 +376,7 @@ let _global = load_global(&home)?;
 
 let name = read_current_identity(&home)?;
 let identity = load_identity(&home, &name)?;
-println!("Текущий пользователь liveletters: {} ({})", identity.display_name(), identity.account_id());
+println!("Текущий пользователь liveletters: {}", identity.display_name());
 ```
 
 ### Сохранить новую идентичность
@@ -391,7 +385,6 @@ println!("Текущий пользователь liveletters: {} ({})", identit
 use liveletters_config::{save_identity, IdentityConfig, MailSettings, SmtpSettings, MailSecurity};
 
 let identity = IdentityConfig {
-    account_id: "acct_alice_3kf".into(),
     display_name: "Alice".into(),
     mail: MailSettings {
         publish: "alice-publish@example.org".into(),
@@ -422,7 +415,7 @@ let settings = map_identity_to_settings(&identity);
 // … передать settings в transport или UI …
 
 // позже, при сохранении правок:
-let updated_identity = settings_to_identity(identity.account_id(), &settings);
+let updated_identity = settings_to_identity(&settings);
 save_identity(&home, "alice", &updated_identity)?;
 ```
 

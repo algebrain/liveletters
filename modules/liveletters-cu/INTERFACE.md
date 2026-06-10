@@ -56,7 +56,6 @@
 `lltt user init alice` создаёт TOML такого вида:
 
 ```toml
-account_id = "acct_alice"
 display_name = "Alice"
 
 [mail]

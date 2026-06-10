@@ -41,7 +41,6 @@ fn outbox_list_shows_pending_post_created() {
     core.create_post_from_identity(CreatePostFromIdentityCommand {
         profile_id: "alice",
         identity: &Identity {
-            account_id: "alice".to_owned(),
             publish: "alice-publish@example.org".to_owned(),
         },
         body: "Запись",

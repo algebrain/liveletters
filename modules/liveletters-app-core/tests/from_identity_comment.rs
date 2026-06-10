@@ -28,7 +28,6 @@ fn save_user(store: &Store) {
 
 fn identity() -> Identity {
     Identity {
-        account_id: "acct_alice".to_owned(),
         publish: "alice-publish@example.org".to_owned(),
     }
 }
@@ -61,7 +60,7 @@ fn create_comment_from_identity_derives_fields_and_persists_comment() {
 
     let comment = result.comment();
     assert!(comment.id().as_str().starts_with("comment-"));
-    assert_eq!(comment.author_id().as_str(), "acct_alice");
+    assert_eq!(comment.author_id().as_str(), "alice-publish@example.org");
     assert_eq!(comment.visibility(), Visibility::FriendsOnly);
     assert_eq!(comment.body().as_str(), "Комментарий");
 
@@ -69,7 +68,7 @@ fn create_comment_from_identity_derives_fields_and_persists_comment() {
         .get_comment_record(comment.id().as_str())
         .unwrap()
         .expect("comment must be persisted");
-    assert_eq!(record.author_id, "acct_alice");
+    assert_eq!(record.author_id, "alice-publish@example.org");
     assert_eq!(record.visibility, "friends_only");
     assert_eq!(record.post_id, post.post().id().as_str());
 }

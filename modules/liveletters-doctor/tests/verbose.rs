@@ -39,8 +39,8 @@ fn verbose_lists_identities_and_current_user() {
 
     let identities_dir = home.join("identities");
     std::fs::create_dir_all(&identities_dir).unwrap();
-    std::fs::write(identities_dir.join("alice.toml"), "account_id = \"a\"\n").unwrap();
-    std::fs::write(identities_dir.join("bob.toml"), "account_id = \"b\"\n").unwrap();
+    std::fs::write(identities_dir.join("alice.toml"), "display_name = \"А\"\n").unwrap();
+    std::fs::write(identities_dir.join("bob.toml"), "display_name = \"Б\"\n").unwrap();
     std::fs::write(home.join("current-user"), "alice\n").unwrap();
 
     let reader = DiagnosticsReader::new(&store);

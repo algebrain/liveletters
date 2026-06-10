@@ -30,8 +30,7 @@ fn draft_toml(name: &str) -> String {
     let display = capitalize_ascii(name);
     let lang = liveletters_i18n::detect_system_locale().as_str();
     format!(
-        r#"account_id = "acct_{name}"
-display_name = "{display}"
+        r#"display_name = "{display}"
 
 [mail]
 publish = "{name}@example.org"

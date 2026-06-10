@@ -26,7 +26,6 @@ fn save_user(store: &Store) {
 
 fn identity() -> Identity {
     Identity {
-        account_id: "acct_alice".to_owned(),
         publish: "alice-publish@example.org".to_owned(),
     }
 }
@@ -49,7 +48,7 @@ fn create_post_from_identity_derives_fields_and_persists_post() {
     let post = result.post();
     assert!(post.id().as_str().starts_with("post-"));
     assert_eq!(post.resource_id().as_str(), "alice-publish@example.org");
-    assert_eq!(post.author_id().as_str(), "acct_alice");
+    assert_eq!(post.author_id().as_str(), "alice-publish@example.org");
     assert_eq!(post.visibility(), Visibility::FriendsOnly);
 
     let record = store
@@ -57,7 +56,7 @@ fn create_post_from_identity_derives_fields_and_persists_post() {
         .unwrap()
         .expect("post must be persisted");
     assert_eq!(record.resource_id, "alice-publish@example.org");
-    assert_eq!(record.author_id, "acct_alice");
+    assert_eq!(record.author_id, "alice-publish@example.org");
     assert_eq!(record.visibility, "friends_only");
 }
 

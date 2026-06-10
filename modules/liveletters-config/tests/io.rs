@@ -6,7 +6,6 @@ use liveletters_domain::ResourceAddress;
 
 fn sample_identity() -> IdentityConfig {
     IdentityConfig {
-        account_id: "acct_alice_3kf".into(),
         display_name: "Alice".into(),
         mail: liveletters_config::MailSettings {
             publish: "alice-publish@example.org".into(),
@@ -45,7 +44,6 @@ fn save_and_load_identity_round_trip() {
     save_identity(tmp.path(), "alice", &cfg).expect("identity should be saved");
     let loaded = load_identity(tmp.path(), "alice").expect("identity should be loaded");
 
-    assert_eq!(loaded.account_id(), cfg.account_id());
     assert_eq!(loaded.display_name(), cfg.display_name());
     assert_eq!(loaded.mail().publish(), cfg.mail().publish());
     assert_eq!(loaded.mail().receive(), cfg.mail().receive());
@@ -100,9 +98,8 @@ fn load_global_returns_default_when_file_missing() {
 fn identity_settings_round_trip_via_app_settings() {
     let original = sample_identity();
     let settings = map_identity_to_settings(&original);
-    let reconstructed = settings_to_identity(original.account_id(), &settings);
+    let reconstructed = settings_to_identity(&settings);
 
-    assert_eq!(reconstructed.account_id(), original.account_id());
     assert_eq!(reconstructed.display_name(), original.display_name());
     assert_eq!(reconstructed.mail().publish(), original.mail().publish());
     assert_eq!(
