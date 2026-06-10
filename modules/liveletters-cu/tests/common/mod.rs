@@ -67,6 +67,7 @@ impl TestHome {
                     imap_mailbox: imap
                         .map(|s| s.mailbox.clone())
                         .unwrap_or_else(|| "INBOX".to_owned()),
+                    initial_lookback_days: 1,
                 })
                 .unwrap();
         }

@@ -160,6 +160,7 @@ impl Store {
         )?;
 
         self.ensure_mail_settings_security_columns()?;
+        self.ensure_mail_settings_initial_lookback_column()?;
         self.ensure_user_settings_language_column()?;
         self.ensure_subscriptions_use_delivery_address_key()?;
 
@@ -172,6 +173,14 @@ impl Store {
         )?;
         self.add_column_if_missing(
             "ALTER TABLE mail_settings ADD COLUMN imap_security TEXT NOT NULL DEFAULT 'starttls'",
+        )?;
+        Ok(())
+    }
+
+    fn ensure_mail_settings_initial_lookback_column(&self) -> Result<(), StoreError> {
+        self.add_column_if_missing(
+            "ALTER TABLE mail_settings \
+             ADD COLUMN initial_lookback_days INTEGER NOT NULL DEFAULT 1",
         )?;
         Ok(())
     }

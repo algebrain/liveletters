@@ -79,6 +79,7 @@ pub struct AppSettings {
     pub imap_username: String,
     pub imap_password: String,
     pub imap_mailbox: String,
+    pub initial_lookback_days: u32,
     pub setup_completed: bool,
 }
 
@@ -189,6 +190,7 @@ impl AppSettings {
             imap_username: String::new(),
             imap_password: String::new(),
             imap_mailbox: "INBOX".to_owned(),
+            initial_lookback_days: 1,
             setup_completed: false,
         }
     }

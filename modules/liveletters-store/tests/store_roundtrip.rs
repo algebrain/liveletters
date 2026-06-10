@@ -342,11 +342,25 @@ fn user_and_mail_settings_can_be_saved_and_read_back() {
             imap_username: "alice".into(),
             imap_password: "secret".into(),
             imap_mailbox: "INBOX".into(),
+            initial_lookback_days: 1,
         })
         .unwrap();
 
     let user = store.get_user_settings_record("default").unwrap().unwrap();
     let mail = store.get_mail_settings_record("default").unwrap().unwrap();
+
+    // Проверка roundtrip initial_lookback_days
+    assert_eq!(
+        mail.initial_lookback_days, 1,
+        "default initial_lookback_days должно быть 1"
+    );
+
+    // Обновим до 7 и проверим, что сохранилось
+    let mut updated = mail.clone();
+    updated.initial_lookback_days = 7;
+    store.save_mail_settings_record(&updated).unwrap();
+    let got = store.get_mail_settings_record("default").unwrap().unwrap();
+    assert_eq!(got.initial_lookback_days, 7);
 
     assert_eq!(user.nickname, "alice");
     assert_eq!(user.email_address, "alice@example.com");
@@ -390,6 +404,7 @@ fn file_store_persists_user_and_mail_settings_under_temp_home() {
                 imap_username: "alice".into(),
                 imap_password: "secret".into(),
                 imap_mailbox: "INBOX".into(),
+                initial_lookback_days: 1,
             })
             .unwrap();
     }
@@ -434,6 +449,7 @@ fn file_store_obfuscates_passwords_before_persisting_to_sqlite() {
                 imap_username: "alice".into(),
                 imap_password: "secret".into(),
                 imap_mailbox: "INBOX".into(),
+                initial_lookback_days: 1,
             })
             .unwrap();
     }
@@ -471,6 +487,7 @@ fn file_store_keeps_empty_passwords_empty_without_creating_key_file() {
                 imap_username: "alice".into(),
                 imap_password: "".into(),
                 imap_mailbox: "INBOX".into(),
+                initial_lookback_days: 1,
             })
             .unwrap();
     }
@@ -510,6 +527,7 @@ fn file_store_lazily_migrates_plaintext_passwords_on_read() {
                 imap_username: "alice".into(),
                 imap_password: "secret".into(),
                 imap_mailbox: "INBOX".into(),
+                initial_lookback_days: 1,
             })
             .unwrap();
     }
@@ -564,6 +582,7 @@ fn file_store_reports_error_when_obfuscated_password_cannot_be_recovered() {
                 imap_username: "alice".into(),
                 imap_password: "secret".into(),
                 imap_mailbox: "INBOX".into(),
+                initial_lookback_days: 1,
             })
             .unwrap();
     }
@@ -622,4 +641,15 @@ fn user_settings_language_column_is_added_by_migration() {
         .expect("legacy user_settings row must be readable after migration");
     assert_eq!(record.language, "ru");
     assert_eq!(record.nickname, "legacy");
+}
+
+#[test]
+fn mail_settings_default_initial_lookback_days_is_one() {
+    use liveletters_store::MailSettingsRecord;
+    let (_store, _tmp) = common::open_temp_store();
+    let default = MailSettingsRecord {
+        profile_id: "default".into(),
+        ..Default::default()
+    };
+    assert_eq!(default.initial_lookback_days, 1);
 }

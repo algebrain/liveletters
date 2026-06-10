@@ -9,14 +9,18 @@ mod error;
 mod run;
 
 #[cfg(feature = "network")]
+mod backfill;
+#[cfg(feature = "network")]
 mod pull;
 #[cfg(feature = "network")]
 mod push;
 
 #[cfg(feature = "network")]
+pub use backfill::run as run_backfill;
+#[cfg(feature = "network")]
 pub use pull::{OutcomeCounts, compute_next_cursor_uid, parse_security, tally};
 #[cfg(feature = "network")]
-pub use push::send_outbox_record;
+pub use push::{default_profile_id, send_outbox_record};
 
 pub use args::{Args, SyncAction};
 pub use error::SyncError;

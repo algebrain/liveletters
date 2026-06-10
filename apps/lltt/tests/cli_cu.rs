@@ -141,6 +141,7 @@ fn cu_show_masks_smtp_password_in_stdout() {
             imap_username: "alice@example.com".into(),
             imap_password: password.into(),
             imap_mailbox: "INBOX".into(),
+            initial_lookback_days: 1,
         })
         .unwrap();
 

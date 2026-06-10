@@ -56,6 +56,7 @@ fn show_reflects_saved_settings() {
             imap_username: "alice@example.org".into(),
             imap_password: String::new(),
             imap_mailbox: "INBOX".into(),
+            initial_lookback_days: 1,
         })
         .unwrap();
     liveletters_settings::run(&ctx_for(&tmp), &args_for_show()).unwrap();
@@ -195,10 +196,87 @@ fn set_language_does_not_touch_mail_settings() {
             imap_username: "alice@example.org".into(),
             imap_password: String::new(),
             imap_mailbox: "INBOX".into(),
+            initial_lookback_days: 1,
         })
         .unwrap();
     liveletters_settings::run(&ctx_for(&tmp), &args_for_set("language", "en")).unwrap();
     let mail = store.get_mail_settings_record("default").unwrap().unwrap();
     assert_eq!(mail.smtp_host, "smtp.example.org");
     assert_eq!(mail.smtp_port, 587);
+}
+
+#[test]
+fn set_imap_initial_lookback_days_persists_value() {
+    use liveletters_store::MailSettingsRecord;
+    let (store, _tmp) = common::open_temp_store();
+    let ctx = ctx_for(&_tmp);
+    // Сначала создаём запись с дефолтом
+    store
+        .save_mail_settings_record(&MailSettingsRecord {
+            profile_id: "default".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    liveletters_settings::run(&ctx, &args_for_set("imap.initial_lookback_days", "7")).unwrap();
+    let mail = store.get_mail_settings_record("default").unwrap().unwrap();
+    assert_eq!(mail.initial_lookback_days, 7);
+}
+
+#[test]
+fn set_imap_initial_lookback_days_zero_is_allowed() {
+    use liveletters_store::MailSettingsRecord;
+    let (store, _tmp) = common::open_temp_store();
+    let ctx = ctx_for(&_tmp);
+    store
+        .save_mail_settings_record(&MailSettingsRecord {
+            profile_id: "default".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    liveletters_settings::run(&ctx, &args_for_set("imap.initial_lookback_days", "0")).unwrap();
+    let mail = store.get_mail_settings_record("default").unwrap().unwrap();
+    assert_eq!(mail.initial_lookback_days, 0);
+}
+
+#[test]
+fn set_imap_initial_lookback_days_negative_rejected() {
+    use liveletters_store::MailSettingsRecord;
+    let (store, _tmp) = common::open_temp_store();
+    let ctx = ctx_for(&_tmp);
+    store
+        .save_mail_settings_record(&MailSettingsRecord {
+            profile_id: "default".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    let result = liveletters_settings::run(&ctx, &args_for_set("imap.initial_lookback_days", "-1"));
+    assert!(
+        result.is_err(),
+        "отрицательное значение должно быть отклонено"
+    );
+    // Значение не должно было измениться
+    let mail = store.get_mail_settings_record("default").unwrap().unwrap();
+    assert_eq!(
+        mail.initial_lookback_days, 1,
+        "значение не должно было измениться"
+    );
+}
+
+#[test]
+fn set_imap_initial_lookback_days_non_numeric_rejected() {
+    use liveletters_store::MailSettingsRecord;
+    let (store, _tmp) = common::open_temp_store();
+    let ctx = ctx_for(&_tmp);
+    store
+        .save_mail_settings_record(&MailSettingsRecord {
+            profile_id: "default".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    let result =
+        liveletters_settings::run(&ctx, &args_for_set("imap.initial_lookback_days", "abc"));
+    assert!(
+        result.is_err(),
+        "не-числовое значение должно быть отклонено"
+    );
 }

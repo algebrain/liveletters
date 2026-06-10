@@ -652,6 +652,7 @@ pub fn save_settings(
         imap_username: command.imap_username.trim().to_owned(),
         imap_password: command.imap_password.to_owned(),
         imap_mailbox: command.imap_mailbox.trim().to_owned(),
+        initial_lookback_days: 1,
         setup_completed: true,
     };
 
@@ -677,6 +678,7 @@ pub fn save_settings(
         imap_username: settings.imap_username.clone(),
         imap_password: settings.imap_password.clone(),
         imap_mailbox: settings.imap_mailbox.clone(),
+        initial_lookback_days: settings.initial_lookback_days,
     })?;
 
     Ok(SaveSettingsResult { settings })

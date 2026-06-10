@@ -64,6 +64,7 @@ imap.security:     <tls|starttls|none>
 imap.username:     <имя>
 imap.password:     <********>
 imap.mailbox:      <папка>
+imap.initial_lookback_days: <целое неотрицательное>
 
 [логирование]
 destination:       <file|stderr|none>
@@ -83,7 +84,7 @@ include_bodies:    <true|false>
 lltt settings set <ключ> <значение>
 ```
 
-Допустимые ключи (22 штуки, жёсткий список в `set::ALLOWED_KEYS`):
+Допустимые ключи (23 штуки, жёсткий список в `set::ALLOWED_KEYS`):
 
 - `nickname` — `user_settings.nickname`;
 - `email_address` — `user_settings.email_address`;
@@ -94,6 +95,11 @@ lltt settings set <ключ> <значение>
   `smtp.password`, `smtp.hello_domain` — `mail_settings.smtp_*`;
 - `imap.host`, `imap.port`, `imap.security`, `imap.username`,
   `imap.password`, `imap.mailbox` — `mail_settings.imap_*`;
+- `imap.initial_lookback_days` — `mail_settings.initial_lookback_days`
+  (целое неотрицательное; `0` — с самого начала, `1` — по умолчанию;
+  нечисловое или отрицательное значение отвергается
+  `SettingsError::InvalidValue`; применяется только при самом
+  первом sync, пока в `sync_cursors` нет записи);
 - `log.destination`, `log.level`, `log.max_size_bytes`, `log.keep_files`, `log.include_bodies` — `GlobalConfig.log` (TOML `config.toml`).
 
 Пароли (`smtp.password`, `imap.password`) проходят через

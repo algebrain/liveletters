@@ -86,6 +86,31 @@ pub struct MailSettingsRecord {
     pub imap_username: String,
     pub imap_password: String,
     pub imap_mailbox: String,
+    /// Сколько суток назад от текущего момента заглядывать при
+    /// самом первом sync. По умолчанию 1 (только сегодняшние письма).
+    /// 0 = "с самого начала".
+    pub initial_lookback_days: u32,
+}
+
+impl Default for MailSettingsRecord {
+    fn default() -> Self {
+        Self {
+            profile_id: String::new(),
+            smtp_host: String::new(),
+            smtp_port: 0,
+            smtp_security: String::new(),
+            smtp_username: String::new(),
+            smtp_password: String::new(),
+            smtp_hello_domain: String::new(),
+            imap_host: String::new(),
+            imap_port: 0,
+            imap_security: String::new(),
+            imap_username: String::new(),
+            imap_password: String::new(),
+            imap_mailbox: String::new(),
+            initial_lookback_days: 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

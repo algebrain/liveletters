@@ -10,7 +10,21 @@ pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send
         }
         Some(SyncAction::Pull) => pull_dispatch(ctx),
         Some(SyncAction::Push) => push_dispatch(ctx),
+        Some(SyncAction::Backfill { days }) => backfill_dispatch(ctx, days),
     }
+}
+
+#[cfg(feature = "network")]
+fn backfill_dispatch(ctx: &CommandContext, days: u32) -> Result<(), Box<dyn Error + Send + Sync>> {
+    crate::backfill::run(ctx, days).map_err(|e| Box::new(e) as _)
+}
+
+#[cfg(not(feature = "network"))]
+fn backfill_dispatch(
+    _ctx: &CommandContext,
+    _days: u32,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    Err(Box::new(NetworkFeatureDisabled) as _)
 }
 
 #[cfg(feature = "network")]

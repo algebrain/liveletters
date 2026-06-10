@@ -18,8 +18,6 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
         .ok_or_else(|| SyncError::MailSettingsMissing(profile_id.clone()))?;
 
     let cursor_uid = store.get_sync_cursor(&profile_id)?.unwrap_or(0);
-    let cursor = MailboxCursor::from_last_seen_uid(cursor_uid);
-
     let mailbox = ConfiguredImapMailbox::new(ImapMailboxConfig::new(
         &mail.imap_host,
         mail.imap_port,
@@ -30,6 +28,17 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
             password: mail.imap_password,
         },
     ));
+
+    // Первый запуск (cursor_uid == 0): используем SINCE, чтобы
+    // пропустить старые письма за пределами initial_lookback_days.
+    let cursor = if cursor_uid == 0 {
+        let since_uid = mailbox
+            .find_min_uid_since_days(mail.initial_lookback_days)
+            .map_err(|e| SyncError::Imap(format!("{e:?}")))?;
+        MailboxCursor::start_with_since_uid(since_uid.max(1))
+    } else {
+        MailboxCursor::from_last_seen_uid(cursor_uid)
+    };
 
     let batch = mailbox
         .fetch_new(&cursor)

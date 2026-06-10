@@ -466,6 +466,16 @@
 3. держать `MailboxCursor`;
 4. вызывать `fetch_new(&cursor)`.
 
+Также доступны вспомогательные методы, не требующие предварительной
+подготовки курсора:
+
+- `find_min_uid_since_days(days)` — открывает отдельное IMAP-соединение,
+  выполняет `UID SEARCH SINCE <дата>`, возвращает минимальный UID
+  среди писем за последние `days` суток (или 1, если писем нет).
+  Используется при первом запуске с `initial_lookback_days` и при backfill.
+- `anchor_for_backfill(days)` — обёртка над `find_min_uid_since_days`,
+  возвращает готовый `MailboxCursor::start_with_since_uid(since_uid)`.
+
 ### Что он возвращает
 
 Возвращается `FetchBatch`, внутри которого есть:
@@ -473,6 +483,34 @@
 - новые `ReceivedEmail`;
 - следующий cursor;
 - статус fetch-операции.
+
+### Четырёхуровневый fallback для нестандартных IMAP-серверов
+
+Не все IMAP-серверы поддерживают `SEARCH HEADER` и
+`BODY.PEEK[HEADER.FIELDS(...)]`. Например, mail.ru отвечает
+`NO [CANNOT] Unsupported search criterion` на `SEARCH HEADER` и
+`BAD [PARSE]` на `BODY.PEEK[HEADER.FIELDS]`. `fetch_new` перебирает
+четыре способа получить заголовок письма в порядке убывания
+совместимости:
+
+1. **`UID SEARCH UID <n>:* HEADER X-LiveLetters-Protocol v1`** —
+   самый быстрый и экономный по трафику, но не все серверы
+   поддерживают поиск по нестандартным заголовкам.
+2. **`UID SEARCH UID <n>:*` + `UID FETCH <uid> BODY.PEEK[HEADER.FIELDS (X-LiveLetters-Protocol)]`** —
+   список всех UID, затем для каждого — только нужный заголовок.
+   Большинство серверов поддерживают.
+3. **`UID FETCH <uid> BODY.PEEK[HEADER]`** — все заголовки целиком,
+   клиент сам ищет в них нужный. Совместимо со всеми серверами,
+   поддерживающими IMAP4rev1.
+4. **`UID FETCH <uid> BODY.PEEK[]` + локальный парсинг заголовков** —
+   всё тело письма. Самый дорогой по трафику, но работает даже на
+   самых ограниченных серверах.
+
+Клиент переходит на следующий уровень только если предыдущий
+вернул `BAD` или `PARSE` от сервера. В обычной ситуации (yandex.ru,
+gmail, fastmail) достаточно первого или второго уровня. На mail.ru
+срабатывает третий. Самый экзотический сервер, отвергающий и
+`BODY.PEEK[HEADER]`, обслуживается четвёртым.
 
 ### Ограничения
 
@@ -529,10 +567,16 @@
 
 - `start()`
 - `from_last_seen_uid(...)`
+- `start_with_since_uid(since_uid)`
 - `last_seen_uid()`
 - `advance_to(uid)`
 
 То есть это минимальный внешний контракт инкрементального чтения mailbox.
+
+`start_with_since_uid(since_uid)` создаёт курсор, который «видел»
+все UID меньше `since_uid`. Это заставляет `fetch_new` начать
+с `since_uid`, пропуская более старые письма. Используется при
+первом запуске с `initial_lookback_days` и при backfill.
 
 ## `FetchBatch`
 

@@ -69,6 +69,7 @@ fn save_identity_to_db(store: &Store, name: &str, cfg: &IdentityConfig) -> Resul
             imap_mailbox: imap
                 .map(|s| s.mailbox.clone())
                 .unwrap_or_else(|| "INBOX".to_owned()),
+            initial_lookback_days: 1,
         })?;
     }
 

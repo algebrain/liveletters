@@ -72,10 +72,11 @@ impl Store {
                     imap_security,
                     imap_username,
                     imap_password,
-                    imap_mailbox
+                    imap_mailbox,
+                    initial_lookback_days
                 )
             VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             "#,
             params![
                 record.profile_id,
@@ -91,6 +92,7 @@ impl Store {
                 record.imap_username,
                 imap_password,
                 record.imap_mailbox,
+                record.initial_lookback_days as i64,
             ],
         )?;
 
@@ -116,7 +118,8 @@ impl Store {
                 imap_security,
                 imap_username,
                 imap_password,
-                imap_mailbox
+                imap_mailbox,
+                initial_lookback_days
             FROM mail_settings
             WHERE profile_id = ?1
             "#,
@@ -149,6 +152,7 @@ impl Store {
             imap_username: row.get(10)?,
             imap_password,
             imap_mailbox: row.get(12)?,
+            initial_lookback_days: row.get::<_, i64>(13)? as u32,
         }))
     }
 
@@ -251,6 +255,22 @@ impl Store {
             "imap.security" => self.update_mail_text_field(profile_id, "imap_security", value)?,
             "imap.username" => self.update_mail_text_field(profile_id, "imap_username", value)?,
             "imap.mailbox" => self.update_mail_text_field(profile_id, "imap_mailbox", value)?,
+            "imap.initial_lookback_days" | "initial_lookback_days" => {
+                let days: i64 = value.parse().map_err(|_| {
+                    StoreError::InvalidColumn(format!(
+                        "{field}: ожидается неотрицательное целое число, получили {value}"
+                    ))
+                })?;
+                if days < 0 {
+                    return Err(StoreError::InvalidColumn(format!(
+                        "{field}: значение не может быть отрицательным, получили {value}"
+                    )));
+                }
+                self.connection().execute(
+                    "UPDATE mail_settings SET initial_lookback_days = ?1 WHERE profile_id = ?2",
+                    rusqlite::params![days, profile_id],
+                )?;
+            }
             other => return Err(StoreError::InvalidColumn(other.to_owned())),
         }
         Ok(())

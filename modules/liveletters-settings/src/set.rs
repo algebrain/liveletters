@@ -24,6 +24,7 @@ const ALLOWED_DB_FIELDS: &[&str] = &[
     "imap.username",
     "imap.password",
     "imap.mailbox",
+    "imap.initial_lookback_days",
 ];
 
 const ALLOWED_LOG_FIELDS: &[&str] = &[
@@ -133,6 +134,7 @@ fn ensure_records_exist(
             imap_username: String::new(),
             imap_password: String::new(),
             imap_mailbox: "INBOX".into(),
+            initial_lookback_days: 1,
         })?;
     }
     Ok(())

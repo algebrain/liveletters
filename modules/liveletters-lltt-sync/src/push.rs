@@ -116,7 +116,7 @@ fn send_one(
     transport.send(&outgoing)
 }
 
-fn default_profile_id(name: &str) -> String {
+pub fn default_profile_id(name: &str) -> String {
     if name.is_empty() {
         "default".to_owned()
     } else {
