@@ -1,7 +1,7 @@
 use liveletters_domain::{
     AccountId, Comment, CommentBody, CommentCreated, CommentCreatedFields, CommentEdited,
     CommentId, DomainError, EventId, Post, PostBody, PostCreated, PostHidden, PostId,
-    ResourceAddress, ResourceId, SubscriptionAction, SubscriptionChanged, Timestamp, Visibility,
+    ResourceAddress, ResourceId, Timestamp, Visibility,
 };
 use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message};
 use liveletters_store::{
@@ -230,7 +230,9 @@ pub fn create_post(
 
     enqueue_message(
         store,
+        command.profile_id,
         event.event_id().as_str(),
+        "post_created",
         &i18n.subject,
         post.resource_id().as_str(),
         OutboxDelivery::ResourceSubscribers,
@@ -328,7 +330,9 @@ pub fn create_comment(
 
     enqueue_message(
         store,
+        command.profile_id,
         event.event_id().as_str(),
+        "comment_created",
         &i18n.subject,
         event.resource_id().as_str(),
         delivery,
@@ -449,7 +453,9 @@ pub fn hide_post(
 
     enqueue_message(
         store,
+        command.profile_id,
         event.event_id().as_str(),
+        "post_hidden",
         &i18n.subject,
         event.resource_id().as_str(),
         OutboxDelivery::ResourceSubscribers,
@@ -538,7 +544,9 @@ pub fn edit_comment(
 
     enqueue_message(
         store,
+        command.profile_id,
         event.event_id().as_str(),
+        "comment_edited",
         &i18n.subject,
         event.resource_id().as_str(),
         OutboxDelivery::ResourceSubscribers,
@@ -799,10 +807,13 @@ fn validate_port(field: &str, value: u16) -> Result<(), AppCoreError> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn enqueue_message(
     store: &Store,
+    profile_id: &str,
     event_id: &str,
-    event_label: &str,
+    event_type: &str,
+    subject: &str,
     resource_id: &str,
     delivery: OutboxDelivery,
     message: ProtocolMessage,
@@ -815,12 +826,30 @@ fn enqueue_message(
         ));
     }
 
+    // Домен для Message-ID берём из `user_settings.email_address` текущего профиля
+    // (часть после `@`). Если email пустой или не содержит `@`, используем
+    // `liveletters.invalid` — DSN-сопоставление всё равно будет искать по
+    // `event_id` внутри Message-ID, а не по самому домену.
+    let domain = store
+        .get_user_settings_record(profile_id)
+        .ok()
+        .flatten()
+        .and_then(|r| r.email_address.split_once('@').map(|(_, d)| d.to_owned()))
+        .unwrap_or_else(|| "liveletters.invalid".to_owned());
+    let message_id = format!("<{event_id}@{domain}>");
+
     store.save_outbox_record(&OutboxRecord {
         event_id: event_id.to_owned(),
-        event_type: event_label.to_owned(),
+        event_type: event_type.to_owned(),
         resource_id: resource_id.to_owned(),
         delivery,
         message_body: encode_message(&message)?,
+        message_id: Some(message_id),
+        subject: if subject.is_empty() {
+            None
+        } else {
+            Some(subject.to_owned())
+        },
     })?;
 
     Ok(())
@@ -851,8 +880,14 @@ pub fn subscribe(
     command: SubscribeCommand<'_>,
 ) -> Result<SubscribeResult, AppCoreError> {
     let resource = ResourceAddress::new(command.resource_address)?;
-    let subscriber = AccountId::new(command.subscriber_delivery_address)?;
+    let _subscriber = AccountId::new(command.subscriber_delivery_address)?;
     let delivery = ResourceAddress::new(command.subscriber_delivery_address)?;
+
+    // UPSERT-семантика: при существующей pending-подписке `requested_at`
+    // сохраняется, обновляется только `last_attempt_at`. Это позволяет
+    // повторно вызывать `lltt sub <addr>` пока подтверждение не пришло.
+    store.save_pending_subscription(command.profile_id, resource.as_str(), command.created_at)?;
+    store.update_pending_last_attempt(command.profile_id, resource.as_str(), command.created_at)?;
 
     let event_id_str = format!(
         "subscription:{}:{}:{}",
@@ -861,16 +896,7 @@ pub fn subscribe(
         command.created_at,
     );
     let event_id = EventId::new(&event_id_str)?;
-    let created_at = Timestamp::from_unix_seconds(command.created_at);
-
-    let event = SubscriptionChanged::new(
-        event_id.clone(),
-        resource.clone(),
-        subscriber,
-        delivery.clone(),
-        SubscriptionAction::Subscribe,
-        created_at,
-    );
+    let _created_at = Timestamp::from_unix_seconds(command.created_at);
 
     let i18n = subscription_changed_active(
         store.get_user_settings_record(command.profile_id)?.as_ref(),
@@ -881,22 +907,23 @@ pub fn subscribe(
     let message = ProtocolMessage::new(
         MessageEnvelope::new(
             "1",
-            "subscription_changed",
+            "subscription_requested",
             resource.as_str(),
-            event.event_id().as_str(),
+            event_id.as_str(),
         )?,
         &i18n.body,
-        DomainEventPayload::SubscriptionChanged {
+        DomainEventPayload::SubscriptionRequested {
             resource_address: resource.as_str().to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
-            active: true,
             created_at: command.created_at,
         },
     )?;
 
     enqueue_message(
         store,
-        event.event_id().as_str(),
+        command.profile_id,
+        event_id.as_str(),
+        "subscription_requested",
         &i18n.subject,
         resource.as_str(),
         OutboxDelivery::Direct(vec![resource.as_str().to_owned()]),
@@ -904,7 +931,7 @@ pub fn subscribe(
     )?;
 
     Ok(SubscribeResult {
-        event_id: event.event_id().as_str().to_owned(),
+        event_id: event_id.as_str().to_owned(),
         resource_address: resource.as_str().to_owned(),
         delivery_address: delivery.as_str().to_owned(),
     })
@@ -928,9 +955,9 @@ pub fn unsubscribe(
     command: UnsubscribeCommand<'_>,
 ) -> Result<UnsubscribeResult, AppCoreError> {
     let resource = ResourceAddress::new(command.resource_address)?;
-    let subscriber = AccountId::new(command.subscriber_delivery_address)?;
+    let _subscriber = AccountId::new(command.subscriber_delivery_address)?;
     let delivery = ResourceAddress::new(command.subscriber_delivery_address)?;
-    let created_at = Timestamp::from_unix_seconds(command.created_at);
+    let _created_at = Timestamp::from_unix_seconds(command.created_at);
 
     let event_id_str = format!(
         "unsubscription:{}:{}:{}",
@@ -939,15 +966,6 @@ pub fn unsubscribe(
         command.created_at
     );
     let event_id = EventId::new(&event_id_str)?;
-
-    let event = SubscriptionChanged::new(
-        event_id,
-        resource.clone(),
-        subscriber,
-        delivery.clone(),
-        SubscriptionAction::Unsubscribe,
-        created_at,
-    );
 
     let i18n = subscription_changed_inactive(
         store.get_user_settings_record(command.profile_id)?.as_ref(),
@@ -958,22 +976,23 @@ pub fn unsubscribe(
     let message = ProtocolMessage::new(
         MessageEnvelope::new(
             "1",
-            "subscription_changed",
+            "subscription_revoked",
             resource.as_str(),
-            event.event_id().as_str(),
+            event_id.as_str(),
         )?,
         &i18n.body,
-        DomainEventPayload::SubscriptionChanged {
+        DomainEventPayload::SubscriptionRevoked {
             resource_address: resource.as_str().to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
-            active: false,
             created_at: command.created_at,
         },
     )?;
 
     enqueue_message(
         store,
-        event.event_id().as_str(),
+        command.profile_id,
+        event_id.as_str(),
+        "subscription_revoked",
         &i18n.subject,
         resource.as_str(),
         OutboxDelivery::Direct(vec![resource.as_str().to_owned()]),
@@ -981,7 +1000,7 @@ pub fn unsubscribe(
     )?;
 
     Ok(UnsubscribeResult {
-        event_id: event.event_id().as_str().to_owned(),
+        event_id: event_id.as_str().to_owned(),
         resource_address: resource.as_str().to_owned(),
     })
 }

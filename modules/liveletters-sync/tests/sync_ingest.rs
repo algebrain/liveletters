@@ -19,9 +19,15 @@ fn protocol_email(event_id: &str, payload: DomainEventPayload, human_body: &str)
         DomainEventPayload::CommentEdited { resource_id, .. } => {
             ("comment_edited", resource_id.as_str())
         }
-        DomainEventPayload::SubscriptionChanged {
+        DomainEventPayload::SubscriptionRequested {
             resource_address, ..
-        } => ("subscription_changed", resource_address.as_str()),
+        } => ("subscription_requested", resource_address.as_str()),
+        DomainEventPayload::SubscriptionConfirmed {
+            resource_address, ..
+        } => ("subscription_confirmed", resource_address.as_str()),
+        DomainEventPayload::SubscriptionRevoked {
+            resource_address, ..
+        } => ("subscription_revoked", resource_address.as_str()),
     };
 
     let protocol_message = ProtocolMessage::new(

@@ -34,6 +34,8 @@ pub struct OutboxRecord {
     pub resource_id: String,
     pub delivery: OutboxDelivery,
     pub message_body: String,
+    pub message_id: Option<String>,
+    pub subject: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -117,4 +119,30 @@ impl Default for MailSettingsRecord {
 pub struct SubscriptionRecord {
     pub resource_address: String,
     pub subscriber_delivery_address: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingSubscriptionRecord {
+    pub profile_id: String,
+    pub resource_address: String,
+    pub requested_at: u64,
+    pub last_attempt_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DisplayNameRecord {
+    pub display_email: String,
+    pub display_name: String,
+    pub source: String,
+    pub updated_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BounceRecord {
+    pub original_message_id: String,
+    pub event_id: Option<String>,
+    pub final_recipient: Option<String>,
+    pub status_code: Option<String>,
+    pub diagnostic_code: Option<String>,
+    pub received_at: u64,
 }

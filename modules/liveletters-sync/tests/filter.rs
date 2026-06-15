@@ -6,19 +6,47 @@ use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage}
 use liveletters_store::SubscriptionRecord;
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
-fn subscription_email(
+fn subscription_requested_email(
     event_id: &str,
     resource_address: &str,
     subscriber_delivery_address: &str,
-    active: bool,
 ) -> ReceivedEmail {
     let message = ProtocolMessage::new(
-        MessageEnvelope::new("1", "subscription_changed", resource_address, event_id).unwrap(),
-        "Подписка",
-        DomainEventPayload::SubscriptionChanged {
+        MessageEnvelope::new("1", "subscription_requested", resource_address, event_id).unwrap(),
+        "Запрос подписки",
+        DomainEventPayload::SubscriptionRequested {
             resource_address: resource_address.into(),
             subscriber_delivery_address: subscriber_delivery_address.into(),
-            active,
+            created_at: 1_710_000_000,
+        },
+    )
+    .unwrap();
+
+    let outgoing = build_protocol_email(
+        "bob@example.test",
+        resource_address,
+        "Sync fixture",
+        &message,
+    )
+    .unwrap();
+
+    ReceivedEmail {
+        message_id: format!("message-{event_id}"),
+        raw_message: outgoing.raw_message,
+    }
+}
+
+fn subscription_revoked_email(
+    event_id: &str,
+    resource_address: &str,
+    subscriber_delivery_address: &str,
+) -> ReceivedEmail {
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "subscription_revoked", resource_address, event_id).unwrap(),
+        "Отписка",
+        DomainEventPayload::SubscriptionRevoked {
+            resource_address: resource_address.into(),
+            subscriber_delivery_address: subscriber_delivery_address.into(),
             created_at: 1_710_000_000,
         },
     )
@@ -102,16 +130,26 @@ fn comment_created_email(
 }
 
 #[test]
-fn apply_subscription_changed_persists_record() {
+fn apply_subscription_requested_persists_subscriber_for_redistribution() {
     let (store, _tmp) = open_temp_store();
-    let engine = SyncEngine::new(&store);
+    // A должен иметь user_settings, чтобы отправить SubscriptionConfirmed.
+    store
+        .save_user_settings_record(&liveletters_store::UserSettingsRecord {
+            profile_id: "alice".into(),
+            nickname: "Алиса".into(),
+            email_address: "alice-publish@example.org".into(),
+            avatar_url: None,
+            language: "ru".into(),
+            setup_completed: true,
+        })
+        .unwrap();
+    let engine = SyncEngine::new(&store).with_profile_id("alice");
 
     let report = engine
-        .ingest_batch(vec![subscription_email(
+        .ingest_batch(vec![subscription_requested_email(
             "sub-1",
             "alice-publish@example.org",
             "bob-feed@example.org",
-            true,
         )])
         .unwrap();
 
@@ -120,95 +158,88 @@ fn apply_subscription_changed_persists_record() {
         SyncMessageOutcome::Applied { .. }
     ));
 
+    // A фиксирует подписку в своей БД — иначе у неё нет списка
+    // адресатов для пересылки (PostCreated/CommentCreated).
     let records = store
         .list_subscriptions_for_resource("alice-publish@example.org")
         .unwrap();
     assert_eq!(
-        records,
-        vec![SubscriptionRecord {
+        records.len(),
+        1,
+        "SubscriptionRequested должен фиксировать подписчика в subscriptions \
+         (нужно для пересылки в ResourceSubscribers)"
+    );
+    assert_eq!(
+        records[0].subscriber_delivery_address,
+        "bob-feed@example.org"
+    );
+}
+
+#[test]
+fn apply_subscription_confirmed_does_not_persist_record_yet() {
+    // До этапа 5 SubscriptionConfirmed no-op; полное поведение в этапе 5.
+    let (store, _tmp) = open_temp_store();
+    let engine = SyncEngine::new(&store);
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new(
+            "1",
+            "subscription_confirmed",
+            "alice-publish@example.org",
+            "sub-2",
+        )
+        .unwrap(),
+        "Подтверждение",
+        DomainEventPayload::SubscriptionConfirmed {
             resource_address: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
-        }]
-    );
-}
-
-#[test]
-fn apply_unsubscription_changed_removes_record() {
-    let (store, _tmp) = open_temp_store();
-    let engine = SyncEngine::new(&store);
-
-    engine
-        .ingest_batch(vec![subscription_email(
-            "sub-1",
-            "alice-publish@example.org",
-            "bob-feed@example.org",
-            true,
-        )])
-        .unwrap();
-
-    engine
-        .ingest_batch(vec![subscription_email(
-            "unsub-1",
-            "alice-publish@example.org",
-            "bob-feed@example.org",
-            false,
-        )])
-        .unwrap();
-
-    assert!(
-        store
-            .list_subscriptions_for_resource("alice-publish@example.org")
-            .unwrap()
-            .is_empty()
-    );
-}
-
-#[test]
-fn apply_legacy_subscription_changed_ignores_account_id() {
-    let (store, _tmp) = open_temp_store();
-    let engine = SyncEngine::new(&store);
-    let raw_message = r#"{
-        "envelope": {
-            "schema_version": "1",
-            "event_type": "subscription_changed",
-            "resource_id": "alice-publish@example.org",
-            "event_id": "sub-legacy"
+            owner_nickname: "Алиса".into(),
+            owner_email: "alice-publish@example.org".into(),
+            accepted: true,
+            created_at: 1_710_000_000,
         },
-        "human_readable_body": "Подписка",
-        "payload": {
-            "kind": "subscription_changed",
-            "resource_address": "alice-publish@example.org",
-            "subscriber_account_id": "not-a-real-global-id",
-            "subscriber_delivery_address": "bob-feed@example.org",
-            "action": "subscribe",
-            "created_at": 1710000000
-        }
-    }"#;
+    )
+    .unwrap();
     let outgoing = build_protocol_email(
-        "bob@example.test",
         "alice-publish@example.org",
+        "bob-feed@example.org",
         "Sync fixture",
-        &liveletters_protocol::decode_message(raw_message).unwrap(),
+        &message,
     )
     .unwrap();
 
-    engine
+    let report = engine
         .ingest_batch(vec![ReceivedEmail {
-            message_id: "message-sub-legacy".into(),
+            message_id: "message-sub-2".into(),
             raw_message: outgoing.raw_message,
         }])
         .unwrap();
-
+    assert!(matches!(
+        report.outcomes()[0],
+        SyncMessageOutcome::Applied { .. }
+    ));
     let records = store
         .list_subscriptions_for_resource("alice-publish@example.org")
         .unwrap();
-    assert_eq!(
-        records,
-        vec![SubscriptionRecord {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "bob-feed@example.org".into(),
-        }]
-    );
+    assert!(records.is_empty());
+}
+
+#[test]
+fn apply_subscription_revoked_is_noop_when_not_yet_subscribed() {
+    // SubscriptionRevoked удаляет запись, но если её нет — no-op.
+    let (store, _tmp) = open_temp_store();
+    let engine = SyncEngine::new(&store);
+
+    let report = engine
+        .ingest_batch(vec![subscription_revoked_email(
+            "unsub-1",
+            "alice-publish@example.org",
+            "bob-feed@example.org",
+        )])
+        .unwrap();
+    assert!(matches!(
+        report.outcomes()[0],
+        SyncMessageOutcome::Applied { .. }
+    ));
 }
 
 #[test]

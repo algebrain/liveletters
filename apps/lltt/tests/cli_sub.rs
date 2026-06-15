@@ -3,7 +3,6 @@
 use std::process::Command;
 
 use assert_cmd::prelude::*;
-use liveletters_store::Store;
 use predicates::str::contains;
 use tempfile::TempDir;
 
@@ -13,15 +12,8 @@ fn lltt() -> Command {
     Command::cargo_bin("lltt").expect("бинарь lltt")
 }
 
-fn local_subscriptions(tmp: &TempDir, name: &str) -> Vec<String> {
-    Store::open_for_home_dir(tmp.path().join("users").join(name))
-        .unwrap()
-        .list_local_subscriptions(name)
-        .unwrap()
-}
-
 #[test]
-fn sub_subscribe_writes_toml_and_outbox() {
+fn sub_subscribe_writes_pending_and_outbox() {
     let tmp = TempDir::new().unwrap();
     common::init_user(tmp.path(), "bob");
 
@@ -32,9 +24,17 @@ fn sub_subscribe_writes_toml_and_outbox() {
         .assert()
         .success();
 
-    let subs = local_subscriptions(&tmp, "bob");
-    assert!(subs.contains(&"alice-publish@example.org".to_owned()));
+    // Подписка в pending, не в local — будет перемещена после SubscriptionConfirmed.
     assert!(tmp.path().join("users/bob/liveletters.sqlite3").exists());
+    let store = liveletters_store::Store::open_for_home_dir(tmp.path().join("users/bob")).unwrap();
+    let pending = store.list_pending_subscriptions("bob").unwrap();
+    assert!(
+        pending
+            .iter()
+            .any(|r| r.resource_address == "alice-publish@example.org")
+    );
+    let local = store.list_local_subscriptions("bob").unwrap();
+    assert!(local.is_empty());
 }
 
 #[test]
@@ -62,17 +62,17 @@ fn sub_list_succeeds_after_subscribe() {
         .assert()
         .success();
 
+    // sub list показывает pending-подписки
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
-        .arg("sub")
-        .arg("list")
+        .args(["sub", "pending"])
         .assert()
         .success()
         .stdout(contains("alice-publish@example.org"));
 }
 
 #[test]
-fn sub_rm_removes_subscription() {
+fn sub_rm_removes_pending_subscription() {
     let tmp = TempDir::new().unwrap();
     common::init_user(tmp.path(), "bob");
 
@@ -91,6 +91,10 @@ fn sub_rm_removes_subscription() {
         .assert()
         .success();
 
-    let subs = local_subscriptions(&tmp, "bob");
-    assert!(!subs.contains(&"alice-publish@example.org".to_owned()));
+    // pending очищен
+    let store = liveletters_store::Store::open_for_home_dir(tmp.path().join("users/bob")).unwrap();
+    let pending = store.list_pending_subscriptions("bob").unwrap();
+    assert!(pending.is_empty());
+    let local = store.list_local_subscriptions("bob").unwrap();
+    assert!(local.is_empty());
 }

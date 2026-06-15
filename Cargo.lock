@@ -521,6 +521,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "liveletters-bounce"
+version = "0.1.0"
+dependencies = [
+ "liveletters-log",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "liveletters-comment"
 version = "0.1.0"
 dependencies = [
@@ -802,6 +811,7 @@ dependencies = [
 name = "liveletters-sync"
 version = "0.1.0"
 dependencies = [
+ "liveletters-bounce",
  "liveletters-domain",
  "liveletters-i18n",
  "liveletters-log",

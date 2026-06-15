@@ -36,7 +36,7 @@ fn outbox_subject_and_body(store: &Store, event_id: &str) -> (String, String) {
         .expect("outbox record for event_id");
     let body: Value = serde_json::from_str(&record.message_body).unwrap();
     (
-        record.event_type.clone(),
+        record.subject.clone().unwrap_or_default(),
         body["human_readable_body"]
             .as_str()
             .unwrap_or("")
@@ -219,10 +219,12 @@ fn subscription_active_subject_uses_localized_template() {
         .find(|r| r.event_id.starts_with("subscription:"))
         .expect("subscribe outbox row");
     assert!(
-        sub.event_type
+        sub.subject
+            .as_deref()
+            .unwrap_or("")
             .contains("New subscription: bob-feed@example.org"),
-        "event_type={}",
-        sub.event_type
+        "subject={:?}",
+        sub.subject
     );
 }
 
@@ -252,8 +254,12 @@ fn subscription_inactive_subject_uses_localized_template() {
         .find(|r| r.event_id.starts_with("unsubscription:"))
         .expect("unsubscribe outbox row");
     assert!(
-        unsub.event_type.contains("Отписка: bob-feed@example.org"),
-        "event_type={}",
-        unsub.event_type
+        unsub
+            .subject
+            .as_deref()
+            .unwrap_or("")
+            .contains("Отписка: bob-feed@example.org"),
+        "subject={:?}",
+        unsub.subject
     );
 }

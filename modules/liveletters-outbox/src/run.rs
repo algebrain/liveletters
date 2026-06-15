@@ -37,14 +37,18 @@ pub fn print_summary(pending: &PendingOutbox) {
     }
 
     println!();
-    let headers = &["event_id", "event_type", "resource_id", "delivery"];
+    let headers = &["subject", "event_type", "resource_id", "delivery"];
     let rows: Vec<Vec<String>> = pending.entries().iter().map(row_from_entry).collect();
     print_table(headers, &rows);
 }
 
 fn row_from_entry(entry: &OutboxEntry) -> Vec<String> {
+    let subject = entry
+        .subject
+        .clone()
+        .unwrap_or_else(|| format!("(без темы) {}", entry.event_type));
     vec![
-        entry.event_id.clone(),
+        subject,
         entry.event_type.clone(),
         entry.resource_id.clone(),
         format_delivery(&entry.delivery),

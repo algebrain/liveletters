@@ -37,10 +37,22 @@ pub enum DomainEventPayload {
         body: String,
         visibility: String,
     },
-    SubscriptionChanged {
+    SubscriptionRequested {
         resource_address: String,
         subscriber_delivery_address: String,
-        active: bool,
+        created_at: u64,
+    },
+    SubscriptionConfirmed {
+        resource_address: String,
+        subscriber_delivery_address: String,
+        owner_nickname: String,
+        owner_email: String,
+        accepted: bool,
+        created_at: u64,
+    },
+    SubscriptionRevoked {
+        resource_address: String,
+        subscriber_delivery_address: String,
         created_at: u64,
     },
 }
@@ -87,15 +99,22 @@ enum WireDomainEventPayload {
         body: String,
         visibility: String,
     },
-    SubscriptionChanged {
+    SubscriptionRequested {
         resource_address: String,
         subscriber_delivery_address: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        active: Option<bool>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        action: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        subscriber_account_id: Option<String>,
+        created_at: u64,
+    },
+    SubscriptionConfirmed {
+        resource_address: String,
+        subscriber_delivery_address: String,
+        owner_nickname: String,
+        owner_email: String,
+        accepted: bool,
+        created_at: u64,
+    },
+    SubscriptionRevoked {
+        resource_address: String,
+        subscriber_delivery_address: String,
         created_at: u64,
     },
 }
@@ -188,17 +207,37 @@ impl From<&DomainEventPayload> for WireDomainEventPayload {
                 body: body.clone(),
                 visibility: visibility.clone(),
             },
-            DomainEventPayload::SubscriptionChanged {
+            DomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
-                active,
                 created_at,
-            } => Self::SubscriptionChanged {
+            } => Self::SubscriptionRequested {
                 resource_address: resource_address.clone(),
                 subscriber_delivery_address: subscriber_delivery_address.clone(),
-                active: Some(*active),
-                action: None,
-                subscriber_account_id: None,
+                created_at: *created_at,
+            },
+            DomainEventPayload::SubscriptionConfirmed {
+                resource_address,
+                subscriber_delivery_address,
+                owner_nickname,
+                owner_email,
+                accepted,
+                created_at,
+            } => Self::SubscriptionConfirmed {
+                resource_address: resource_address.clone(),
+                subscriber_delivery_address: subscriber_delivery_address.clone(),
+                owner_nickname: owner_nickname.clone(),
+                owner_email: owner_email.clone(),
+                accepted: *accepted,
+                created_at: *created_at,
+            },
+            DomainEventPayload::SubscriptionRevoked {
+                resource_address,
+                subscriber_delivery_address,
+                created_at,
+            } => Self::SubscriptionRevoked {
+                resource_address: resource_address.clone(),
+                subscriber_delivery_address: subscriber_delivery_address.clone(),
                 created_at: *created_at,
             },
         }
@@ -276,30 +315,39 @@ impl TryFrom<WireDomainEventPayload> for DomainEventPayload {
                 body,
                 visibility,
             }),
-            WireDomainEventPayload::SubscriptionChanged {
+            WireDomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
-                active,
-                action,
                 created_at,
-                ..
-            } => {
-                let active = match (active, action.as_deref()) {
-                    (Some(active), _) => active,
-                    (None, Some("subscribe")) | (None, None) => true,
-                    (None, Some("unsubscribe")) => false,
-                    (None, Some(other)) => {
-                        return Err(format!("unknown subscription action: {other}"));
-                    }
-                };
-
-                Ok(Self::SubscriptionChanged {
-                    resource_address,
-                    subscriber_delivery_address,
-                    active,
-                    created_at,
-                })
-            }
+            } => Ok(Self::SubscriptionRequested {
+                resource_address,
+                subscriber_delivery_address,
+                created_at,
+            }),
+            WireDomainEventPayload::SubscriptionConfirmed {
+                resource_address,
+                subscriber_delivery_address,
+                owner_nickname,
+                owner_email,
+                accepted,
+                created_at,
+            } => Ok(Self::SubscriptionConfirmed {
+                resource_address,
+                subscriber_delivery_address,
+                owner_nickname,
+                owner_email,
+                accepted,
+                created_at,
+            }),
+            WireDomainEventPayload::SubscriptionRevoked {
+                resource_address,
+                subscriber_delivery_address,
+                created_at,
+            } => Ok(Self::SubscriptionRevoked {
+                resource_address,
+                subscriber_delivery_address,
+                created_at,
+            }),
         }
     }
 }

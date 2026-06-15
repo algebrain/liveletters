@@ -53,16 +53,24 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
 
     let next_uid = compute_next_cursor_uid(cursor_uid, &received);
 
-    let engine = SyncEngine::new(&store);
+    let engine = SyncEngine::new(&store).with_profile_id(&profile_id);
     let report = engine.ingest_batch(received)?;
     let counts = tally(&report);
+
+    // Считаем pending_subscriptions после применения
+    let pending = store
+        .list_pending_subscriptions(&profile_id)
+        .unwrap_or_default()
+        .len();
 
     println!("применено событий:    {}", counts.applied);
     println!("дубликатов:           {}", counts.duplicates);
     println!("некорректных писем:   {}", counts.malformed);
+    println!("доставок не удалось:  {}", counts.bounced);
+    println!("подписок в ожидании:  {}", pending);
     liveletters_log::log_info(format!(
-        "sync.pull summary profile={profile_id} applied={} duplicates={} malformed={}",
-        counts.applied, counts.duplicates, counts.malformed,
+        "sync.pull summary profile={profile_id} applied={} duplicates={} malformed={} bounced={} pending={}",
+        counts.applied, counts.duplicates, counts.malformed, counts.bounced, pending,
     ));
 
     store.save_sync_cursor(&profile_id, next_uid)?;
@@ -75,6 +83,7 @@ pub struct OutcomeCounts {
     pub applied: usize,
     pub duplicates: usize,
     pub malformed: usize,
+    pub bounced: usize,
 }
 
 pub fn tally(report: &SyncReport) -> OutcomeCounts {
@@ -84,6 +93,9 @@ pub fn tally(report: &SyncReport) -> OutcomeCounts {
             SyncMessageOutcome::Applied { .. } => counts.applied += 1,
             SyncMessageOutcome::Duplicate { .. } => counts.duplicates += 1,
             SyncMessageOutcome::Malformed { .. } => counts.malformed += 1,
+            SyncMessageOutcome::Filtered { reason, .. } if reason.contains("bounce") => {
+                counts.bounced += 1;
+            }
             _ => {}
         }
     }

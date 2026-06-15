@@ -334,6 +334,8 @@ fn sync_without_subcommand_runs_pull_then_push() {
             resource_id: "blog-1".into(),
             delivery: liveletters_store::OutboxDelivery::ResourceSubscribers,
             message_body: encode_message(&outgoing).expect("encode"),
+            message_id: None,
+            subject: None,
         })
         .expect("save outbox");
 
@@ -404,6 +406,8 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
             resource_id: "blog-1".into(),
             delivery: liveletters_store::OutboxDelivery::ResourceSubscribers,
             message_body: body,
+            message_id: None,
+            subject: None,
         })
         .expect("save outbox");
 
@@ -518,16 +522,15 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
     let outgoing = ProtocolMessage::new(
         MessageEnvelope::new(
             "1",
-            "subscription_changed",
+            "subscription_requested",
             "algebrain@example.org",
             "event-sub-direct",
         )
         .unwrap(),
-        "Подписка",
-        DomainEventPayload::SubscriptionChanged {
+        "Запрос подписки",
+        DomainEventPayload::SubscriptionRequested {
             resource_address: "algebrain@example.org".into(),
             subscriber_delivery_address: "alice@example.test".into(),
-            active: true,
             created_at: 1_710_000_000,
         },
     )
@@ -535,12 +538,14 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
     store
         .save_outbox_record(&liveletters_store::OutboxRecord {
             event_id: "event-sub-direct".into(),
-            event_type: "subscription_changed".into(),
+            event_type: "subscription_requested".into(),
             resource_id: "algebrain@example.org".into(),
             delivery: liveletters_store::OutboxDelivery::Direct(vec![
                 "algebrain@example.org".into(),
             ]),
             message_body: encode_message(&outgoing).expect("encode"),
+            message_id: None,
+            subject: None,
         })
         .expect("save outbox");
 

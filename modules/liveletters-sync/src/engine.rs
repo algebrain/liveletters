@@ -2,10 +2,10 @@ use liveletters_i18n::{Locale, Vars, translate};
 use liveletters_mail::{
     ReceivedEmail, decode_protocol_message, extract_liveletters_parts, parse_email,
 };
-use liveletters_protocol::DomainEventPayload;
+use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message};
 use liveletters_store::{
-    CommentRecord, DeferredEventRecord, OutboxDelivery, OutboxRecord, PostRecord, RawEventRecord,
-    RawMessageRecord, Store, StoreError, SubscriptionRecord,
+    BounceRecord, CommentRecord, DeferredEventRecord, OutboxDelivery, OutboxRecord, PostRecord,
+    RawEventRecord, RawMessageRecord, Store, StoreError, SubscriptionRecord,
 };
 
 use crate::{SyncError, SyncMessageOutcome, SyncReport};
@@ -13,6 +13,7 @@ use crate::{SyncError, SyncMessageOutcome, SyncReport};
 pub struct SyncEngine<'a> {
     store: &'a Store,
     identity_filter: Option<IdentityFilter<'a>>,
+    profile_id: Option<&'a str>,
 }
 
 struct IdentityFilter<'a> {
@@ -25,6 +26,7 @@ impl<'a> SyncEngine<'a> {
         Self {
             store,
             identity_filter: None,
+            profile_id: None,
         }
     }
 
@@ -40,7 +42,13 @@ impl<'a> SyncEngine<'a> {
                 own_address,
                 subscribed: subscribed_refs,
             }),
+            profile_id: None,
         }
+    }
+
+    pub fn with_profile_id(mut self, profile_id: &'a str) -> Self {
+        self.profile_id = Some(profile_id);
+        self
     }
 
     pub fn ingest_batch(&self, messages: Vec<ReceivedEmail>) -> Result<SyncReport, SyncError> {
@@ -189,6 +197,14 @@ impl<'a> SyncEngine<'a> {
         let protocol_message = match decode_protocol_message(parts.technical_body()) {
             Ok(protocol_message) => protocol_message,
             Err(error) => {
+                // Письмо не парсится как protocol — возможно, это DSN-bounce.
+                // Пробуем распознать bounce и обработать отдельно.
+                if let Some(bounce) = liveletters_bounce::parse_dsn(&message.raw_message)
+                    .ok()
+                    .flatten()
+                {
+                    return self.handle_bounce(message, &bounce);
+                }
                 self.store.save_raw_message_record(&RawMessageRecord {
                     message_id: message.message_id.clone(),
                     raw_message: message.raw_message,
@@ -384,6 +400,104 @@ impl<'a> SyncEngine<'a> {
         }
     }
 
+    /// Обработка DSN-bounce: сопоставляем с нашим исходящим по `Message-ID`,
+    /// и если нашли `SubscriptionRequested` в outbox — удаляем pending.
+    fn handle_bounce(
+        &self,
+        message: ReceivedEmail,
+        bounce: &liveletters_bounce::BounceReport,
+    ) -> Result<SyncMessageOutcome, SyncError> {
+        let Some(message_id) = &bounce.original_message_id else {
+            // Не наш DSN — игнор
+            self.store.save_raw_message_record(&RawMessageRecord {
+                message_id: message.message_id.clone(),
+                raw_message: message.raw_message,
+                status: "bounce.ignored".into(),
+            })?;
+            return Ok(SyncMessageOutcome::Filtered {
+                message_id: message.message_id,
+                event_id: "<unknown>".to_owned(),
+                reason: "DSN без Original-Message-ID".to_owned(),
+            });
+        };
+
+        let Some(outgoing) = self
+            .store
+            .find_outbox_by_message_id(message_id)
+            .map_err(SyncError::Store)?
+        else {
+            // DSN для чужого Message-ID — игнор
+            self.store.save_raw_message_record(&RawMessageRecord {
+                message_id: message.message_id.clone(),
+                raw_message: message.raw_message,
+                status: "bounce.unmatched".into(),
+            })?;
+            return Ok(SyncMessageOutcome::Filtered {
+                message_id: message.message_id,
+                event_id: "<unknown>".to_owned(),
+                reason: format!("DSN не соответствует нашему outbox: {message_id}"),
+            });
+        };
+
+        if outgoing.event_type != "subscription_requested" {
+            // Bounce для другого типа события (post/comment) — пока логируем,
+            // полная обработка в будущем.
+            liveletters_log::log_warn(format!(
+                "bounce для {event_type} пока не обрабатывается: {message_id}",
+                event_type = outgoing.event_type
+            ));
+            self.store.save_raw_message_record(&RawMessageRecord {
+                message_id: message.message_id.clone(),
+                raw_message: message.raw_message,
+                status: "bounce.unsupported_event".into(),
+            })?;
+            return Ok(SyncMessageOutcome::Filtered {
+                message_id: message.message_id,
+                event_id: outgoing.event_id,
+                reason: format!("bounce для {} пока не обрабатывается", outgoing.event_type),
+            });
+        }
+
+        // Удаляем pending-подписку для текущего профиля. (B — единственный,
+        // кто мог отправить этот `SubscriptionRequested` и получить bounce.)
+        let profile_id = self.profile_id.unwrap_or("default");
+        self.store
+            .remove_pending_subscription(profile_id, &outgoing.resource_id)
+            .map_err(SyncError::Store)?;
+        // Сохраняем bounce_record
+        self.store
+            .save_bounce_record(&BounceRecord {
+                original_message_id: message_id.clone(),
+                event_id: Some(outgoing.event_id.clone()),
+                final_recipient: Some(bounce.final_recipient.clone()),
+                status_code: Some(bounce.status.clone()),
+                diagnostic_code: Some(bounce.diagnostic_code.clone()),
+                received_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+            })
+            .map_err(SyncError::Store)?;
+
+        self.store.save_raw_message_record(&RawMessageRecord {
+            message_id: message.message_id.clone(),
+            raw_message: message.raw_message,
+            status: "bounce.applied".into(),
+        })?;
+
+        liveletters_log::log_warn(format!(
+            "доставка не удалась: subscription_requested -> {recipient}: {status} {diag}",
+            recipient = bounce.final_recipient,
+            status = bounce.status,
+            diag = bounce.diagnostic_code,
+        ));
+
+        Ok(SyncMessageOutcome::Applied {
+            message_id: message.message_id,
+            event_id: outgoing.event_id,
+        })
+    }
+
     fn apply_payload(
         &self,
         payload: &DomainEventPayload,
@@ -566,29 +680,215 @@ impl<'a> SyncEngine<'a> {
                     })
                     .map_err(ApplyEventError::Store)
             }
-            DomainEventPayload::SubscriptionChanged {
+            DomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
-                active,
                 ..
             } => {
-                let record = SubscriptionRecord {
-                    resource_address: resource_address.clone(),
-                    subscriber_delivery_address: subscriber_delivery_address.clone(),
-                };
-                if *active {
-                    self.store
-                        .save_subscription(&record)
-                        .map_err(ApplyEventError::Store)
+                // A — владелец ресурса — фиксирует подписку у себя,
+                // чтобы знать подписчиков для последующих пересылок
+                // (PostCreated/CommentCreated) и чтобы SubscriptionConfirmed
+                // был идемпотентным.
+                self.store
+                    .save_subscription(&SubscriptionRecord {
+                        resource_address: resource_address.clone(),
+                        subscriber_delivery_address: subscriber_delivery_address.clone(),
+                    })
+                    .map_err(ApplyEventError::Store)?;
+
+                // A автоматически отвечает B: формируем SubscriptionConfirmed
+                // и кладём в свой outbox. B получит его через sync.
+                let response = self.build_subscription_confirmed_response(
+                    resource_address,
+                    subscriber_delivery_address,
+                )?;
+                self.enqueue_outgoing(&response)?;
+                Ok(())
+            }
+            DomainEventPayload::SubscriptionConfirmed {
+                resource_address,
+                subscriber_delivery_address,
+                owner_nickname,
+                owner_email,
+                accepted,
+                ..
+            } => {
+                if *accepted {
+                    // pending → subscriptions + local + display_names
+                    self.accept_pending_subscription(
+                        resource_address,
+                        subscriber_delivery_address,
+                        owner_nickname,
+                        owner_email,
+                    )?;
                 } else {
-                    let _ = self
-                        .store
-                        .delete_subscription(resource_address, subscriber_delivery_address)
-                        .map_err(ApplyEventError::Store)?;
-                    Ok(())
+                    // A отклонил — удалить pending, ничего не создавать
+                    self.decline_pending_subscription(
+                        resource_address,
+                        subscriber_delivery_address,
+                    )?;
                 }
+                Ok(())
+            }
+            DomainEventPayload::SubscriptionRevoked {
+                resource_address,
+                subscriber_delivery_address,
+                ..
+            } => {
+                let _ = self
+                    .store
+                    .delete_subscription(resource_address, subscriber_delivery_address)
+                    .map_err(ApplyEventError::Store)?;
+                Ok(())
             }
         }
+    }
+
+    /// A автоматически отвечает B: формирует `SubscriptionConfirmed` с профилем
+    /// текущей идентичности (ник + email) и кладёт в свой outbox.
+    fn build_subscription_confirmed_response(
+        &self,
+        resource_address: &str,
+        subscriber_delivery_address: &str,
+    ) -> Result<OutboxRecord, ApplyEventError> {
+        let profile_id = self.profile_id.unwrap_or("default");
+        let user = self
+            .store
+            .get_user_settings_record(profile_id)
+            .map_err(ApplyEventError::Store)?
+            .ok_or_else(|| {
+                ApplyEventError::Invalid(format!(
+                    "profile_id {profile_id} не найден в user_settings"
+                ))
+            })?;
+
+        let owner_nickname = if user.nickname.is_empty() {
+            // По решению пользователя: пустой профиль отправляем, логируем warning.
+            liveletters_log::log_warn(format!(
+                "user_settings.nickname пуст для {profile_id}; отправляем пустой профиль"
+            ));
+            String::new()
+        } else {
+            user.nickname.clone()
+        };
+        let owner_email = user.email_address.clone();
+        let domain = owner_email
+            .split_once('@')
+            .map(|(_, d)| d.to_owned())
+            .unwrap_or_else(|| "liveletters.invalid".to_owned());
+
+        let event_id_str = format!(
+            "subscription-confirmed:{}:{}:{}",
+            resource_address,
+            subscriber_delivery_address,
+            owner_email.as_str()
+        );
+        let event_id = liveletters_domain::EventId::new(&event_id_str)
+            .map_err(|e| ApplyEventError::Invalid(format!("event_id: {e:?}")))?;
+        let created_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let message = ProtocolMessage::new(
+            MessageEnvelope::new(
+                "1",
+                "subscription_confirmed",
+                resource_address,
+                event_id.as_str(),
+            )
+            .map_err(|e| ApplyEventError::Invalid(format!("envelope: {e:?}")))?,
+            "подтверждение подписки",
+            DomainEventPayload::SubscriptionConfirmed {
+                resource_address: resource_address.to_owned(),
+                subscriber_delivery_address: subscriber_delivery_address.to_owned(),
+                owner_nickname,
+                owner_email,
+                accepted: true,
+                created_at,
+            },
+        )
+        .map_err(|e| ApplyEventError::Invalid(format!("protocol: {e:?}")))?;
+
+        let message_body = encode_message(&message)
+            .map_err(|e| ApplyEventError::Invalid(format!("encode: {e:?}")))?;
+
+        let message_id = format!("<{}@{}>", event_id.as_str(), domain);
+
+        Ok(OutboxRecord {
+            event_id: event_id.as_str().to_owned(),
+            event_type: "subscription_confirmed".to_owned(),
+            resource_id: resource_address.to_owned(),
+            delivery: OutboxDelivery::Direct(vec![subscriber_delivery_address.to_owned()]),
+            message_body,
+            message_id: Some(message_id),
+            subject: None,
+        })
+    }
+
+    fn enqueue_outgoing(&self, record: &OutboxRecord) -> Result<(), ApplyEventError> {
+        self.store
+            .save_outbox_record(record)
+            .map_err(ApplyEventError::Store)
+    }
+
+    /// B: `SubscriptionConfirmed { accepted: true }` →
+    /// `pending → subscriptions + local_subscriptions + display_names`.
+    /// Если pending нет (например, B уже отменил через `lltt sub cancel`),
+    /// событие игнорируется с логом.
+    fn accept_pending_subscription(
+        &self,
+        resource_address: &str,
+        subscriber_delivery_address: &str,
+        owner_nickname: &str,
+        owner_email: &str,
+    ) -> Result<(), ApplyEventError> {
+        let profile_id = self.profile_id.unwrap_or("default");
+
+        if self
+            .store
+            .find_pending_subscription(profile_id, resource_address)
+            .map_err(ApplyEventError::Store)?
+            .is_none()
+        {
+            liveletters_log::log_warn(format!(
+                "SubscriptionConfirmed для {resource_address}, но pending нет; игнор (гонка состояний)"
+            ));
+            return Ok(());
+        }
+
+        self.store
+            .save_subscription(&SubscriptionRecord {
+                resource_address: resource_address.to_owned(),
+                subscriber_delivery_address: subscriber_delivery_address.to_owned(),
+            })
+            .map_err(ApplyEventError::Store)?;
+        self.store
+            .add_local_subscription(profile_id, resource_address)
+            .map_err(ApplyEventError::Store)?;
+        self.store
+            .save_display_name(owner_email, owner_nickname, "subscription_confirmed")
+            .map_err(ApplyEventError::Store)?;
+        self.store
+            .remove_pending_subscription(profile_id, resource_address)
+            .map_err(ApplyEventError::Store)?;
+        Ok(())
+    }
+
+    /// B: `SubscriptionConfirmed { accepted: false }` → удалить pending.
+    fn decline_pending_subscription(
+        &self,
+        resource_address: &str,
+        subscriber_delivery_address: &str,
+    ) -> Result<(), ApplyEventError> {
+        let profile_id = self.profile_id.unwrap_or("default");
+        self.store
+            .remove_pending_subscription(profile_id, resource_address)
+            .map_err(ApplyEventError::Store)?;
+        liveletters_log::log_info(format!(
+            "sub declined: {subscriber_delivery_address} rejected by {resource_address}"
+        ));
+        Ok(())
     }
 
     fn enqueue_redistribution(
@@ -646,6 +946,8 @@ impl<'a> SyncEngine<'a> {
             resource_id: resource_id.to_owned(),
             delivery: OutboxDelivery::Direct(recipients),
             message_body,
+            message_id: None,
+            subject: None,
         };
         self.store
             .save_outbox_record(&record)
@@ -698,7 +1000,25 @@ fn validate_protocol_message(
             }
         }
         DomainEventPayload::PostHidden { .. } => {}
-        DomainEventPayload::SubscriptionChanged {
+        DomainEventPayload::SubscriptionRequested {
+            resource_address,
+            subscriber_delivery_address,
+            ..
+        } => {
+            if resource_address.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
+                return Err("blank_subscription_field".into());
+            }
+        }
+        DomainEventPayload::SubscriptionConfirmed {
+            resource_address,
+            subscriber_delivery_address,
+            ..
+        } => {
+            if resource_address.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
+                return Err("blank_subscription_field".into());
+            }
+        }
+        DomainEventPayload::SubscriptionRevoked {
             resource_address,
             subscriber_delivery_address,
             ..
@@ -747,7 +1067,9 @@ fn infer_event_type(payload: &DomainEventPayload) -> &'static str {
         DomainEventPayload::CommentCreated { .. } => "comment_created",
         DomainEventPayload::PostHidden { .. } => "post_hidden",
         DomainEventPayload::CommentEdited { .. } => "comment_edited",
-        DomainEventPayload::SubscriptionChanged { .. } => "subscription_changed",
+        DomainEventPayload::SubscriptionRequested { .. } => "subscription_requested",
+        DomainEventPayload::SubscriptionConfirmed { .. } => "subscription_confirmed",
+        DomainEventPayload::SubscriptionRevoked { .. } => "subscription_revoked",
     }
 }
 
@@ -757,7 +1079,13 @@ fn infer_resource_id(payload: &DomainEventPayload) -> &str {
         | DomainEventPayload::CommentCreated { resource_id, .. }
         | DomainEventPayload::PostHidden { resource_id, .. }
         | DomainEventPayload::CommentEdited { resource_id, .. } => resource_id,
-        DomainEventPayload::SubscriptionChanged {
+        DomainEventPayload::SubscriptionRequested {
+            resource_address, ..
+        }
+        | DomainEventPayload::SubscriptionConfirmed {
+            resource_address, ..
+        }
+        | DomainEventPayload::SubscriptionRevoked {
             resource_address, ..
         } => resource_address,
     }
@@ -769,7 +1097,9 @@ fn infer_actor_id(payload: &DomainEventPayload) -> &str {
         | DomainEventPayload::CommentCreated { actor_id, .. }
         | DomainEventPayload::PostHidden { actor_id, .. }
         | DomainEventPayload::CommentEdited { actor_id, .. } => actor_id,
-        DomainEventPayload::SubscriptionChanged { .. } => "",
+        DomainEventPayload::SubscriptionRequested { .. }
+        | DomainEventPayload::SubscriptionConfirmed { .. }
+        | DomainEventPayload::SubscriptionRevoked { .. } => "",
     }
 }
 

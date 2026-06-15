@@ -36,7 +36,7 @@ fn subscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions
         OutboxDelivery::Direct(vec!["alice-publish@example.org".to_owned()])
     );
     let decoded = decode_message(&outbox[0].message_body).expect("message should decode");
-    assert_eq!(decoded.envelope().event_type(), "subscription_changed");
+    assert_eq!(decoded.envelope().event_type(), "subscription_requested");
 
     let records = store
         .list_subscriptions_for_resource("alice-publish@example.org")
@@ -75,7 +75,10 @@ fn unsubscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptio
     assert_eq!(outbox.len(), 2);
     assert!(outbox.iter().all(|r| {
         let decoded = decode_message(&r.message_body).expect("message should decode");
-        decoded.envelope().event_type() == "subscription_changed"
+        matches!(
+            decoded.envelope().event_type(),
+            "subscription_requested" | "subscription_revoked"
+        )
     }));
     assert!(outbox.iter().all(|r| matches!(
         r.delivery,

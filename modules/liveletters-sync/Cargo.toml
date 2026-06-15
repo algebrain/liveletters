@@ -8,6 +8,7 @@ license.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
+liveletters-bounce = { path = "../liveletters-bounce" }
 liveletters-domain = { path = "../liveletters-domain" }
 liveletters-i18n = { path = "../liveletters-i18n" }
 liveletters-log = { path = "../liveletters-log" }

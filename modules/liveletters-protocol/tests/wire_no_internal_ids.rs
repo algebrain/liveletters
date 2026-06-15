@@ -58,11 +58,24 @@ fn comment_created_actor_id_email_does_not_leak_acct_prefix() {
 }
 
 #[test]
-fn subscription_changed_does_not_leak_acct_prefix() {
-    let payload = DomainEventPayload::SubscriptionChanged {
+fn subscription_requested_does_not_leak_acct_prefix() {
+    let payload = DomainEventPayload::SubscriptionRequested {
         resource_address: "blog-1".into(),
         subscriber_delivery_address: "carol@example.org".into(),
-        active: true,
+        created_at: 1_710_000_000,
+    };
+    let encoded = json_of(payload);
+    assert!(!encoded.contains("acct_"), "encoded: {encoded}");
+}
+
+#[test]
+fn subscription_confirmed_does_not_leak_acct_prefix() {
+    let payload = DomainEventPayload::SubscriptionConfirmed {
+        resource_address: "blog-1".into(),
+        subscriber_delivery_address: "carol@example.org".into(),
+        owner_nickname: "Каролина".into(),
+        owner_email: "carol@example.org".into(),
+        accepted: true,
         created_at: 1_710_000_000,
     };
     let encoded = json_of(payload);

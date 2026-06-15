@@ -51,16 +51,27 @@ pub enum SubAction {
     Subscribe { resource_address: String },
     List,
     Rm        { resource_address: String },
+    Pending,
+    Cancel    { resource_address: String },
 }
 ```
 
-| Первый токен     | Под-аргументы       | Получаемый `SubAction`           |
-|------------------|---------------------|----------------------------------|
-| `list`           | —                   | `List`                           |
-| `rm`             | `<адрес>`           | `Rm { resource_address }`        |
-| (любой `<адрес>`)| —                   | `Subscribe { resource_address }` |
+|Первый токен       | Под-аргументы       | Получаемый `SubAction`           |
+|-------------------|---------------------|----------------------------------|
+| `list`            | —                   | `List`                           |
+| `pending`         | —                   | `Pending`                        |
+| `rm`              | `<адрес>`           | `Rm { resource_address }`        |
+| `cancel`          | `<адрес>`           | `Cancel { resource_address }`    |
+| (любой `<адрес>`) | —                   | `Subscribe { resource_address }` |
 
-Имена `list` и `rm` зарезервированы (без учёта регистра). Если первый токен не распознан и не похож на адрес — `SubError::InvalidArgs` с человекочитаемым сообщением.
+Имена `list`, `pending`, `rm`, `cancel` зарезервированы (без учёта
+регистра). Если первый токен не распознан и не похож на адрес —
+`SubError::InvalidArgs` с человекочитаемым сообщением.
+
+`Subscribe` отправляет `SubscriptionRequested` и кладёт запись в
+`pending_subscriptions`. `Cancel` отменяет `pending` без уведомления
+адресата. `Rm` отменяет и `pending`, и подтверждённую подписку, и
+отправляет `SubscriptionRevoked`.
 
 ## `SubError`
 

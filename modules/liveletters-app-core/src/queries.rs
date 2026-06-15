@@ -146,6 +146,8 @@ fn outbox_entry_from_record(record: OutboxRecord) -> OutboxEntry {
         resource_id: record.resource_id,
         delivery: record.delivery,
         message_body: record.message_body,
+        subject: record.subject,
+        message_id: record.message_id,
     }
 }
 

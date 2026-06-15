@@ -15,4 +15,6 @@ pub enum SubAction {
     Subscribe { resource_address: String },
     List,
     Rm { resource_address: String },
+    Pending,
+    Cancel { resource_address: String },
 }

@@ -1,0 +1,15 @@
+[package]
+name = "liveletters-bounce"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+liveletters-log = { path = "../liveletters-log" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

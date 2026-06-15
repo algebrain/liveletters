@@ -77,6 +77,8 @@ fn print_summary_works_with_empty_and_populated() {
         resource_id: "alice-publish@example.org".to_owned(),
         delivery: OutboxDelivery::ResourceSubscribers,
         message_body: "{}".to_owned(),
+        subject: None,
+        message_id: None,
     }]);
     print_summary(&populated);
 }

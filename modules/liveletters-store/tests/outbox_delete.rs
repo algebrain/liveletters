@@ -16,6 +16,8 @@ fn delete_removes_record() {
         resource_id: "blog-1".into(),
         delivery: OutboxDelivery::ResourceSubscribers,
         message_body: "{}".into(),
+        message_id: None,
+        subject: None,
     };
     store.save_outbox_record(&record).expect("save");
 

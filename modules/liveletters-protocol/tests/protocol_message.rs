@@ -137,20 +137,19 @@ fn comment_edited_round_trip_keeps_new_body() {
 }
 
 #[test]
-fn subscription_changed_subscribe_round_trip_keeps_payload() {
+fn subscription_requested_round_trip_keeps_payload() {
     let message = ProtocolMessage::new(
         MessageEnvelope::new(
             "1",
-            "subscription_changed",
+            "subscription_requested",
             "alice-publish@example.org",
             "sub-1",
         )
         .unwrap(),
-        "Подписка",
-        DomainEventPayload::SubscriptionChanged {
+        "Запрос подписки",
+        DomainEventPayload::SubscriptionRequested {
             resource_address: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
-            active: true,
             created_at: 1_710_000_400,
         },
     )
@@ -160,15 +159,13 @@ fn subscription_changed_subscribe_round_trip_keeps_payload() {
     let decoded = decode_message(&encoded).unwrap();
 
     match decoded.payload() {
-        DomainEventPayload::SubscriptionChanged {
+        DomainEventPayload::SubscriptionRequested {
             resource_address,
             subscriber_delivery_address,
-            active,
             created_at,
         } => {
             assert_eq!(resource_address, "alice-publish@example.org");
             assert_eq!(subscriber_delivery_address, "bob-feed@example.org");
-            assert!(*active);
             assert_eq!(*created_at, 1_710_000_400);
         }
         other => panic!("unexpected payload after decode: {other:?}"),
@@ -176,50 +173,59 @@ fn subscription_changed_subscribe_round_trip_keeps_payload() {
 }
 
 #[test]
-fn subscription_changed_serializes_with_snake_case_tag() {
-    let payload = DomainEventPayload::SubscriptionChanged {
+fn subscription_confirmed_round_trip_keeps_payload() {
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new(
+            "1",
+            "subscription_confirmed",
+            "alice-publish@example.org",
+            "sub-2",
+        )
+        .unwrap(),
+        "Подтверждение",
+        DomainEventPayload::SubscriptionConfirmed {
+            resource_address: "alice-publish@example.org".into(),
+            subscriber_delivery_address: "bob-feed@example.org".into(),
+            owner_nickname: "Алиса".into(),
+            owner_email: "alice-publish@example.org".into(),
+            accepted: true,
+            created_at: 1_710_000_500,
+        },
+    )
+    .unwrap();
+
+    let encoded = encode_message(&message).unwrap();
+    let decoded = decode_message(&encoded).unwrap();
+
+    match decoded.payload() {
+        DomainEventPayload::SubscriptionConfirmed {
+            resource_address,
+            subscriber_delivery_address,
+            owner_nickname,
+            owner_email,
+            accepted,
+            created_at,
+        } => {
+            assert_eq!(resource_address, "alice-publish@example.org");
+            assert_eq!(subscriber_delivery_address, "bob-feed@example.org");
+            assert_eq!(owner_nickname, "Алиса");
+            assert_eq!(owner_email, "alice-publish@example.org");
+            assert!(*accepted);
+            assert_eq!(*created_at, 1_710_000_500);
+        }
+        other => panic!("unexpected payload after decode: {other:?}"),
+    }
+}
+
+#[test]
+fn subscription_revoked_serializes_with_snake_case_tag() {
+    let payload = DomainEventPayload::SubscriptionRevoked {
         resource_address: "alice-publish@example.org".into(),
         subscriber_delivery_address: "bob-feed@example.org".into(),
-        active: false,
         created_at: 1_710_000_500,
     };
 
     let json = serde_json::to_value(&payload).unwrap();
 
-    assert_eq!(json["kind"], "subscription_changed");
-    assert_eq!(json["active"], false);
-    assert!(json.get("subscriber_account_id").is_none());
-}
-
-#[test]
-fn subscription_changed_decodes_legacy_account_id_but_ignores_it() {
-    let json = r#"{
-        "envelope": {
-            "schema_version": "1",
-            "event_type": "subscription_changed",
-            "resource_id": "alice-publish@example.org",
-            "event_id": "sub-legacy"
-        },
-        "human_readable_body": "Подписка",
-        "payload": {
-            "kind": "subscription_changed",
-            "resource_address": "alice-publish@example.org",
-            "subscriber_account_id": "acct_bob",
-            "subscriber_delivery_address": "bob-feed@example.org",
-            "action": "subscribe",
-            "created_at": 1710000600
-        }
-    }"#;
-
-    let decoded = decode_message(json).unwrap();
-
-    assert_eq!(
-        decoded.payload(),
-        &DomainEventPayload::SubscriptionChanged {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "bob-feed@example.org".into(),
-            active: true,
-            created_at: 1_710_000_600,
-        }
-    );
+    assert_eq!(json["kind"], "subscription_revoked");
 }

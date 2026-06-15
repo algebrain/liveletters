@@ -43,6 +43,8 @@ fn outbox_record_for(message: &ProtocolMessage) -> OutboxRecord {
         resource_id: message.envelope().resource_id().to_owned(),
         delivery: OutboxDelivery::ResourceSubscribers,
         message_body: encode_message(message).expect("protocol serializes"),
+        message_id: None,
+        subject: None,
     }
 }
 

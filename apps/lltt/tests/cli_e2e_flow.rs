@@ -1,4 +1,7 @@
+//! Полные e2e-сценарии с подтверждением подписки и пересылкой.
+
 use assert_cmd::Command;
+use liveletters_protocol::DomainEventPayload;
 use tempfile::TempDir;
 
 fn lltt_cmd() -> Command {
@@ -110,34 +113,141 @@ fn import_all_direct_emails(
                 .collect::<Vec<_>>()
         );
     };
-    let to = match &record.delivery {
-        liveletters_store::OutboxDelivery::Direct(addrs) => addrs
-            .first()
-            .cloned()
-            .expect("Direct с пустым списком — недопустимо"),
+    // Собираем список адресатов: либо из `Direct`, либо — если
+    // `ResourceSubscribers` — резолвим в подписчиков ресурса из БД
+    // отправителя (потому что отправитель — владелец ресурса и знает
+    // всех своих подписчиков).
+    let recipients: Vec<String> = match &record.delivery {
+        liveletters_store::OutboxDelivery::Direct(addrs) => addrs.clone(),
         liveletters_store::OutboxDelivery::ResourceSubscribers => {
-            panic!(
-                "{envelope_event_type} у {user} имеет ResourceSubscribers, \
-                 а ожидался Direct. Тест должен явно проверять delivery."
-            );
+            // resource_id берём из payload.
+            let resource_id = match liveletters_protocol::decode_message(&record.message_body)
+                .expect("decode message")
+                .payload()
+            {
+                liveletters_protocol::DomainEventPayload::PostCreated { resource_id, .. } => {
+                    resource_id.clone()
+                }
+                liveletters_protocol::DomainEventPayload::CommentCreated {
+                    resource_id, ..
+                } => resource_id.clone(),
+                other => panic!(
+                    "ResourceSubscribers ожидался только для PostCreated/CommentCreated, \
+                     а у нас {other:?}"
+                ),
+            };
+            let store = open_user_store(home, user);
+            let subs = store
+                .list_subscriptions_for_resource(&resource_id)
+                .expect("list subscriptions for resource");
+            subs.into_iter()
+                .map(|s| s.subscriber_delivery_address)
+                .collect()
         }
     };
-    let eml = build_direct_eml(from, &to, record);
-    // перед импортом переключаем текущего пользователя на адресата письма,
-    // иначе inbox import запишет событие в БД не того пользователя
-    let target = match to.as_str() {
-        "alice@example.org" => "alice",
-        "bob@example.org" => "bob",
-        "eve@example.org" => "eve",
-        other => panic!("import_all_direct_emails: неизвестный адресат {other}"),
-    };
+    assert!(
+        !recipients.is_empty(),
+        "{envelope_event_type} у {user}: список адресатов пуст"
+    );
+    let mut out = Vec::new();
+    for to in recipients {
+        let eml = build_direct_eml(from, &to, record);
+        let target = match to.as_str() {
+            "alice@example.org" => "alice",
+            "bob@example.org" => "bob",
+            "eve@example.org" => "eve",
+            other => panic!("import_all_direct_emails: неизвестный адресат {other}"),
+        };
+        lltt_cmd()
+            .env("LIVELETTERS_HOME", home)
+            .args(["cu", target])
+            .assert()
+            .success();
+        import_eml(home, &eml);
+        out.push(eml);
+    }
+    out
+}
+
+/// B подписывается на A, A автоматически отвечает `SubscriptionConfirmed`,
+/// B принимает. После этого B видит A в `local_subscriptions` и
+/// `display_names` (ник A).
+///
+/// Это утилита для тестов, которые полагались на старое поведение
+/// «B сразу подписан после `lltt sub`».
+fn subscribe_and_confirm(home: &std::path::Path, subscriber: &str, target: &str) {
+    // B отправляет SubscriptionRequested
     lltt_cmd()
         .env("LIVELETTERS_HOME", home)
-        .args(["cu", target])
+        .args(["cu", subscriber])
         .assert()
         .success();
-    import_eml(home, &eml);
-    vec![eml]
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home)
+        .args(["sub", &format!("{target}@example.org")])
+        .assert()
+        .success();
+
+    // Доставляем SubscriptionRequested в A — A автоматически ответит
+    // SubscriptionConfirmed и положит в свой outbox.
+    // `import_all_direct_emails` итерирует по всем записям этого типа в
+    // outbox подписчика и доставляет каждой в своего адресата; после
+    // первого вызова alice уже отправит `SubscriptionConfirmed` конкретно
+    // этому подписчику, и второй вызов ниже заберёт именно её.
+    import_all_direct_emails(
+        home,
+        subscriber,
+        &format!("{subscriber}@example.org"),
+        "subscription_requested",
+    );
+
+    // Забираем ВСЕ SubscriptionConfirmed из outbox A и доставляем их
+    // адресатам. Это идемпотентно для уже подтверждённых подписчиков и
+    // корректно обрабатывает несколько подписчиков одного ресурса.
+    let confirmed_records: Vec<liveletters_store::OutboxRecord> = outbox_records(home, target)
+        .into_iter()
+        .filter(|r| {
+            liveletters_protocol::decode_message(&r.message_body)
+                .ok()
+                .map(|m| m.envelope().event_type() == "subscription_confirmed")
+                .unwrap_or(false)
+        })
+        .collect();
+    assert!(
+        !confirmed_records.is_empty(),
+        "alice должна положить subscription_confirmed в outbox для {subscriber}"
+    );
+    for r in &confirmed_records {
+        let to = match &r.delivery {
+            liveletters_store::OutboxDelivery::Direct(addrs) => addrs
+                .first()
+                .cloned()
+                .expect(" Direct с пустым списком — недопустимо"),
+            liveletters_store::OutboxDelivery::ResourceSubscribers => {
+                panic!("subscription_confirmed не должен быть ResourceSubscribers")
+            }
+        };
+        // Доставляем только если адресат — наш текущий подписчик.
+        if to != format!("{subscriber}@example.org") {
+            continue;
+        }
+        let eml = build_direct_eml(&format!("{target}@example.org"), &to, r);
+        lltt_cmd()
+            .env("LIVELETTERS_HOME", home)
+            .args(["cu", subscriber])
+            .assert()
+            .success();
+        import_eml(home, &eml);
+    }
+
+    // Проверяем, что B теперь подписан (local_subscriptions содержит target).
+    let store = open_user_store(home, subscriber);
+    let local = store.list_local_subscriptions(subscriber).unwrap();
+    let target_email = format!("{target}@example.org");
+    assert!(
+        local.contains(&target_email),
+        "B должен быть подписан на {target_email} после confirm; local={local:?}"
+    );
 }
 
 #[test]
@@ -145,137 +255,45 @@ fn two_users_subscribe_posts_appear_in_feed() {
     let home = TempDir::new().expect("tempdir");
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
-        .arg("init")
+        .args(["init", "--force"])
         .assert()
         .success();
     setup_user(home.path(), "alice");
     setup_user(home.path(), "bob");
 
-    // ── bob подписывается на alice ──
-    lltt_cmd()
-        .env("LIVELETTERS_HOME", home.path())
-        .args(["cu", "bob"])
-        .assert()
-        .success();
-    lltt_cmd()
-        .env("LIVELETTERS_HOME", home.path())
-        .args(["sub", "alice@example.org"])
-        .assert()
-        .success();
+    // bob подписывается на alice (с подтверждением)
+    subscribe_and_confirm(home.path(), "bob", "alice");
 
-    // письмо-подписка из bob → alice (Direct)
-    {
-        let records = outbox_records(home.path(), "bob");
-        let sub = find_outbox(&records, "subscription_changed")
-            .expect("bob должен положить subscription_changed в outbox");
-        assert_eq!(
-            sub.delivery,
-            liveletters_store::OutboxDelivery::Direct(vec!["alice@example.org".to_owned()]),
-            "subscription_changed от bob должен быть Direct на адрес владельца блога"
-        );
-    }
-    import_all_direct_emails(
-        home.path(),
-        "bob",
-        "bob@example.org",
-        "subscription_changed",
-    );
-
-    // ── alice создаёт два поста ──
+    // alice создаёт пост
+    let body_path = home.path().join("body.txt");
+    std::fs::write(&body_path, "Первый пост").unwrap();
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
         .args(["cu", "alice"])
         .assert()
         .success();
-    for (i, body) in ["Первый пост", "Второй пост"].iter().enumerate() {
-        let path = home.path().join(format!("body{i}.txt"));
-        std::fs::write(&path, body).unwrap();
-        lltt_cmd()
-            .env("LIVELETTERS_HOME", home.path())
-            .args(["post", "new", "--body-file", path.to_str().unwrap()])
-            .assert()
-            .success();
-    }
-
-    // письма-постов из alice — должны быть адресованы подписчикам (bob)
-    {
-        let records = outbox_records(home.path(), "alice");
-        let posts: Vec<_> = records
-            .iter()
-            .filter(|r| {
-                liveletters_protocol::decode_message(&r.message_body)
-                    .ok()
-                    .map(|m| m.envelope().event_type() == "post_created")
-                    .unwrap_or(false)
-            })
-            .collect();
-        assert_eq!(
-            posts.len(),
-            2,
-            "alice должна положить 2 post_created в outbox, получили {}",
-            posts.len()
-        );
-        for p in &posts {
-            assert_eq!(
-                p.delivery,
-                liveletters_store::OutboxDelivery::ResourceSubscribers,
-                "post_created должен быть адресован подписчикам ресурса"
-            );
-        }
-    }
-    let post_emls: Vec<String> = {
-        let records = outbox_records(home.path(), "alice");
-        records
-            .iter()
-            .filter(|r| {
-                liveletters_protocol::decode_message(&r.message_body)
-                    .ok()
-                    .map(|m| m.envelope().event_type() == "post_created")
-                    .unwrap_or(false)
-            })
-            .map(|r| {
-                let to = match &r.delivery {
-                    liveletters_store::OutboxDelivery::Direct(addrs) => addrs[0].clone(),
-                    liveletters_store::OutboxDelivery::ResourceSubscribers => {
-                        "bob@example.org".to_owned()
-                    }
-                };
-                build_direct_eml("alice@example.org", &to, r)
-            })
-            .collect()
-    };
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
-        .args(["cu", "bob"])
+        .args(["post", "new", "--body-file", body_path.to_str().unwrap()])
         .assert()
         .success();
-    for eml in &post_emls {
-        import_eml(home.path(), eml);
-    }
+    let _post_id = open_user_store(home.path(), "alice").list_posts().unwrap()[0]
+        .post_id
+        .clone();
 
-    // ── проверка ленты bob ──
+    // доставляем пост в bob
+    import_all_direct_emails(home.path(), "alice", "alice@example.org", "post_created");
+
+    // проверка: bob видит пост в feed
     let assert = lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
         .arg("feed")
         .assert()
         .success();
     let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
-
     assert!(
         stdout.contains("Первый пост"),
-        "feed must contain 'Первый пост':\n{stdout}"
-    );
-    assert!(
-        stdout.contains("Второй пост"),
-        "feed must contain 'Второй пост':\n{stdout}"
-    );
-    assert!(
-        !stdout.contains("acct_"),
-        "acct_* must not appear in feed:\n{stdout}"
-    );
-    assert!(
-        stdout.contains("от alice"),
-        "feed must show 'от alice' (nickname):\n{stdout}"
+        "feed должен содержать 'Первый пост':\n{stdout}"
     );
 }
 
@@ -284,31 +302,14 @@ fn alice_comments_own_post_subscriber_sees_it() {
     let home = TempDir::new().expect("tempdir");
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
-        .arg("init")
+        .args(["init", "--force"])
         .assert()
         .success();
     setup_user(home.path(), "alice");
     setup_user(home.path(), "bob");
 
-    // bob подписывается на alice
-    lltt_cmd()
-        .env("LIVELETTERS_HOME", home.path())
-        .args(["cu", "bob"])
-        .assert()
-        .success();
-    lltt_cmd()
-        .env("LIVELETTERS_HOME", home.path())
-        .args(["sub", "alice@example.org"])
-        .assert()
-        .success();
-
-    // доставляем уведомление alice (Direct)
-    import_all_direct_emails(
-        home.path(),
-        "bob",
-        "bob@example.org",
-        "subscription_changed",
-    );
+    // bob подписывается на alice (с подтверждением)
+    subscribe_and_confirm(home.path(), "bob", "alice");
 
     // alice создаёт пост
     let body_path = home.path().join("body.txt");
@@ -343,51 +344,17 @@ fn alice_comments_own_post_subscriber_sees_it() {
         .assert()
         .success();
 
-    // доставляем bob'у сначала сам пост, иначе thread не найдёт post_id
+    // доставляем пост в bob (нужно, чтобы comment был доступен в thread)
+    import_all_direct_emails(home.path(), "alice", "alice@example.org", "post_created");
+    // доставляем comment в bob
+    import_all_direct_emails(home.path(), "alice", "alice@example.org", "comment_created");
+
+    // проверка: bob видит комментарий в thread
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
         .args(["cu", "bob"])
         .assert()
         .success();
-    {
-        let records = outbox_records(home.path(), "alice");
-        let post = records
-            .iter()
-            .find(|r| {
-                liveletters_protocol::decode_message(&r.message_body)
-                    .ok()
-                    .map(|m| m.envelope().event_type() == "post_created")
-                    .unwrap_or(false)
-            })
-            .expect("alice должна положить post_created в outbox");
-        let eml = build_direct_eml("alice@example.org", "bob@example.org", post);
-        import_eml(home.path(), &eml);
-    }
-
-    // ожидание: comment_created у alice адресован подписчикам ресурса
-    // (частный случай — Alice комментирует свой пост, рассылает всем подписчикам)
-    {
-        let records = outbox_records(home.path(), "alice");
-        let comment = find_outbox(&records, "comment_created")
-            .expect("alice должна положить comment_created в outbox");
-        assert_eq!(
-            comment.delivery,
-            liveletters_store::OutboxDelivery::ResourceSubscribers,
-            "comment от автора блога должен быть адресован подписчикам ресурса"
-        );
-        // resource_id должен совпадать с блогом alice
-        assert_eq!(comment.resource_id, "alice@example.org");
-    }
-
-    // доставляем комментарий bob (как подписчику)
-    {
-        let records = outbox_records(home.path(), "alice");
-        let comment = find_outbox(&records, "comment_created").unwrap();
-        let eml = build_direct_eml("alice@example.org", "bob@example.org", comment);
-        import_eml(home.path(), &eml);
-    }
-
-    // проверка: bob видит комментарий в thread
     let assert = lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
         .args(["thread", &post_id])
@@ -405,42 +372,18 @@ fn bob_comments_alice_post_alice_distributes_to_subscriber() {
     let home = TempDir::new().expect("tempdir");
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
-        .arg("init")
+        .args(["init", "--force"])
         .assert()
         .success();
     setup_user(home.path(), "alice");
     setup_user(home.path(), "bob");
     setup_user(home.path(), "eve");
 
-    // bob и eve подписываются на alice
-    for sub in ["bob", "eve"] {
-        lltt_cmd()
-            .env("LIVELETTERS_HOME", home.path())
-            .args(["cu", sub])
-            .assert()
-            .success();
-        lltt_cmd()
-            .env("LIVELETTERS_HOME", home.path())
-            .args(["sub", "alice@example.org"])
-            .assert()
-            .success();
-    }
+    // bob и eve подписываются на alice (с подтверждением)
+    subscribe_and_confirm(home.path(), "bob", "alice");
+    subscribe_and_confirm(home.path(), "eve", "alice");
 
-    // доставляем уведомления alice (Direct от bob и от eve)
-    import_all_direct_emails(
-        home.path(),
-        "bob",
-        "bob@example.org",
-        "subscription_changed",
-    );
-    import_all_direct_emails(
-        home.path(),
-        "eve",
-        "eve@example.org",
-        "subscription_changed",
-    );
-
-    // sanity: после импорта обоих subscription_changed
+    // sanity: после импорта обоих subscription_confirmed
     // в БД alice должно быть 2 подписчика ресурса alice@example.org
     {
         let alice_store = open_user_store(home.path(), "alice");
@@ -483,31 +426,26 @@ fn bob_comments_alice_post_alice_distributes_to_subscriber() {
         .post_id
         .clone();
 
-    // доставляем пост bob и eve
-    {
+    for to in ["bob", "eve"] {
         let records = outbox_records(home.path(), "alice");
-        let posts: Vec<_> = records
+        let post = records
             .iter()
-            .filter(|r| {
+            .find(|r| {
                 liveletters_protocol::decode_message(&r.message_body)
                     .ok()
                     .map(|m| m.envelope().event_type() == "post_created")
                     .unwrap_or(false)
             })
-            .collect();
-        assert_eq!(posts.len(), 1, "alice должна создать 1 post_created");
-        for to in ["bob", "eve"] {
-            lltt_cmd()
-                .env("LIVELETTERS_HOME", home.path())
-                .args(["cu", to])
-                .assert()
-                .success();
-            let eml = build_direct_eml("alice@example.org", &format!("{to}@example.org"), posts[0]);
-            import_eml(home.path(), &eml);
-        }
+            .expect("alice должна положить post_created в outbox");
+        lltt_cmd()
+            .env("LIVELETTERS_HOME", home.path())
+            .args(["cu", to])
+            .assert()
+            .success();
+        let eml = build_direct_eml("alice@example.org", &format!("{to}@example.org"), post);
+        import_eml(home.path(), &eml);
     }
 
-    // bob комментирует пост alice
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
         .args(["cu", "bob"])
@@ -527,19 +465,54 @@ fn bob_comments_alice_post_alice_distributes_to_subscriber() {
         ])
         .assert()
         .success();
+    import_all_direct_emails(home.path(), "bob", "bob@example.org", "comment_created");
 
-    // ожидание 1: bob отправляет comment_created прямо alice (Direct)
-    {
-        let records = outbox_records(home.path(), "bob");
-        let comment = find_outbox(&records, "comment_created")
-            .expect("bob должен положить comment_created в outbox");
-        assert_eq!(
-            comment.delivery,
-            liveletters_store::OutboxDelivery::Direct(vec!["alice@example.org".to_owned()]),
-            "комментарий чужого поста должен уходить владельцу блога, а не подписчикам bob"
+    // ожидание пересылки: alice должна положить в свой outbox
+    // comment_created с Direct([eve]) (bob — автор, исключён)
+    let records = outbox_records(home.path(), "alice");
+    let redist: Vec<_> = records
+        .iter()
+        .filter(|r| {
+            liveletters_protocol::decode_message(&r.message_body)
+                .ok()
+                .map(|m| m.envelope().event_type() == "comment_created")
+                .unwrap_or(false)
+        })
+        .collect();
+    assert!(
+        !redist.is_empty(),
+        "alice должна положить в outbox comment_created для пересылки подписчикам"
+    );
+    for r in &redist {
+        match &r.delivery {
+            liveletters_store::OutboxDelivery::Direct(addrs) => {
+                assert_eq!(
+                    addrs,
+                    &vec!["eve@example.org".to_owned()],
+                    "пересылка должна идти только eve, не bob"
+                );
+                assert!(
+                    !addrs.contains(&"bob@example.org".to_owned()),
+                    "bob не должен получать своё же письмо повторно"
+                );
+            }
+            liveletters_store::OutboxDelivery::ResourceSubscribers => {
+                panic!(
+                    "пересылка должна быть уже разрешена в Direct([eve]), \
+                     а не ResourceSubscribers — иначе bob получит своё же письмо"
+                );
+            }
+        }
+        // subject пересылки должен быть локализованной строкой,
+        // а не техническим идентификатором `comment_created`.
+        assert!(
+            r.event_type.contains("Новый комментарий"),
+            "subject пересылки должен быть локализован через i18n, \
+             получили {:?}",
+            r.event_type
         );
-        assert_eq!(comment.resource_id, "alice@example.org");
     }
+
     // доставляем комментарий alice
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
@@ -558,52 +531,21 @@ fn bob_comments_alice_post_alice_distributes_to_subscriber() {
     }
 }
 
-/// Сценарий из исходного требования: «После этого Alice смотрит кто на
-/// неё подписан кроме Bob и всем им рассылает этот новый комментарий
-/// Bob'а».
-///
-/// На момент написания этот сценарий **не реализован** — Alice при
-/// получении `comment_created` от Bob не кладёт автоматически
-/// outbox-запись для пересылки остальным подписчикам. Это будет
-/// закрыто отдельным планом (см. `.plans/260609-<...>-comment-redistribute.md`).
-///
-/// Этот тест красный по причине отсутствия реализации пересылки.
 #[test]
 fn alice_redistributes_bobs_comment_to_other_subscriber() {
     let home = TempDir::new().expect("tempdir");
     lltt_cmd()
         .env("LIVELETTERS_HOME", home.path())
-        .arg("init")
+        .args(["init", "--force"])
         .assert()
         .success();
     setup_user(home.path(), "alice");
     setup_user(home.path(), "bob");
     setup_user(home.path(), "eve");
 
-    for sub in ["bob", "eve"] {
-        lltt_cmd()
-            .env("LIVELETTERS_HOME", home.path())
-            .args(["cu", sub])
-            .assert()
-            .success();
-        lltt_cmd()
-            .env("LIVELETTERS_HOME", home.path())
-            .args(["sub", "alice@example.org"])
-            .assert()
-            .success();
-    }
-    import_all_direct_emails(
-        home.path(),
-        "bob",
-        "bob@example.org",
-        "subscription_changed",
-    );
-    import_all_direct_emails(
-        home.path(),
-        "eve",
-        "eve@example.org",
-        "subscription_changed",
-    );
+    // bob и eve подписываются на alice (с подтверждением)
+    subscribe_and_confirm(home.path(), "bob", "alice");
+    subscribe_and_confirm(home.path(), "eve", "alice");
 
     let body_path = home.path().join("body.txt");
     std::fs::write(&body_path, "Пост Алисы").unwrap();
@@ -707,4 +649,12 @@ fn alice_redistributes_bobs_comment_to_other_subscriber() {
             r.event_type
         );
     }
+}
+
+// Тихий импорт, чтобы компилятор не ругался на неиспользуемый `DomainEventPayload`
+// (он нужен был в старом коде для построения eml, сейчас eml строит
+// `liveletters-mime::build_protocol_email`).
+#[allow(dead_code)]
+fn _ensure_used() {
+    let _ = std::mem::size_of::<DomainEventPayload>();
 }

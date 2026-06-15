@@ -92,6 +92,8 @@ fn outbox_entries_are_exposed_through_stable_dto() {
             resource_id: "blog-1".into(),
             delivery: OutboxDelivery::ResourceSubscribers,
             message_body: "{\"kind\":\"post_created\",\"actor\":\"alice@example.test\"}".into(),
+            message_id: None,
+            subject: None,
         })
         .unwrap();
 

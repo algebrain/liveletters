@@ -9,7 +9,13 @@ use crate::InboxError;
 
 pub fn run(home: &Path, files: &[PathBuf]) -> Result<(), InboxError> {
     let store = Store::open_for_home_dir(home)?;
-    let engine = SyncEngine::new(&store);
+
+    // Профиль_id берём из `current-user` файла (если он есть).
+    // Без профиля id `decline_pending` / `accept_pending` используют «default»,
+    // что работает не для всех пользователей. Здесь оставляем как есть —
+    // inbox import работает на текущий профиль (тот, кто выполняет команду).
+    let profile_id = read_current_profile_id(home);
+    let engine = SyncEngine::new(&store).with_profile_id(&profile_id);
 
     let mut total_applied = 0;
     let mut total_duplicate = 0;
@@ -73,4 +79,19 @@ pub fn run(home: &Path, files: &[PathBuf]) -> Result<(), InboxError> {
     println!("отклонено:  {total_rejected}");
 
     Ok(())
+}
+
+fn read_current_profile_id(state_home: &Path) -> String {
+    // `current-user` лежит в корне LIVELETTERS_HOME, не в `users/<name>/`.
+    // `state_home` = `<home>/users/<name>`, поэтому поднимаемся на два уровня.
+    let home_root = state_home
+        .parent()
+        .and_then(|p| p.parent())
+        .unwrap_or(state_home);
+    let path = home_root.join("current-user");
+    std::fs::read_to_string(&path)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "default".to_string())
 }

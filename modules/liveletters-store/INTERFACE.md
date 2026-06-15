@@ -338,10 +338,13 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 Он хранит:
 
 - `event_id`
-- `event_type`
+- `event_type` — литерал-идентификатор (`"post_created"`, `"subscription_requested"`, …)
 - `resource_id`
 - `message_body`
 - `delivery: OutboxDelivery` — куда именно отправлять запись
+- `message_id: Option<String>` — `Message-ID` исходящего (используется
+  для сопоставления с DSN-bounce)
+- `subject: Option<String>` — локализованный заголовок для UI
 
 Главный смысл:
 
@@ -411,6 +414,50 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 - `payload_json`
 
 То есть это “не забудь попробовать применить это позже”.
+
+### `PendingSubscriptionRecord`
+
+Запись о подписке, ожидающей подтверждения от владельца блога.
+
+Поля:
+
+- `profile_id` — локальный идентификатор текущего пользователя
+- `resource_address` — адрес блога, на который подписываемся
+- `requested_at` — момент отправки `SubscriptionRequested`
+- `last_attempt_at` — момент последней повторной отправки
+
+Создаётся командой `lltt sub <addr>`. Удаляется при получении
+`SubscriptionConfirmed` (через `pending → subscriptions`) или DSN-bounce.
+
+### `DisplayNameRecord`
+
+Кеш профилей чужих пользователей, на которых мы подписаны.
+
+Поля:
+
+- `display_email` — почтовый адрес владельца блога
+- `display_name` — ник (для отображения в `feed`/`thread` как «Алиса»)
+- `source` — откуда пришёл (`"subscription_confirmed"`, `"post_created"`, …)
+- `updated_at`
+
+Используется `print_thread`/`print_posts` для отображения автора поста
+ником вместо почтового адреса.
+
+### `BounceRecord`
+
+Запись о DSN-bounce, сопоставленном с нашим исходящим.
+
+Поля:
+
+- `original_message_id` — `Message-ID` нашего исходящего (PK)
+- `event_id` — наш `event_id` исходящего (для трассировки)
+- `final_recipient` — кому не доставлено (из DSN)
+- `status_code` — например, `"5.1.1"`
+- `diagnostic_code` — подробности от SMTP-сервера
+- `received_at`
+
+Создаётся при обработке DSN-bounce, который удалось сопоставить с
+нашим исходящим по `Message-ID`.
 
 ## Какие операции предоставляет `Store`
 

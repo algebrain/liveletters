@@ -233,6 +233,8 @@ fn outbox_records_can_be_saved_and_listed() {
             resource_id: "blog-1".into(),
             delivery: OutboxDelivery::ResourceSubscribers,
             message_body: "{\"kind\":\"post_created\"}".into(),
+            message_id: None,
+            subject: None,
         })
         .unwrap();
 

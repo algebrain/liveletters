@@ -28,6 +28,8 @@ pub struct OutboxEntry {
     pub resource_id: String,
     pub delivery: liveletters_store::OutboxDelivery,
     pub message_body: String,
+    pub subject: Option<String>,
+    pub message_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

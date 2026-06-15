@@ -15,17 +15,16 @@ pub fn subscribe(
         .unwrap_or(0);
 
     let core = liveletters_app_core::AppCore::new(store);
-    let _ = core.subscribe(liveletters_app_core::SubscribeCommand {
+    core.subscribe(liveletters_app_core::SubscribeCommand {
         profile_id: &ctx.identity_name,
         resource_address,
         subscriber_delivery_address: &delivery_address,
         created_at,
     })?;
 
-    store.add_local_subscription(&ctx.identity_name, resource_address)?;
     println!(
-        "подписан на {}: посты будут приходить на {}",
-        resource_address, delivery_address
+        "запрошена подписка на {}: ожидайте подтверждения (проверьте `lltt sub pending`)",
+        resource_address
     );
     Ok(())
 }
@@ -49,7 +48,10 @@ pub fn unsubscribe(
         created_at,
     })?;
 
+    // `lltt sub rm` отменяет и подтверждённую, и pending-подписку:
+    // в обоих случаях пользователь хочет «больше не получать посты от A».
     store.remove_local_subscription(&ctx.identity_name, resource_address)?;
+    store.remove_pending_subscription(&ctx.identity_name, resource_address)?;
     println!("отписан от {}", resource_address);
     Ok(())
 }
@@ -113,7 +115,32 @@ pub fn run(ctx: &liveletters_output::CommandContext, args: &Args) -> Result<(), 
         SubAction::Subscribe { resource_address } => subscribe(ctx, &store, &resource_address)?,
         SubAction::Rm { resource_address } => unsubscribe(ctx, &store, &resource_address)?,
         SubAction::List => list_subscriptions(ctx, &store)?,
+        SubAction::Pending => list_pending(ctx, &store)?,
+        SubAction::Cancel { resource_address } => cancel_pending(ctx, &store, &resource_address)?,
     }
+    Ok(())
+}
+
+fn list_pending(ctx: &liveletters_output::CommandContext, store: &Store) -> Result<(), SubError> {
+    let pending = store.list_pending_subscriptions(&ctx.identity_name)?;
+    println!("подписки в ожидании:");
+    if pending.is_empty() {
+        println!("  (пусто)");
+    } else {
+        for r in &pending {
+            println!("  {}", r.resource_address);
+        }
+    }
+    Ok(())
+}
+
+fn cancel_pending(
+    ctx: &liveletters_output::CommandContext,
+    store: &Store,
+    resource_address: &str,
+) -> Result<(), SubError> {
+    store.remove_pending_subscription(&ctx.identity_name, resource_address)?;
+    println!("ожидание отменено: {}", resource_address);
     Ok(())
 }
 
@@ -129,6 +156,25 @@ fn parse_action(tokens: &[String]) -> Result<SubAction, SubError> {
                 )));
             }
             Ok(SubAction::List)
+        }
+        Some("pending") => {
+            if tokens.len() != 1 {
+                return Err(SubError::InvalidArgs(format!(
+                    "`pending` не принимает аргументов, получили: {tokens:?}"
+                )));
+            }
+            Ok(SubAction::Pending)
+        }
+        Some("cancel") => {
+            if tokens.len() != 2 {
+                return Err(SubError::InvalidArgs(format!(
+                    "`cancel` требует один адрес, получили: {tokens:?}"
+                )));
+            }
+            ensure_subscription_address_valid(&tokens[1])?;
+            Ok(SubAction::Cancel {
+                resource_address: tokens[1].clone(),
+            })
         }
         Some("rm") => {
             if tokens.len() != 2 {

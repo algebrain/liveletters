@@ -202,6 +202,9 @@
 - `CommentCreated`
 - `PostHidden`
 - `CommentEdited`
+- `SubscriptionRequested` (B → A: запрос на подписку)
+- `SubscriptionConfirmed` (A → B: автоматический ответ с профилем A)
+- `SubscriptionRevoked` (B → A: отзыв подписки, без подтверждения)
 
 ## Что означает каждый вариант payload
 
@@ -263,6 +266,49 @@
 - `visibility`
 
 То есть передает новую прикладную форму комментария после изменения.
+
+### `SubscriptionRequested`
+
+B отправляет A, чтобы заявить: «хочу получать ваши посты».
+
+Поля:
+
+- `resource_address` — адрес блога, на который B подписывается
+- `subscriber_delivery_address` — почтовый адрес B, на который A
+  будет слать посты
+- `created_at`
+
+При получении A автоматически отвечает `SubscriptionConfirmed` со
+своим профилем. Подписка B остаётся в `pending` до получения
+подтверждения; если приходит DSN-bounce — `pending` очищается.
+
+### `SubscriptionConfirmed`
+
+A отвечает B после получения `SubscriptionRequested`. Передаёт
+свой профиль:
+
+- `resource_address` — адрес блога A
+- `subscriber_delivery_address` — куда слать посты (равно B из запроса)
+- `owner_nickname` — ник A (для отображения у B)
+- `owner_email` — почтовый адрес A (для отображения у B)
+- `accepted` — `true` если A принимает подписку, `false` если отклоняет
+- `created_at`
+
+B при получении `accepted=true` перемещает `pending` в подтверждённые
+подписки и сохраняет профиль A в `display_names` (для печати в
+`feed`/`thread` как «Алиса»). При `accepted=false` — `pending`
+удаляется.
+
+### `SubscriptionRevoked`
+
+B отправляет A, чтобы отписаться. Подтверждение не требуется — A
+просто удаляет B из своих `subscriptions` при обработке.
+
+Поля:
+
+- `resource_address`
+- `subscriber_delivery_address`
+- `created_at`
 
 ## Почему payload сделан именно enum, а не произвольной картой
 

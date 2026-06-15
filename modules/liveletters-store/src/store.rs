@@ -78,7 +78,9 @@ impl Store {
                 event_type TEXT NOT NULL,
                 resource_id TEXT NOT NULL,
                 delivery_json TEXT NOT NULL,
-                message_body TEXT NOT NULL
+                message_body TEXT NOT NULL,
+                message_id TEXT,
+                subject TEXT
             );
 
             CREATE TABLE IF NOT EXISTS raw_messages (
@@ -156,6 +158,30 @@ impl Store {
                 resource_address TEXT NOT NULL,
                 PRIMARY KEY (profile_id, resource_address)
             );
+
+            CREATE TABLE IF NOT EXISTS pending_subscriptions (
+                profile_id TEXT NOT NULL,
+                resource_address TEXT NOT NULL,
+                requested_at INTEGER NOT NULL,
+                last_attempt_at INTEGER NOT NULL,
+                PRIMARY KEY (profile_id, resource_address)
+            );
+
+            CREATE TABLE IF NOT EXISTS display_names (
+                display_email TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                source TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS bounce_records (
+                original_message_id TEXT PRIMARY KEY,
+                event_id TEXT,
+                final_recipient TEXT,
+                status_code TEXT,
+                diagnostic_code TEXT,
+                received_at INTEGER NOT NULL
+            );
             "#,
         )?;
 
@@ -163,6 +189,7 @@ impl Store {
         self.ensure_mail_settings_initial_lookback_column()?;
         self.ensure_user_settings_language_column()?;
         self.ensure_subscriptions_use_delivery_address_key()?;
+        self.ensure_outbox_message_id_column()?;
 
         Ok(())
     }
@@ -228,6 +255,18 @@ impl Store {
             "#,
         )?;
 
+        Ok(())
+    }
+
+    fn ensure_outbox_message_id_column(&self) -> Result<(), StoreError> {
+        if !self.table_has_column("outbox", "message_id")? {
+            self.connection
+                .execute("ALTER TABLE outbox ADD COLUMN message_id TEXT", [])?;
+        }
+        if !self.table_has_column("outbox", "subject")? {
+            self.connection
+                .execute("ALTER TABLE outbox ADD COLUMN subject TEXT", [])?;
+        }
         Ok(())
     }
 

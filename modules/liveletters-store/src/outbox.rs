@@ -7,9 +7,9 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO outbox
-                (event_id, event_type, resource_id, delivery_json, message_body)
+                (event_id, event_type, resource_id, delivery_json, message_body, message_id, subject)
             VALUES
-                (?1, ?2, ?3, ?4, ?5)
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             "#,
             params![
                 record.event_id,
@@ -17,6 +17,8 @@ impl Store {
                 record.resource_id,
                 encode_delivery(&record.delivery),
                 record.message_body,
+                record.message_id,
+                record.subject,
             ],
         )?;
 
@@ -26,7 +28,7 @@ impl Store {
     pub fn list_outbox_records(&self) -> Result<Vec<OutboxRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT event_id, event_type, resource_id, delivery_json, message_body
+            SELECT event_id, event_type, resource_id, delivery_json, message_body, message_id, subject
             FROM outbox
             ORDER BY rowid ASC
             "#,
@@ -39,12 +41,22 @@ impl Store {
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
                 row.get::<_, String>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
             ))
         })?;
 
         let mut records = Vec::new();
         for row in rows {
-            let (event_id, event_type, resource_id, delivery_json, message_body) = row?;
+            let (
+                event_id,
+                event_type,
+                resource_id,
+                delivery_json,
+                message_body,
+                message_id,
+                subject,
+            ) = row?;
             let delivery = decode_delivery(&delivery_json)?;
             records.push(OutboxRecord {
                 event_id,
@@ -52,10 +64,47 @@ impl Store {
                 resource_id,
                 delivery,
                 message_body,
+                message_id,
+                subject,
             });
         }
 
         Ok(records)
+    }
+
+    pub fn find_outbox_by_message_id(
+        &self,
+        message_id: &str,
+    ) -> Result<Option<OutboxRecord>, StoreError> {
+        let mut stmt = self.connection().prepare(
+            r#"
+            SELECT event_id, event_type, resource_id, delivery_json, message_body, message_id, subject
+            FROM outbox
+            WHERE message_id = ?1
+            "#,
+        )?;
+
+        let mut rows = stmt.query(params![message_id])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+        let event_id: String = row.get(0)?;
+        let event_type: String = row.get(1)?;
+        let resource_id: String = row.get(2)?;
+        let delivery_json: String = row.get(3)?;
+        let message_body: String = row.get(4)?;
+        let message_id: Option<String> = row.get(5)?;
+        let subject: Option<String> = row.get(6)?;
+        let delivery = decode_delivery(&delivery_json)?;
+        Ok(Some(OutboxRecord {
+            event_id,
+            event_type,
+            resource_id,
+            delivery,
+            message_body,
+            message_id,
+            subject,
+        }))
     }
 
     pub fn count_outbox(&self) -> Result<u64, StoreError> {

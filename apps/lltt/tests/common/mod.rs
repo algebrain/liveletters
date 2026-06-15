@@ -16,7 +16,7 @@ pub fn lltt() -> Command {
 pub fn init_user(home: &std::path::Path, name: &str) {
     lltt()
         .env("LIVELETTERS_HOME", home)
-        .arg("init")
+        .args(["init", "--force"])
         .assert()
         .success();
     write_identity(home, name);

@@ -10,31 +10,47 @@ fn tokens(args: &[&str]) -> liveletters_sub::Args {
         tokens: args.iter().map(|s| s.to_string()).collect(),
     }
 }
-fn read_local_subscriptions(home: &std::path::Path, name: &str) -> Vec<String> {
+fn read_pending_subscriptions(home: &std::path::Path, name: &str) -> Vec<String> {
     let store = liveletters_store::Store::open_for_home_dir(home).unwrap();
-    store.list_local_subscriptions(name).unwrap()
+    store
+        .list_pending_subscriptions(name)
+        .unwrap()
+        .into_iter()
+        .map(|r| r.resource_address)
+        .collect()
 }
 
 #[test]
-fn subscribe_writes_local_subscriptions_and_outbox() {
+fn subscribe_writes_pending_and_outbox() {
     let home = common::TestHome::new();
     home.add_identity("bob");
     let ctx = home.ctx("bob");
 
     run(&ctx, &tokens(&["alice-publish@example.org"])).unwrap();
 
-    let subs = read_local_subscriptions(home.path(), "bob");
-    assert_eq!(subs, vec!["alice-publish@example.org"]);
+    // pending_subscriptions содержит запись
+    let pending = read_pending_subscriptions(home.path(), "bob");
+    assert_eq!(pending, vec!["alice-publish@example.org".to_string()]);
 
+    // local_subscriptions пуст — будет заполнен при SubscriptionConfirmed
     let store = home.open_store();
+    let local = store.list_local_subscriptions("bob").unwrap();
+    assert!(local.is_empty());
+
+    // outbox получил subscription_requested
     let outbox = store.list_outbox_records().unwrap();
     assert_eq!(outbox.len(), 1);
+    assert_eq!(outbox[0].event_type, "subscription_requested");
     assert!(
         outbox[0]
             .event_id
             .starts_with("subscription:alice-publish@example.org:"),
         "event_id={}",
         outbox[0].event_id
+    );
+    assert!(
+        outbox[0].message_id.is_some(),
+        "Message-ID должен быть заполнен"
     );
 }
 
@@ -64,7 +80,7 @@ fn list_shows_subscribed_and_owned() {
 }
 
 #[test]
-fn rm_removes_local_subscription_and_writes_unsubscribe() {
+fn rm_removes_pending_subscription_and_writes_unsubscribe() {
     let home = common::TestHome::new();
     home.add_identity("bob");
     let ctx = home.ctx("bob");
@@ -72,8 +88,9 @@ fn rm_removes_local_subscription_and_writes_unsubscribe() {
     run(&ctx, &tokens(&["alice-publish@example.org"])).unwrap();
     run(&ctx, &tokens(&["rm", "alice-publish@example.org"])).unwrap();
 
-    let subs = read_local_subscriptions(home.path(), "bob");
-    assert!(subs.is_empty());
+    // pending_subscriptions пуст — отписка отменяет ожидающую подписку
+    let pending = read_pending_subscriptions(home.path(), "bob");
+    assert!(pending.is_empty());
 
     let store = home.open_store();
     let outbox = store.list_outbox_records().unwrap();

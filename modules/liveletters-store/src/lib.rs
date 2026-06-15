@@ -1,5 +1,6 @@
 mod comments;
 mod error;
+mod extras;
 mod metrics;
 mod models;
 mod outbox;
@@ -14,8 +15,9 @@ mod sync_state;
 
 pub use error::StoreError;
 pub use models::{
-    CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxDelivery, OutboxRecord,
-    PostRecord, RawEventRecord, RawMessageRecord, SubscriptionRecord, UserSettingsRecord,
+    BounceRecord, CommentRecord, DeferredEventRecord, DisplayNameRecord, MailSettingsRecord,
+    OutboxDelivery, OutboxRecord, PendingSubscriptionRecord, PostRecord, RawEventRecord,
+    RawMessageRecord, SubscriptionRecord, UserSettingsRecord,
 };
 pub use outbox::{decode_delivery, encode_delivery};
 pub use paths::{EnvOverrides, StorePaths, resolve_data_dir, resolve_data_dir_from_env};
