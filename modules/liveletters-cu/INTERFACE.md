@@ -48,7 +48,7 @@
 | `lltt user list` | Печатает имена файлов `identities/*.toml` по одному в строке. |
 | `lltt user init <имя> [--force]` | Создаёт черновик `<home>/drafts/<имя>.toml`, печатает путь и содержимое. Без `--force` не перезаписывает существующий черновик. |
 | `lltt user show <имя> [--reveal]` | Загружает `<home>/identities/<имя>.toml` и печатает его через `liveletters_output::print_identity`. |
-| `lltt user add <имя> [--from <путь>]` | Читает TOML, проверяет имя, скрывает пароли при `pwd_obfuscate = true`, сохраняет `<home>/identities/<имя>.toml` и копирует почтовые секции в `mail_settings`. Без `--from` берёт `<home>/drafts/<имя>.toml`. Текущего пользователя не меняет. |
+| `lltt user add <имя> [--from <путь>]` | Читает TOML, проверяет имя, валидирует `mail.publish` (см. ниже), скрывает пароли при `pwd_obfuscate = true`, сохраняет `<home>/identities/<имя>.toml` и копирует почтовые секции в `mail_settings`. Без `--from` берёт `<home>/drafts/<имя>.toml`. Текущего пользователя не меняет. |
 | `lltt user rm <имя> --yes` | Удаляет `<home>/identities/<имя>.toml`; без `--yes` возвращает ошибку; текущего пользователя удалить нельзя. |
 
 ## Черновик идентичности
@@ -86,6 +86,22 @@ subscriptions = []
 ```
 
 Имя не может быть пустым, `.` или `..`, содержать пробелы, `/` или `\`.
+
+## Инвариант после `lltt user add`
+
+После успешного завершения `lltt user add` оба поля в
+`UserSettingsRecord` гарантированно непусты:
+
+- `email_address` — e-mail из `mail.publish` черновика;
+- `nickname` — либо `display_name` из черновика, либо (если в
+  черновике `display_name` пусто) локальная часть e-mail до `@`.
+
+`mail.publish` **обязателен**: пустое значение или значение без `@`
+приводит к ошибке команды. Без работающего e-mail нельзя
+сформировать `Message-ID` для DSN и домен для envelope. Этот
+инвариант не должен нарушаться ниже по стеку: код `lltt` может
+полагаться на то, что `UserSettingsRecord.email_address` и
+`UserSettingsRecord.nickname` всегда непустые.
 
 ## Пароли
 

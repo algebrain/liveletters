@@ -22,6 +22,30 @@ pub fn run(
     let raw = std::fs::read_to_string(from)?;
     let mut cfg: IdentityConfig = toml::from_str(&raw)
         .map_err(|e| CuError::Config(liveletters_config::ConfigError::Toml(e.to_string())))?;
+
+    // Инвариант после `lltt user add`: оба поля в `UserSettingsRecord`
+    // (email_address и nickname) непустые. E-mail обязателен —
+    // без него нельзя сформировать Message-ID для DSN и домен для envelope.
+    if cfg.mail.publish.trim().is_empty() {
+        return Err(CuError::InvalidArgs(
+            "mail.publish пустой; e-mail обязателен для lltt user add".to_owned(),
+        ));
+    }
+    if !cfg.mail.publish.contains('@') {
+        return Err(CuError::InvalidArgs(format!(
+            "mail.publish «{}» не содержит @; e-mail обязателен",
+            cfg.mail.publish
+        )));
+    }
+    // display_name опционален: если в черновике пусто, берём локальную
+    // часть e-mail (до @). Пример: bob@example.com → display_name = "bob".
+    if cfg.display_name.trim().is_empty() {
+        let local = cfg.mail.publish.split('@').next().unwrap_or("").trim();
+        if !local.is_empty() {
+            cfg.display_name = local.to_owned();
+        }
+    }
+
     let mut confirmer = DialoguerPasswordConfirmer;
     let user_state_home = ctx.home.join("users").join(name);
     let changed = obfuscate_identity_passwords(&user_state_home, &mut cfg, &mut confirmer)?;

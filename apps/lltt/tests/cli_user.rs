@@ -137,14 +137,15 @@ fn user_add_uses_default_draft_path_when_from_is_omitted() {
 }
 
 #[test]
-fn user_add_leaves_nickname_and_email_empty_until_settings_explicitly_set() {
+fn user_add_derives_nickname_from_publish_when_display_name_blank() {
     let tmp = TempDir::new().unwrap();
     init_home(&tmp);
     let source = tmp.path().join("alice.toml");
+    // display_name пустое — должна подставиться локальная часть e-mail.
     fs::write(
         &source,
         r#"
-display_name = "Алиса"
+display_name = ""
 
 [mail]
 publish = "alice@example.org"
@@ -177,18 +178,146 @@ mailbox = "INBOX"
         .success();
 
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
-    let settings = store.get_user_settings_record("alice").unwrap();
-    assert!(
-        settings.is_some(),
-        "RED: UserSettingsRecord should be created by `lltt user add` with display_name and publish"
+    let s = store
+        .get_user_settings_record("alice")
+        .unwrap()
+        .expect("UserSettingsRecord должен быть создан");
+    // Инвариант: после `lltt user add` оба поля непустые.
+    // display_name было пустым → берём локальную часть `publish`.
+    assert_eq!(
+        s.nickname, "alice",
+        "nickname должен быть извлечён из локальной части publish"
     );
-    let s = settings.unwrap();
-    assert!(
-        !s.nickname.is_empty(),
-        "RED: nickname should be populated from display_name"
-    );
-    assert!(
-        !s.email_address.is_empty(),
-        "RED: email_address should be populated from mail.publish"
-    );
+    assert_eq!(s.email_address, "alice@example.org");
+}
+
+#[test]
+fn user_add_rejects_empty_publish() {
+    let tmp = TempDir::new().unwrap();
+    init_home(&tmp);
+    let source = tmp.path().join("alice.toml");
+    fs::write(
+        &source,
+        r#"
+display_name = "Алиса"
+
+[mail]
+publish = ""
+receive = ["alice@example.org"]
+
+[mail.smtp]
+host = "smtp.example.org"
+port = 587
+security = "starttls"
+username = "alice@example.org"
+password = ""
+hello_domain = "example.org"
+
+[mail.imap]
+host = "imap.example.org"
+port = 993
+security = "tls"
+username = "alice@example.org"
+password = ""
+mailbox = "INBOX"
+"#,
+    )
+    .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["user", "add", "alice", "--from"])
+        .arg(&source)
+        .assert()
+        .failure()
+        .stderr(contains("publish"));
+
+    // БД не должна быть создана — нельзя работать без e-mail.
+    let db = tmp.path().join("users/alice/liveletters.sqlite3");
+    assert!(!db.exists(), "БД не должна создаваться, если e-mail пустой");
+}
+
+#[test]
+fn user_add_rejects_publish_without_at_sign() {
+    let tmp = TempDir::new().unwrap();
+    init_home(&tmp);
+    let source = tmp.path().join("alice.toml");
+    fs::write(
+        &source,
+        r#"
+display_name = "Алиса"
+
+[mail]
+publish = "no-at-sign"
+receive = ["alice@example.org"]
+
+[mail.smtp]
+host = "smtp.example.org"
+port = 587
+security = "starttls"
+username = "alice@example.org"
+password = ""
+hello_domain = "example.org"
+
+[mail.imap]
+host = "imap.example.org"
+port = 993
+security = "tls"
+username = "alice@example.org"
+password = ""
+mailbox = "INBOX"
+"#,
+    )
+    .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["user", "add", "alice", "--from"])
+        .arg(&source)
+        .assert()
+        .failure()
+        .stderr(contains("@"));
+}
+
+#[test]
+fn user_add_rejects_blank_email_even_if_display_name_set() {
+    let tmp = TempDir::new().unwrap();
+    init_home(&tmp);
+    let source = tmp.path().join("alice.toml");
+    fs::write(
+        &source,
+        r#"
+display_name = "Bob"
+
+[mail]
+publish = ""
+receive = ["bob@example.org"]
+
+[mail.smtp]
+host = "smtp.example.org"
+port = 587
+security = "starttls"
+username = "bob@example.org"
+password = ""
+hello_domain = "example.org"
+
+[mail.imap]
+host = "imap.example.org"
+port = 993
+security = "tls"
+username = "bob@example.org"
+password = ""
+mailbox = "INBOX"
+"#,
+    )
+    .unwrap();
+
+    // display_name есть, но e-mail пуст — это всё равно ошибка.
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["user", "add", "alice", "--from"])
+        .arg(&source)
+        .assert()
+        .failure()
+        .stderr(contains("publish"));
 }

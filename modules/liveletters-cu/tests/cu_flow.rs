@@ -95,7 +95,7 @@ fn add_action_creates_identity_file() {
 display_name = "Каролина"
 
 [mail]
-publish = "https://example.com/carol/"
+publish = "carol@example.com"
 receive = ["comments+carol@example.com"]
 "#,
     )
