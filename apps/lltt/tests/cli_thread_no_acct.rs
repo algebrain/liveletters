@@ -79,7 +79,6 @@ fn local_post_and_comment_thread_does_not_show_acct_prefix() {
         .args([
             "comment",
             "new",
-            "--post",
             &post_id,
             "--body-file",
             comment_body.to_str().unwrap(),

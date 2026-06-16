@@ -2,6 +2,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
+mod answer;
 mod context;
 
 use liveletters_comment as comment;
@@ -46,6 +47,8 @@ enum Command {
     Post(post::Args),
     /// Создать комментарий.
     Comment(comment::Args),
+    /// Ответить на пост или на комментарий (id начинается с post- или comment-).
+    Answer(answer::Args),
     /// Показать исходящую очередь.
     Outbox(outbox::Args),
     /// Показать тред поста.
@@ -126,6 +129,10 @@ fn main() -> ExitCode {
         Command::Comment(args) => {
             init_logger(&ctx);
             comment::run(&ctx, &args)
+        }
+        Command::Answer(args) => {
+            init_logger(&ctx);
+            answer::run(&ctx, &args)
         }
         Command::Outbox(args) => {
             init_logger(&ctx);

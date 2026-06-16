@@ -29,4 +29,13 @@ pub enum CommentError {
 
     #[error("идентичность `{0}` не найдена в базе")]
     IdentityNotFound(String),
+
+    #[error("пост «{0}» не найден")]
+    PostNotFound(String),
+
+    #[error("комментарий «{0}» не найден")]
+    CommentNotFound(String),
+
+    #[error("id «{0}» должен начинаться с «post-» или «comment-»")]
+    InvalidTarget(String),
 }

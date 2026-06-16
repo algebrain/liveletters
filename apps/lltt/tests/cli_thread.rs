@@ -56,7 +56,6 @@ fn thread_with_comment_shows_comment_in_output() {
         .args([
             "comment",
             "new",
-            "--post",
             &post_id,
             "--body-file",
             body_path.to_str().unwrap(),

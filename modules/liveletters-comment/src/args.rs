@@ -12,13 +12,9 @@ pub enum CommentAction {
 
 #[derive(Debug, clap::Args)]
 pub struct NewArgs {
-    /// Идентификатор записи, к которой добавляется комментарий.
-    #[arg(long)]
-    pub post: String,
-
-    /// Идентификатор родительского комментария (для вложенных ответов).
-    #[arg(long)]
-    pub parent: Option<String>,
+    /// Id поста (начинается с «post-») или родительского комментария
+    /// (начинается с «comment-»).
+    pub target: String,
 
     /// Файл с телом комментария. Если не указан — тело читается из stdin.
     #[arg(long)]

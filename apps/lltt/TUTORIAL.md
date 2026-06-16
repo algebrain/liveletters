@@ -663,11 +663,13 @@ lltt sub add
 
 ## 9. Комментарии
 
-Команда `lltt comment new` добавляет комментарий к посту. Обязательный
-аргумент — `--post`, идентификатор поста.
+Команды `lltt answer` и `lltt comment new` создают новый комментарий.
+Позиционный аргумент — идентификатор того, на что мы отвечаем: поста
+(начинается с `post-`) или комментария (начинается с `comment-`).
+`lltt answer` и `lltt comment new` — синонимы.
 
 ```sh
-lltt comment new --post post-1780677869022
+lltt answer post-1988f4a2c0b14e7e
 ```
 
 Команда читает тело из stdin (или из `--body-file`); в конце — клавиша
@@ -678,16 +680,25 @@ lltt comment new --post post-1780677869022
 Ctrl-D
 ```
 
-Команда печатает `комментарий создан: comment-…`.
+Или через пайп (то же, что `lltt post new`):
+
+```sh
+echo "Отличный пост!" | lltt answer post-1988f4a2c0b14e7e
+```
+
+Команда печатает `комментарий создан: comment-…`. Конец строки от `echo`
+срезается автоматически — тело хранится без хвостового перевода строки.
 
 ### 9.1. Вложенные ответы
 
-Чтобы ответить на конкретный комментарий, передайте его идентификатор
-через `--parent`:
+Чтобы ответить на конкретный комментарий, передайте его идентификатор:
 
 ```sh
-lltt comment new --post post-1780677869022 --parent comment-1780677869100 --body-file ~/lltt-demo/work/reply.txt
+lltt answer comment-b1c2d3e4f5a67890 --body-file ~/lltt-demo/work/reply.txt
 ```
+
+`post_id` для ответа команда подставит сама — он уже записан в
+родительском комментарии.
 
 ### 9.2. Видимость комментариев
 
@@ -696,8 +707,11 @@ lltt comment new --post post-1780677869022 --parent comment-1780677869100 --body
 
 ### 9.3. Ошибки
 
-Если указать несуществующий идентификатор поста, команда завершится
-с ошибкой. Пустое тело также недопустимо.
+Если указать несуществующий идентификатор поста или комментария, команда
+завершится с человекочитаемой ошибкой (`пост «post-…» не найден` или
+`комментарий «comment-…» не найден`). Если идентификатор не начинается
+с `post-` или `comment-`, команда сообщит `id «foo-bar» должен
+начинаться с «post-» или «comment-»`. Пустое тело также недопустимо.
 
 ## 10. Тред (обсуждение)
 
@@ -995,8 +1009,8 @@ lltt sync
 lltt inbox list
 
 # 11. Пишем комментарий к своему последнему посту
-POST_ID=$(lltt cu posts --limit 1 | sed -n 's/^.*#\(post-[0-9]*\).*$/\1/p' | head -1)
-lltt comment new --post "$POST_ID" --body-file "$LIVELETTERS_HOME/work/post-1.txt"
+POST_ID=$(lltt cu posts --limit 1 | sed -n 's/^.*#\(post-[0-9a-f]*\).*$/\1/p' | head -1)
+lltt answer "$POST_ID" --body-file "$LIVELETTERS_HOME/work/post-1.txt"
 
 # 12. Смотрим тред
 lltt thread "$POST_ID"
@@ -1029,8 +1043,9 @@ lltt doctor --verbose
 | `lltt post new` | Создать пост (тело из stdin) |
 | `lltt post new --body-file <файл>` | Создать пост из файла |
 | `lltt post new --visibility <уровень>` | Пост с уровнем видимости |
-| `lltt comment new --post <id>` | Добавить комментарий к посту |
-| `lltt comment new --parent <id> --post <id>` | Ответить на комментарий |
+| `echo "..." \| lltt answer <id>` | Ответить на пост или на комментарий (тело из stdin) |
+| `lltt answer <id> --body-file <файл>` | То же, тело из файла |
+| `lltt comment new <id>` | Синоним `lltt answer` |
 | `lltt cu posts` | Показать свои посты |
 | `lltt cu posts --limit N` | Показать последние N своих постов |
 | `lltt feed` | Показать ленту подписок |

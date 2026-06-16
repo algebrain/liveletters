@@ -336,7 +336,6 @@ fn alice_comments_own_post_subscriber_sees_it() {
         .args([
             "comment",
             "new",
-            "--post",
             &post_id,
             "--body-file",
             comment_body.to_str().unwrap(),
@@ -458,7 +457,6 @@ fn bob_comments_alice_post_alice_distributes_to_subscriber() {
         .args([
             "comment",
             "new",
-            "--post",
             &post_id,
             "--body-file",
             comment_body.to_str().unwrap(),
@@ -602,7 +600,6 @@ fn alice_redistributes_bobs_comment_to_other_subscriber() {
         .args([
             "comment",
             "new",
-            "--post",
             &post_id,
             "--body-file",
             comment_body.to_str().unwrap(),

@@ -7,7 +7,7 @@ mod run;
 pub use args::{Args, CommentAction, NewArgs};
 pub use error::CommentError;
 pub use liveletters_output::CommandContext;
-pub use run::run;
+pub use run::{create, run};
 
 /// Имя команды для clap-дерева и для диагностических сообщений.
 pub const COMMAND_NAME: &str = "comment";

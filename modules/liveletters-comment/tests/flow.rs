@@ -50,8 +50,7 @@ fn comment_new_creates_persisted_comment_with_default_visibility() {
 
     let args = Args {
         action: CommentAction::New(NewArgs {
-            post: post_id.clone(),
-            parent: None,
+            target: post_id.clone(),
             body_file: Some(body_path),
             visibility: "public".to_owned(),
         }),
@@ -79,8 +78,7 @@ fn comment_new_with_friends_only_visibility() {
 
     let args = Args {
         action: CommentAction::New(NewArgs {
-            post: post_id.clone(),
-            parent: None,
+            target: post_id.clone(),
             body_file: Some(body_path),
             visibility: "friends_only".to_owned(),
         }),
@@ -105,8 +103,7 @@ fn comment_new_with_parent_creates_reply() {
     std::fs::write(&root_body, "Корневой").unwrap();
     let root_args = Args {
         action: CommentAction::New(NewArgs {
-            post: post_id.clone(),
-            parent: None,
+            target: post_id.clone(),
             body_file: Some(root_body),
             visibility: "public".to_owned(),
         }),
@@ -123,8 +120,7 @@ fn comment_new_with_parent_creates_reply() {
     std::fs::write(&reply_body, "Ответ").unwrap();
     let reply_args = Args {
         action: CommentAction::New(NewArgs {
-            post: post_id.clone(),
-            parent: Some(root_id.clone()),
+            target: root_id.clone(),
             body_file: Some(reply_body),
             visibility: "public".to_owned(),
         }),
@@ -152,8 +148,7 @@ fn comment_new_rejects_empty_body() {
 
     let args = Args {
         action: CommentAction::New(NewArgs {
-            post: post_id,
-            parent: None,
+            target: post_id,
             body_file: Some(body_path),
             visibility: "public".to_owned(),
         }),
@@ -174,8 +169,7 @@ fn comment_new_to_missing_post_errors() {
 
     let args = Args {
         action: CommentAction::New(NewArgs {
-            post: "missing-post".to_owned(),
-            parent: None,
+            target: "post-missing".to_owned(),
             body_file: Some(body_path),
             visibility: "public".to_owned(),
         }),

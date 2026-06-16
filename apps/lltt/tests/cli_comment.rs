@@ -43,7 +43,6 @@ fn comment_new_creates_persisted_comment() {
         .args([
             "comment",
             "new",
-            "--post",
             &post_id,
             "--body-file",
             body_path.to_str().unwrap(),
@@ -73,7 +72,6 @@ fn comment_new_with_parent_creates_reply() {
         .args([
             "comment",
             "new",
-            "--post",
             &post_id,
             "--body-file",
             root_body.to_str().unwrap(),
@@ -96,9 +94,6 @@ fn comment_new_with_parent_creates_reply() {
         .args([
             "comment",
             "new",
-            "--post",
-            &post_id,
-            "--parent",
             &root_id,
             "--body-file",
             reply_body.to_str().unwrap(),

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::io::{self};
 
-use liveletters_app_core::{AppCore, CreateCommentFromIdentityCommand, Identity};
+use liveletters_app_core::{AppCore, CreateCommentFromIdentityCommand, Identity, Visibility};
 use liveletters_output::{CommandContext, parse_visibility, read_body};
 use liveletters_store::Store;
 
@@ -20,6 +20,27 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), CommentError> {
 }
 
 fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), CommentError> {
+    let body = read_body(args.body_file.as_deref(), &mut io::stdin().lock())
+        .map_err(CommentError::IoFromOutput)?;
+    let visibility = parse_visibility(&args.visibility).map_err(CommentError::UnknownVisibility)?;
+    let result = create(ctx, &args.target, &body, visibility)?;
+    print_created(result.comment().id().as_str());
+    Ok(())
+}
+
+/// Создать комментарий по target (id поста или родительского комментария).
+/// Дискриминация — по префиксу id. Используется и `lltt answer`,
+/// и `lltt comment new` (как синоним).
+pub fn create(
+    ctx: &CommandContext,
+    target: &str,
+    body: &str,
+    visibility: Visibility,
+) -> Result<liveletters_app_core::CreateCommentResult, CommentError> {
+    if body.trim().is_empty() {
+        return Err(CommentError::EmptyBody);
+    }
+
     let store = Store::open_for_home_dir(&ctx.state_home)?;
     let user = store
         .get_user_settings_record(&ctx.identity_name)?
@@ -28,24 +49,39 @@ fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), CommentError> {
         publish: user.email_address,
     };
 
-    let body = read_body(args.body_file.as_deref(), &mut io::stdin().lock())
-        .map_err(CommentError::IoFromOutput)?;
-    if body.trim().is_empty() {
-        return Err(CommentError::EmptyBody);
+    let core = AppCore::new(&store);
+
+    if target.starts_with("post-") {
+        if store.get_post_record(target)?.is_none() {
+            return Err(CommentError::PostNotFound(target.to_owned()));
+        }
+        return core
+            .create_comment_from_identity(CreateCommentFromIdentityCommand {
+                profile_id: &ctx.identity_name,
+                identity: &identity,
+                post_id: target,
+                parent_comment_id: None,
+                body,
+                visibility,
+            })
+            .map_err(CommentError::AppCore);
     }
 
-    let visibility = parse_visibility(&args.visibility).map_err(CommentError::UnknownVisibility)?;
+    if target.starts_with("comment-") {
+        let Some(parent) = store.get_comment_record(target)? else {
+            return Err(CommentError::CommentNotFound(target.to_owned()));
+        };
+        return core
+            .create_comment_from_identity(CreateCommentFromIdentityCommand {
+                profile_id: &ctx.identity_name,
+                identity: &identity,
+                post_id: &parent.post_id,
+                parent_comment_id: Some(target),
+                body,
+                visibility,
+            })
+            .map_err(CommentError::AppCore);
+    }
 
-    let core = AppCore::new(&store);
-    let result = core.create_comment_from_identity(CreateCommentFromIdentityCommand {
-        profile_id: &ctx.identity_name,
-        identity: &identity,
-        post_id: &args.post,
-        parent_comment_id: args.parent.as_deref(),
-        body: &body,
-        visibility,
-    })?;
-
-    print_created(result.comment().id().as_str());
-    Ok(())
+    Err(CommentError::InvalidTarget(target.to_owned()))
 }
