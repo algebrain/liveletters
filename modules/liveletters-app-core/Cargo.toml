@@ -13,6 +13,7 @@ liveletters-i18n = { path = "../liveletters-i18n" }
 liveletters-protocol = { path = "../liveletters-protocol" }
 liveletters-sync = { path = "../liveletters-sync" }
 liveletters-store = { path = "../liveletters-store" }
+uuid = { workspace = true }
 
 [dev-dependencies]
 liveletters-mail = { path = "../liveletters-mail" }
