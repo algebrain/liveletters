@@ -78,7 +78,7 @@ pub fn post_hidden(
     }
 }
 
-pub fn subscription_changed_active(
+pub fn subscription_requested(
     record: Option<&UserSettingsRecord>,
     subscriber: &str,
     resource: &str,
@@ -86,14 +86,44 @@ pub fn subscription_changed_active(
     let loc = locale_for(record);
     let vars = Vars(&[("subscriber", subscriber), ("resource", resource)]);
     SubjectAndBody {
-        subject: translate("subscription_changed.active.subject", loc, vars)
-            .expect("шаблон subscription_changed.active.subject присутствует в таблице"),
-        body: translate("subscription_changed.active.body", loc, vars)
-            .expect("шаблон subscription_changed.active.body присутствует в таблице"),
+        subject: translate("subscription_requested.subject", loc, vars)
+            .expect("шаблон subscription_requested.subject присутствует в таблице"),
+        body: translate("subscription_requested.body", loc, vars)
+            .expect("шаблон subscription_requested.body присутствует в таблице"),
     }
 }
 
-pub fn subscription_changed_inactive(
+pub fn subscription_confirmed_accepted(
+    record: Option<&UserSettingsRecord>,
+    owner: &str,
+    resource: &str,
+) -> SubjectAndBody {
+    let loc = locale_for(record);
+    let vars = Vars(&[("owner", owner), ("resource", resource)]);
+    SubjectAndBody {
+        subject: translate("subscription_confirmed_accepted.subject", loc, vars)
+            .expect("шаблон subscription_confirmed_accepted.subject присутствует в таблице"),
+        body: translate("subscription_confirmed_accepted.body", loc, vars)
+            .expect("шаблон subscription_confirmed_accepted.body присутствует в таблице"),
+    }
+}
+
+pub fn subscription_confirmed_declined(
+    record: Option<&UserSettingsRecord>,
+    owner: &str,
+    resource: &str,
+) -> SubjectAndBody {
+    let loc = locale_for(record);
+    let vars = Vars(&[("owner", owner), ("resource", resource)]);
+    SubjectAndBody {
+        subject: translate("subscription_confirmed_declined.subject", loc, vars)
+            .expect("шаблон subscription_confirmed_declined.subject присутствует в таблице"),
+        body: translate("subscription_confirmed_declined.body", loc, vars)
+            .expect("шаблон subscription_confirmed_declined.body присутствует в таблице"),
+    }
+}
+
+pub fn subscription_revoked(
     record: Option<&UserSettingsRecord>,
     subscriber: &str,
     resource: &str,
@@ -101,9 +131,25 @@ pub fn subscription_changed_inactive(
     let loc = locale_for(record);
     let vars = Vars(&[("subscriber", subscriber), ("resource", resource)]);
     SubjectAndBody {
-        subject: translate("subscription_changed.inactive.subject", loc, vars)
-            .expect("шаблон subscription_changed.inactive.subject присутствует в таблице"),
-        body: translate("subscription_changed.inactive.body", loc, vars)
-            .expect("шаблон subscription_changed.inactive.body присутствует в таблице"),
+        subject: translate("subscription_revoked.subject", loc, vars)
+            .expect("шаблон subscription_revoked.subject присутствует в таблице"),
+        body: translate("subscription_revoked.body", loc, vars)
+            .expect("шаблон subscription_revoked.body присутствует в таблице"),
+    }
+}
+
+pub fn comment_created_redistribute(
+    record: Option<&UserSettingsRecord>,
+    sender: &str,
+    post_id: &str,
+    body: &str,
+) -> SubjectAndBody {
+    let loc = locale_for(record);
+    let vars = Vars(&[("sender", sender), ("post_id", post_id), ("body", body)]);
+    SubjectAndBody {
+        subject: translate("comment_created_redistribute.subject", loc, vars)
+            .expect("шаблон comment_created_redistribute.subject присутствует в таблице"),
+        body: translate("comment_created_redistribute.body", loc, vars)
+            .expect("шаблон comment_created_redistribute.body присутствует в таблице"),
     }
 }

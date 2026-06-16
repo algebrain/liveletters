@@ -201,9 +201,38 @@ fn post_hidden_subject_uses_localized_template() {
 }
 
 #[test]
-fn subscription_active_subject_uses_localized_template() {
+fn subscription_requested_subject_uses_localized_template_en() {
+    let (_dir_en, store_en) = open();
+    save_user(&store_en, "en");
+    let app_en = AppCore::new(&store_en);
+    app_en
+        .subscribe(SubscribeCommand {
+            profile_id: "default",
+            resource_address: "alice-publish@example.org",
+            subscriber_delivery_address: "bob-feed@example.org",
+            created_at: 1,
+        })
+        .unwrap();
+
+    let records = store_en.list_outbox_records().unwrap();
+    let sub = records
+        .iter()
+        .find(|r| r.event_id.starts_with("subscription:"))
+        .expect("subscribe outbox row");
+    assert!(
+        sub.subject
+            .as_deref()
+            .unwrap_or("")
+            .contains("New subscription: bob-feed@example.org"),
+        "subject={:?}",
+        sub.subject
+    );
+}
+
+#[test]
+fn subscription_requested_subject_uses_localized_template_ru() {
     let (_dir, store) = open();
-    save_user(&store, "en");
+    save_user(&store, "ru");
     let app = AppCore::new(&store);
     app.subscribe(SubscribeCommand {
         profile_id: "default",
@@ -222,14 +251,50 @@ fn subscription_active_subject_uses_localized_template() {
         sub.subject
             .as_deref()
             .unwrap_or("")
-            .contains("New subscription: bob-feed@example.org"),
+            .contains("Подписка: bob-feed@example.org"),
         "subject={:?}",
         sub.subject
     );
 }
 
 #[test]
-fn subscription_inactive_subject_uses_localized_template() {
+fn subscription_revoked_subject_uses_localized_template_en() {
+    let (_dir, store) = open();
+    save_user(&store, "en");
+    let app = AppCore::new(&store);
+    app.subscribe(SubscribeCommand {
+        profile_id: "default",
+        resource_address: "alice-publish@example.org",
+        subscriber_delivery_address: "bob-feed@example.org",
+        created_at: 1,
+    })
+    .unwrap();
+    app.unsubscribe(UnsubscribeCommand {
+        profile_id: "default",
+        resource_address: "alice-publish@example.org",
+        subscriber_delivery_address: "bob-feed@example.org",
+        created_at: 2,
+    })
+    .unwrap();
+
+    let records = store.list_outbox_records().unwrap();
+    let unsub = records
+        .iter()
+        .find(|r| r.event_id.starts_with("unsubscription:"))
+        .expect("unsubscribe outbox row");
+    assert!(
+        unsub
+            .subject
+            .as_deref()
+            .unwrap_or("")
+            .contains("Unsubscribed: bob-feed@example.org"),
+        "subject={:?}",
+        unsub.subject
+    );
+}
+
+#[test]
+fn subscription_revoked_subject_uses_localized_template_ru() {
     let (_dir, store) = open();
     save_user(&store, "ru");
     let app = AppCore::new(&store);

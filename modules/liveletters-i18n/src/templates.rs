@@ -33,17 +33,31 @@ pub(super) fn template(key: &str, locale: Locale) -> Option<&'static str> {
             "%actor% скрыл(а) запись %post_id% в вашем блоге.\n\n— LiveLetters",
             "%actor% has hidden post %post_id% in your blog.\n\n— LiveLetters",
         ),
-        "subscription_changed.active.subject" => {
+        "subscription_requested.subject" => {
             ("Подписка: %subscriber%", "New subscription: %subscriber%")
         }
-        "subscription_changed.active.body" => (
+        "subscription_requested.body" => (
             "%subscriber% подписался(ась) на вас в LiveLetters (блог %resource%).\n\n— LiveLetters",
             "%subscriber% has subscribed to you in LiveLetters (blog %resource%).\n\n— LiveLetters",
         ),
-        "subscription_changed.inactive.subject" => {
-            ("Отписка: %subscriber%", "Unsubscribed: %subscriber%")
-        }
-        "subscription_changed.inactive.body" => (
+        "subscription_confirmed_accepted.subject" => (
+            "Подписка подтверждена: %resource%",
+            "Subscription confirmed: %resource%",
+        ),
+        "subscription_confirmed_accepted.body" => (
+            "%owner% подтвердил(а) вашу подписку на %resource% в LiveLetters.\n\n— LiveLetters",
+            "%owner% confirmed your subscription to %resource% in LiveLetters.\n\n— LiveLetters",
+        ),
+        "subscription_confirmed_declined.subject" => (
+            "Запрос на подписку отклонён",
+            "Subscription request declined",
+        ),
+        "subscription_confirmed_declined.body" => (
+            "%owner% отклонил(а) ваш запрос на подписку на %resource% в LiveLetters.\n\n— LiveLetters",
+            "%owner% declined your subscription request to %resource% in LiveLetters.\n\n— LiveLetters",
+        ),
+        "subscription_revoked.subject" => ("Отписка: %subscriber%", "Unsubscribed: %subscriber%"),
+        "subscription_revoked.body" => (
             "%subscriber% отписался(ась) от вас в LiveLetters (блог %resource%).\n\n— LiveLetters",
             "%subscriber% has unsubscribed from you in LiveLetters (blog %resource%).\n\n— LiveLetters",
         ),

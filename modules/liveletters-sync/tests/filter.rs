@@ -382,11 +382,19 @@ fn applied_comment_created_creates_outbox_redistribution_to_other_subscribers() 
         other => panic!("ожидался Direct, получили {other:?}"),
     }
 
-    // subject — локализованная строка
-    assert!(
-        redist[0].event_type.contains("Новый комментарий"),
-        "subject должен быть локализован, получили {:?}",
+    // event_type — технический, subject — локализованная строка
+    assert_eq!(
+        redist[0].event_type, "comment_created",
+        "event_type пересылки должен быть техническим, получили {:?}",
         redist[0].event_type
+    );
+    let subject = redist[0]
+        .subject
+        .as_deref()
+        .expect("redistribute должен иметь subject");
+    assert!(
+        subject.contains("Новый комментарий"),
+        "subject должен быть локализован, получили {subject:?}"
     );
     // human_readable_body — локализованная строка с автором и post_id
     let message = liveletters_protocol::decode_message(&redist[0].message_body).unwrap();

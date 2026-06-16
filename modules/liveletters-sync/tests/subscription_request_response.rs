@@ -119,6 +119,54 @@ fn a_responds_to_subscription_request_with_confirmed() {
         }
         other => panic!("ожидался SubscriptionConfirmed, получили: {other:?}"),
     }
+    // subject должен быть локализован на языке отправителя (alice, ru).
+    let subject = resp
+        .subject
+        .as_deref()
+        .expect("SubscriptionConfirmed должен иметь локализованный subject");
+    assert!(
+        subject.contains("Подписка подтверждена"),
+        "subject должен быть на языке отправителя, получили: {subject:?}"
+    );
+}
+
+#[test]
+fn auto_confirm_uses_sender_language_for_subject() {
+    let (store, _tmp) = open();
+    // alice настроена на английский
+    store
+        .save_user_settings_record(&UserSettingsRecord {
+            profile_id: "alice".into(),
+            nickname: "Alice".into(),
+            email_address: "alice-publish@example.org".into(),
+            avatar_url: None,
+            language: "en".into(),
+            setup_completed: true,
+        })
+        .unwrap();
+    let engine = SyncEngine::new(&store).with_profile_id("alice");
+
+    let raw = build_subscription_requested_email(
+        "bob-feed@example.org",
+        "alice-publish@example.org",
+        "sub-en",
+    );
+
+    engine.ingest_batch(vec![raw]).expect("ingest ok");
+
+    let outbox = store.list_outbox_records().unwrap();
+    let resp = outbox
+        .iter()
+        .find(|r| r.event_type == "subscription_confirmed")
+        .expect("SubscriptionConfirmed в outbox");
+    let subject = resp
+        .subject
+        .as_deref()
+        .expect("SubscriptionConfirmed должен иметь subject");
+    assert!(
+        subject.contains("Subscription confirmed"),
+        "subject должен быть на английском (язык alice), получили: {subject:?}"
+    );
 }
 
 #[test]

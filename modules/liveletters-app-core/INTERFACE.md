@@ -262,15 +262,15 @@
 - `create_post` / `create_comment` / `hide_post` / `edit_comment` —
   `ResourceSubscribers(resource_id)`;
 - `subscribe` / `unsubscribe` — `Direct(vec![resource.as_str()])`,
-  чтобы доставить служебное событие `subscription_changed` ровно
-  владельцу блога.
+  чтобы доставить служебное событие `subscription_requested` /
+  `subscription_revoked` ровно владельцу блога.
 
 Команды `subscribe` и `unsubscribe` **не** трогают таблицу `subscriptions`
 (это «подписчики моего ресурса», а не «мои подписки»): они обновляют
 только локальный список подписок в `identities/<текущий>.toml` и пишут
 исходящее событие в `outbox`. Запись в таблицу `subscriptions` делает
 **входящий** конвейер `liveletters-lltt-sync` при приёме
-`subscription_changed` от чужого пользователя.
+`subscription_requested` от чужого пользователя.
 
 `AppCoreError::InvalidDelivery(String)` возвращается из `enqueue_message`,
 если команда попыталась поставить `Direct(vec![])` (пустой список
@@ -295,16 +295,19 @@
 - `comment_created(record, sender, post_id, body)` — новый комментарий;
 - `comment_edited(record, sender, post_id, body)` — правка комментария;
 - `post_hidden(record, actor, post_id)` — скрытие записи;
-- `subscription_changed_active(record, subscriber, resource)` — подписка;
-- `subscription_changed_inactive(record, subscriber, resource)` — отписка;
+- `subscription_requested(record, subscriber, resource)` — запрос подписки (B → A);
+- `subscription_confirmed_accepted(record, owner, resource)` — подтверждение подписки (A → B);
+- `subscription_confirmed_declined(record, owner, resource)` — отказ в подписке (A → B);
+- `subscription_revoked(record, subscriber, resource)` — отписка (B → A);
+- `comment_created_redistribute(record, sender, post_id, body)` — пересылка комментария подписчикам ресурса;
 - `locale_for(record)` — выбирает локаль по `record.language`; если записи нет или значение не парсится, возвращает `detect_system_locale()` (см. `liveletters-i18n`).
 
 ### Где используется
 
 - `commands::create_post`, `create_comment`, `hide_post`, `edit_comment`, `subscribe`, `unsubscribe` — читают `UserSettingsRecord` и кладут subject/body в outbox и `human_readable_body`;
-- `OutboxRecord.event_type` хранит уже локализованный subject (subject письма, не машинный идентификатор);
-- машинный идентификатор (`post_created`, `comment_created`, …) остаётся внутри `ProtocolMessage.envelope.event_type` для служебных нужд;
-- `liveletters-lltt-sync::send_one` подставляет `record.event_type` в SMTP-заголовок `Subject`.
+- `OutboxRecord.event_type` хранит машинный идентификатор (`post_created`, `comment_created`, `subscription_confirmed`, …);
+- локализованный subject письма лежит в `OutboxRecord.subject` (тип `Option<String>`); `None` для записей, у которых subject не задан (например, старые записи, добавленные до введения поля);
+- `liveletters-lltt-sync::send_one` подставляет в SMTP-заголовок `Subject` строку из `record.subject`, а при `None` падает обратно на `record.event_type` (для обратной совместимости).
 
 ## `ReprocessDeferredEventsCommand`
 

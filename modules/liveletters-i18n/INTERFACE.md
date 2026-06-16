@@ -56,10 +56,16 @@ pub enum Locale { Ru, En }
 | `comment_edited.body` | `sender`, `post_id`, `body` | Тело письма об изменении комментарии. |
 | `post_hidden.subject` | `actor` | Тема письма о скрытии записи. |
 | `post_hidden.body` | `actor`, `post_id` | Тело письма о скрытии записи. |
-| `subscription_changed.active.subject` | `subscriber` | Тема письма о подписке. |
-| `subscription_changed.active.body` | `subscriber`, `resource` | Тело письма о подписке. |
-| `subscription_changed.inactive.subject` | `subscriber` | Тема письма об отписке. |
-| `subscription_changed.inactive.body` | `subscriber`, `resource` | Тело письма об отписке. |
+| `comment_created_redistribute.subject` | `resource` | Тема пересылки комментария подписчикам ресурса. |
+| `comment_created_redistribute.body` | `sender`, `post_id`, `body` | Тело пересылки комментария подписчикам ресурса. |
+| `subscription_requested.subject` | `subscriber` | Тема письма с запросом подписки (B → A). |
+| `subscription_requested.body` | `subscriber`, `resource` | Тело письма с запросом подписки (B → A). |
+| `subscription_confirmed_accepted.subject` | `owner`, `resource` | Тема письма о подтверждении подписки (A → B). |
+| `subscription_confirmed_accepted.body` | `owner`, `resource` | Тело письма о подтверждении подписки (A → B). |
+| `subscription_confirmed_declined.subject` | `owner` | Тема письма об отказе в подписке (A → B). |
+| `subscription_confirmed_declined.body` | `owner`, `resource` | Тело письма об отказе в подписке (A → B). |
+| `subscription_revoked.subject` | `subscriber` | Тема письма об отписке (B → A). |
+| `subscription_revoked.body` | `subscriber`, `resource` | Тело письма об отписке (B → A). |
 
 Символы, не входящие в `%...%`, передаются в результат без изменений.
 

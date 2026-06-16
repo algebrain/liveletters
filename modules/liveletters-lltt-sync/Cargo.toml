@@ -23,5 +23,6 @@ liveletters-sync = { path = "../liveletters-sync" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+base64 = { workspace = true }
 tempfile = { workspace = true }
 liveletters-protocol = { path = "../liveletters-protocol" }

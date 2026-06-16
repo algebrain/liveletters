@@ -16,8 +16,9 @@ pub use commands::{
 };
 pub use errors::AppCoreError;
 pub use i18n_strings::{
-    SubjectAndBody, comment_created, comment_edited, locale_for, post_created, post_hidden,
-    subscription_changed_active, subscription_changed_inactive,
+    SubjectAndBody, comment_created, comment_created_redistribute, comment_edited, locale_for,
+    post_created, post_hidden, subscription_confirmed_accepted, subscription_confirmed_declined,
+    subscription_requested, subscription_revoked,
 };
 pub use ids::{new_comment_id, new_post_id, unix_millis_now};
 pub use liveletters_domain::Visibility;

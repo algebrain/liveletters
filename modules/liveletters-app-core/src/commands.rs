@@ -12,8 +12,7 @@ use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
 use crate::{
     AppCoreError, AppSettings, DeferredReprocessingSummary, new_comment_id, new_post_id,
-    post_created, post_hidden, subscription_changed_active, subscription_changed_inactive,
-    unix_millis_now,
+    post_created, post_hidden, subscription_requested, subscription_revoked, unix_millis_now,
 };
 use crate::{comment_created, comment_edited};
 
@@ -898,7 +897,7 @@ pub fn subscribe(
     let event_id = EventId::new(&event_id_str)?;
     let _created_at = Timestamp::from_unix_seconds(command.created_at);
 
-    let i18n = subscription_changed_active(
+    let i18n = subscription_requested(
         store.get_user_settings_record(command.profile_id)?.as_ref(),
         delivery.as_str(),
         resource.as_str(),
@@ -967,7 +966,7 @@ pub fn unsubscribe(
     );
     let event_id = EventId::new(&event_id_str)?;
 
-    let i18n = subscription_changed_inactive(
+    let i18n = subscription_revoked(
         store.get_user_settings_record(command.profile_id)?.as_ref(),
         delivery.as_str(),
         resource.as_str(),

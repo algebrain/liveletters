@@ -141,6 +141,100 @@ fn spawn_smtp_capture() -> (String, u16, mpsc::Receiver<Vec<String>>) {
     ("127.0.0.1".to_owned(), port, rx)
 }
 
+/// SMTP-сервер, который дополнительно собирает Subject каждого
+/// отправленного письма. Возвращает `rx_subjects` в том же порядке,
+/// что и `rx_rcpts`. Используется в тестах на локализованный Subject.
+fn spawn_smtp_capture_subjects() -> (String, u16, mpsc::Receiver<Vec<String>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let (tx, rx) = mpsc::channel();
+    let ready = Arc::new(Barrier::new(2));
+    let subjects = Arc::new(Mutex::new(Vec::<String>::new()));
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+    let ready_clone = Arc::clone(&ready);
+    let subjects_clone = Arc::clone(&subjects);
+    let stop_clone = Arc::clone(&stop);
+    let _handle = thread::spawn(move || {
+        let _ = ready_clone.wait();
+        while !stop_clone.load(std::sync::atomic::Ordering::Relaxed) {
+            let (mut socket, _) = match listener.accept() {
+                Ok(p) => p,
+                Err(_) => return,
+            };
+            socket
+                .write_all(b"220 localhost ESMTP capture\r\n")
+                .expect("greeting");
+            let mut reader = socket.try_clone().expect("clone");
+            let mut buf = [0_u8; 8192];
+            let mut data_buf = String::new();
+            let mut in_data = false;
+            let mut last_subject: Option<String> = None;
+            loop {
+                let n = match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => n,
+                    Err(_) => break,
+                };
+                let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
+                for line in chunk.split("\r\n") {
+                    if line.is_empty() {
+                        continue;
+                    }
+                    if in_data {
+                        if line == "." {
+                            if let Some(s) = last_subject.take() {
+                                subjects_clone.lock().expect("subjects lock").push(s);
+                            }
+                            socket.write_all(b"250 OK\r\n").ok();
+                            in_data = false;
+                            data_buf.clear();
+                        } else {
+                            data_buf.push_str(line);
+                            data_buf.push('\n');
+                            if let Some(s) = line.strip_prefix("Subject: ").map(str::to_owned) {
+                                last_subject = Some(s);
+                            }
+                        }
+                        continue;
+                    }
+                    if line.starts_with("DATA") {
+                        socket.write_all(b"354 End data\r\n").ok();
+                        in_data = true;
+                        continue;
+                    }
+                    if line.starts_with("QUIT") {
+                        socket.write_all(b"221 Bye\r\n").ok();
+                        break;
+                    }
+                    socket.write_all(b"250 OK\r\n").ok();
+                }
+            }
+        }
+    });
+
+    let _ = ready.wait();
+    thread::sleep(Duration::from_millis(20));
+    let subjects_clone2 = Arc::clone(&subjects);
+    let stop_clone2 = Arc::clone(&stop);
+    let tx_clone = tx;
+    let _collector = thread::spawn(move || {
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while std::time::Instant::now() < deadline {
+            let n = subjects_clone2.lock().expect("lock").len();
+            if n >= 1 {
+                break;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        stop_clone2.store(true, std::sync::atomic::Ordering::Relaxed);
+        let collected = std::mem::take(&mut *subjects_clone2.lock().expect("lock"));
+        let _ = tx_clone.send(collected);
+    });
+    let _ = _collector;
+    ("127.0.0.1".to_owned(), port, rx)
+}
+
 fn make_transport(port: u16) -> ConfiguredSmtpTransport {
     ConfiguredSmtpTransport::new(SmtpTransportConfig::new(
         "127.0.0.1",
@@ -284,4 +378,71 @@ fn build_protocol_email_round_trip_for_push() {
     )
     .expect("build");
     assert!(outgoing.raw_message.contains("Subject: post_created"));
+}
+
+#[test]
+fn push_uses_localized_subject_when_present() {
+    let (_tmp, store) = open_store();
+    let (_host, port, rx_subjects) = spawn_smtp_capture_subjects();
+    let transport = make_transport(port);
+
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_address: "blog-1".into(),
+            subscriber_delivery_address: "bob@example.test".into(),
+        })
+        .expect("save sub");
+
+    let message = sample_protocol_message("event-loc");
+    let mut record = outbox_record_for(&message);
+    // event_type — технический, subject — локализованный (новая конвенция)
+    record.event_type = "post_created".to_owned();
+    record.subject = Some("Новая запись в журнале blog-1".to_owned());
+
+    let _ = send_outbox_record(&store, &transport, "alice@example.test", &record).expect("send ok");
+    let subjects = rx_subjects.recv().expect("subjects collected");
+    assert_eq!(subjects.len(), 1, "ожидался 1 subject");
+    // Subject в SMTP-капчуре приходит в виде RFC 2047 `=?utf-8?B?...?=`;
+    // проверяем наличие base64 от ожидаемой строки.
+    let expected_b64 = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        "Новая запись в журнале blog-1".as_bytes(),
+    );
+    assert!(
+        subjects[0].contains(&expected_b64),
+        "в письме должен быть локализованный subject (RFC 2047), получили: {:?}",
+        subjects[0]
+    );
+    assert!(
+        !subjects[0].contains("post_created"),
+        "в письме не должно быть технического идентификатора: {:?}",
+        subjects[0]
+    );
+}
+
+#[test]
+fn push_falls_back_to_event_type_when_subject_missing() {
+    let (_tmp, store) = open_store();
+    let (_host, port, rx_subjects) = spawn_smtp_capture_subjects();
+    let transport = make_transport(port);
+
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_address: "blog-1".into(),
+            subscriber_delivery_address: "bob@example.test".into(),
+        })
+        .expect("save sub");
+
+    let message = sample_protocol_message("event-fallback");
+    let record = outbox_record_for(&message); // subject: None
+
+    let _ = send_outbox_record(&store, &transport, "alice@example.test", &record).expect("send ok");
+    let subjects = rx_subjects.recv().expect("subjects collected");
+    assert_eq!(subjects.len(), 1);
+    // fallback на event_type для обратной совместимости
+    assert!(
+        subjects[0].contains("post_created"),
+        "fallback должен дать event_type, получили: {:?}",
+        subjects[0]
+    );
 }

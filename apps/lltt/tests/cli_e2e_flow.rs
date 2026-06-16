@@ -503,13 +503,20 @@ fn bob_comments_alice_post_alice_distributes_to_subscriber() {
                 );
             }
         }
-        // subject пересылки должен быть локализованной строкой,
-        // а не техническим идентификатором `comment_created`.
-        assert!(
-            r.event_type.contains("Новый комментарий"),
-            "subject пересылки должен быть локализован через i18n, \
-             получили {:?}",
+        // event_type — технический идентификатор
+        assert_eq!(
+            r.event_type, "comment_created",
+            "event_type пересылки должен быть техническим, получили {:?}",
             r.event_type
+        );
+        // subject — локализованная строка на языке отправителя (alice = ru)
+        let subject = r
+            .subject
+            .as_deref()
+            .expect("redistribute должен иметь локализованный subject");
+        assert!(
+            subject.contains("Новый комментарий"),
+            "subject пересылки должен быть локализован, получили {subject:?}"
         );
     }
 
@@ -640,13 +647,20 @@ fn alice_redistributes_bobs_comment_to_other_subscriber() {
                 );
             }
         }
-        // subject пересылки должен быть локализованной строкой,
-        // а не техническим идентификатором `comment_created`.
-        assert!(
-            r.event_type.contains("Новый комментарий"),
-            "subject пересылки должен быть локализован через i18n, \
-             получили {:?}",
+        // event_type — технический идентификатор
+        assert_eq!(
+            r.event_type, "comment_created",
+            "event_type пересылки должен быть техническим, получили {:?}",
             r.event_type
+        );
+        // subject — локализованная строка на языке отправителя (alice = ru)
+        let subject = r
+            .subject
+            .as_deref()
+            .expect("redistribute должен иметь локализованный subject");
+        assert!(
+            subject.contains("Новый комментарий"),
+            "subject пересылки должен быть локализован, получили {subject:?}"
         );
     }
 }

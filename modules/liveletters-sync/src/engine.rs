@@ -1,4 +1,4 @@
-use liveletters_i18n::{Locale, Vars, translate};
+use liveletters_i18n::{Vars, detect_system_locale, parse_locale, translate};
 use liveletters_mail::{
     ReceivedEmail, decode_protocol_message, extract_liveletters_parts, parse_email,
 };
@@ -746,6 +746,8 @@ impl<'a> SyncEngine<'a> {
 
     /// A автоматически отвечает B: формирует `SubscriptionConfirmed` с профилем
     /// текущей идентичности (ник + email) и кладёт в свой outbox.
+    /// Subject/body локализуются на языке отправителя (A) через
+    /// `i18n_strings::subscription_confirmed_accepted`.
     fn build_subscription_confirmed_response(
         &self,
         resource_address: &str,
@@ -790,6 +792,23 @@ impl<'a> SyncEngine<'a> {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
+        // Локализованный subject/body на языке A.
+        // (вызываем напрямую `liveletters_i18n`, чтобы не зависеть от
+        // `liveletters-app-core` — граф зависимостей циклический.)
+        let locale = parse_locale(&user.language).unwrap_or_else(|_| detect_system_locale());
+        let subject = translate(
+            "subscription_confirmed_accepted.subject",
+            locale,
+            Vars(&[("owner", &owner_nickname), ("resource", resource_address)]),
+        )
+        .expect("шаблон subscription_confirmed_accepted.subject присутствует в таблице");
+        let body = translate(
+            "subscription_confirmed_accepted.body",
+            locale,
+            Vars(&[("owner", &owner_nickname), ("resource", resource_address)]),
+        )
+        .expect("шаблон subscription_confirmed_accepted.body присутствует в таблице");
+
         let message = ProtocolMessage::new(
             MessageEnvelope::new(
                 "1",
@@ -798,7 +817,7 @@ impl<'a> SyncEngine<'a> {
                 event_id.as_str(),
             )
             .map_err(|e| ApplyEventError::Invalid(format!("envelope: {e:?}")))?,
-            "подтверждение подписки",
+            &body,
             DomainEventPayload::SubscriptionConfirmed {
                 resource_address: resource_address.to_owned(),
                 subscriber_delivery_address: subscriber_delivery_address.to_owned(),
@@ -822,7 +841,7 @@ impl<'a> SyncEngine<'a> {
             delivery: OutboxDelivery::Direct(vec![subscriber_delivery_address.to_owned()]),
             message_body,
             message_id: Some(message_id),
-            subject: None,
+            subject: Some(subject),
         })
     }
 
@@ -913,15 +932,25 @@ impl<'a> SyncEngine<'a> {
             return Ok(());
         }
 
+        // Локализация на языке отправителя (владелец ресурса = profile_id движка).
+        let profile_id = self.profile_id.unwrap_or("default");
+        let locale = self
+            .store
+            .get_user_settings_record(profile_id)
+            .ok()
+            .flatten()
+            .and_then(|r| parse_locale(&r.language).ok())
+            .unwrap_or_else(detect_system_locale);
+
         let subject = translate(
             "comment_created_redistribute.subject",
-            Locale::Ru,
+            locale,
             Vars(&[("resource", resource_id)]),
         )
         .expect("шаблон comment_created_redistribute.subject присутствует в таблице");
         let human_body = translate(
             "comment_created_redistribute.body",
-            Locale::Ru,
+            locale,
             Vars(&[("sender", author_id), ("post_id", post_id), ("body", body)]),
         )
         .expect("шаблон comment_created_redistribute.body присутствует в таблице");
@@ -942,12 +971,13 @@ impl<'a> SyncEngine<'a> {
 
         let record = OutboxRecord {
             event_id: new_event_id,
-            event_type: subject,
+            // event_type — технический идентификатор (Subject живёт в `subject`).
+            event_type: envelope.event_type().to_owned(),
             resource_id: resource_id.to_owned(),
             delivery: OutboxDelivery::Direct(recipients),
             message_body,
             message_id: None,
-            subject: None,
+            subject: Some(subject),
         };
         self.store
             .save_outbox_record(&record)

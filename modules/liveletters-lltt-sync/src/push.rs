@@ -112,7 +112,10 @@ fn send_one(
     record: &OutboxRecord,
     message: &ProtocolMessage,
 ) -> Result<SendStatus, TransportError> {
-    let outgoing: OutgoingEmail = build_protocol_email(from, to, &record.event_type, message)?;
+    // Subject — локализованная строка из `OutboxRecord.subject`,
+    // с fallback на технический `event_type` (обратная совместимость).
+    let subject = record.subject.as_deref().unwrap_or(&record.event_type);
+    let outgoing: OutgoingEmail = build_protocol_email(from, to, subject, message)?;
     transport.send(&outgoing)
 }
 

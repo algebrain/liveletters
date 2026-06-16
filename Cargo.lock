@@ -649,6 +649,7 @@ dependencies = [
 name = "liveletters-lltt-sync"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "clap",
  "liveletters-log",
  "liveletters-mail",

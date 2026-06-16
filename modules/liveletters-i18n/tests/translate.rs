@@ -91,15 +91,15 @@ fn translate_keeps_unrelated_percent_signs_unchanged() {
 }
 
 #[test]
-fn translate_subscription_active_and_inactive_have_different_texts() {
+fn translate_subscription_requested_and_revoked_have_different_texts() {
     let active = translate(
-        "subscription_changed.active.subject",
+        "subscription_requested.subject",
         Locale::Ru,
         Vars(&[("subscriber", "alice@example.org")]),
     )
     .unwrap();
     let inactive = translate(
-        "subscription_changed.inactive.subject",
+        "subscription_revoked.subject",
         Locale::Ru,
         Vars(&[("subscriber", "alice@example.org")]),
     )
@@ -107,6 +107,24 @@ fn translate_subscription_active_and_inactive_have_different_texts() {
     assert!(active.starts_with("Подписка:"));
     assert!(inactive.starts_with("Отписка:"));
     assert_ne!(active, inactive);
+}
+
+#[test]
+fn translate_subscription_confirmed_accepted_is_present() {
+    let s = translate(
+        "subscription_confirmed_accepted.subject",
+        Locale::Ru,
+        Vars(&[("owner", "Алиса"), ("resource", "alice@example.org")]),
+    )
+    .unwrap();
+    assert!(s.contains("Подписка подтверждена"), "got: {s}");
+    let s_en = translate(
+        "subscription_confirmed_accepted.subject",
+        Locale::En,
+        Vars(&[("owner", "Alice"), ("resource", "alice@example.org")]),
+    )
+    .unwrap();
+    assert!(s_en.contains("Subscription confirmed"), "got: {s_en}");
 }
 
 #[test]
