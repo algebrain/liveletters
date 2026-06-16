@@ -80,7 +80,8 @@ impl Store {
                 delivery_json TEXT NOT NULL,
                 message_body TEXT NOT NULL,
                 message_id TEXT,
-                subject TEXT
+                subject TEXT,
+                human_readable_body TEXT
             );
 
             CREATE TABLE IF NOT EXISTS raw_messages (
@@ -266,6 +267,10 @@ impl Store {
         if !self.table_has_column("outbox", "subject")? {
             self.connection
                 .execute("ALTER TABLE outbox ADD COLUMN subject TEXT", [])?;
+        }
+        if !self.table_has_column("outbox", "human_readable_body")? {
+            self.connection
+                .execute("ALTER TABLE outbox ADD COLUMN human_readable_body TEXT", [])?;
         }
         Ok(())
     }

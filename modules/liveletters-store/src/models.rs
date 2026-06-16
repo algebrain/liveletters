@@ -36,6 +36,12 @@ pub struct OutboxRecord {
     pub message_body: String,
     pub message_id: Option<String>,
     pub subject: Option<String>,
+    /// Локализованное тело письма, отдельное от `message_body`
+    /// (где хранится JSON `ProtocolMessage`). Используется при сборке
+    /// `text/plain` под-части в `liveletters-mime::build_protocol_email`.
+    /// В JSON-поле `ProtocolMessage.human_readable_body` намеренно
+    /// не сериализуется, чтобы избежать дублирования в wire-формате.
+    pub human_readable_body: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

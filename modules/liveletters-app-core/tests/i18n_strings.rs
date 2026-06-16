@@ -6,7 +6,6 @@ use liveletters_app_core::{
     SubscribeCommand, UnsubscribeCommand, Visibility,
 };
 use liveletters_store::{Store, UserSettingsRecord};
-use serde_json::Value;
 use tempfile::tempdir;
 
 fn open() -> (tempfile::TempDir, Store) {
@@ -29,18 +28,20 @@ fn save_user(store: &Store, language: &str) {
 }
 
 fn outbox_subject_and_body(store: &Store, event_id: &str) -> (String, String) {
+    // Локализованный subject хранится в `OutboxRecord.subject`
+    // (он же попадает в SMTP-заголовок Subject). Локализованное тело
+    // хранится в `OutboxRecord.human_readable_body` (он попадает в
+    // text/plain под-часть при сборке письма). В JSON его нет —
+    // (см. message.rs: skip_serializing default), потому что тело уже
+    // есть в отдельной колонке outbox и не должно дублироваться в wire-формате.
     let records = store.list_outbox_records().unwrap();
     let record = records
         .iter()
         .find(|r| r.event_id == event_id)
         .expect("outbox record for event_id");
-    let body: Value = serde_json::from_str(&record.message_body).unwrap();
     (
         record.subject.clone().unwrap_or_default(),
-        body["human_readable_body"]
-            .as_str()
-            .unwrap_or("")
-            .to_owned(),
+        record.human_readable_body.clone().unwrap_or_default(),
     )
 }
 

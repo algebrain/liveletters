@@ -340,11 +340,18 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 - `event_id`
 - `event_type` — литерал-идентификатор (`"post_created"`, `"subscription_requested"`, …)
 - `resource_id`
-- `message_body`
+- `message_body` — JSON-сериализованный `ProtocolMessage` (без поля
+  `human_readable_body` — оно намеренно не в JSON)
 - `delivery: OutboxDelivery` — куда именно отправлять запись
 - `message_id: Option<String>` — `Message-ID` исходящего (используется
   для сопоставления с DSN-bounce)
-- `subject: Option<String>` — локализованный заголовок для UI
+- `subject: Option<String>` — локализованный заголовок для UI и SMTP
+- `human_readable_body: Option<String>` — локализованное тело письма
+  для `text/plain` под-части. Хранится отдельно от `message_body`,
+  чтобы в wire-формате не было дублирования строки. Канонический
+  путь: `liveletters-lltt-sync::send_outbox_record` читает это поле
+  и передаёт в `liveletters-mime::build_protocol_email` как
+  `body: Option<&str>`.
 
 Главный смысл:
 

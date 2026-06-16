@@ -32,8 +32,14 @@ fn comment_created_email(
         },
     )
     .unwrap();
-    let outgoing =
-        build_protocol_email(author_email, resource_id, "Sync fixture", &message).unwrap();
+    let outgoing = build_protocol_email(
+        author_email,
+        resource_id,
+        "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
+        &message,
+    )
+    .unwrap();
     ReceivedEmail {
         message_id: format!("message-{event_id}"),
         raw_message: outgoing.raw_message,
@@ -59,6 +65,7 @@ fn post_created_email(event_id: &str, post_id: &str, resource_id: &str) -> Recei
         "alice-publish@example.org",
         resource_id,
         "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .unwrap();

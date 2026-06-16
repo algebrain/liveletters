@@ -7,12 +7,19 @@ pub fn build_protocol_email(
     from: &str,
     to: &str,
     subject: &str,
+    body: Option<&str>,
     protocol_message: &ProtocolMessage,
 ) -> Result<OutgoingEmail, MimeError> {
     let technical_payload = encode_message(protocol_message)
         .map_err(|error| MimeError::Protocol(format_protocol_error(error)))?;
 
     let encoded_subject = encode_rfc2047(subject);
+    // `text/plain` под-часть берётся из `body`, который приходит
+    // из отдельной колонки outbox (`OutboxRecord.human_readable_body`).
+    // Из `ProtocolMessage.human_readable_body()` НЕ читаем — поле
+    // не сериализуется в JSON (skip_serializing), а при десериализации
+    // будет `None` (default). Канонический путь для тела — outbox-колонка.
+    let human = body.unwrap_or("");
 
     let raw_message = format!(
         "From: {from}\n\
@@ -32,7 +39,6 @@ pub fn build_protocol_email(
          \n\
          {technical_payload}\n\
          --{BOUNDARY}--\n",
-        human = protocol_message.human_readable_body(),
     );
 
     Ok(OutgoingEmail {

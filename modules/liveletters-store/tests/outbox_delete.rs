@@ -18,6 +18,7 @@ fn delete_removes_record() {
         message_body: "{}".into(),
         message_id: None,
         subject: None,
+        human_readable_body: None,
     };
     store.save_outbox_record(&record).expect("save");
 

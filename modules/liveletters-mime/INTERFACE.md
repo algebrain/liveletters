@@ -24,7 +24,7 @@
 
 - `parse_email(&str) -> Result<ParsedEmail, MimeError>`;
 - `extract_liveletters_parts(&ParsedEmail) -> Result<ExtractedMailParts, MimeError>`;
-- `build_protocol_email(from, to, subject, &ProtocolMessage) -> Result<OutgoingEmail, MimeError>`;
+- `build_protocol_email(from, to, subject, body: Option<&str>, &ProtocolMessage) -> Result<OutgoingEmail, MimeError>`;
 - `decode_protocol_message(&str) -> Result<ProtocolMessage, MimeError>`;
 - типы `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`;
 - тип ошибки `MimeError`;
@@ -106,7 +106,7 @@ Content-Disposition: attachment; filename="liveletters.json"
 --liveletters-boundary--
 ```
 
-`human_readable_body` берётся из `text/plain` под-части, `technical_body` — это JSON из `application/json` под-части. JSON передаётся как есть, без base64url-кодирования.
+`text/plain` под-часть заполняется из аргумента `body` функции `build_protocol_email` (берётся из колонки `OutboxRecord.human_readable_body` на стороне отправителя). `application/json` под-часть — это JSON-сериализованный `ProtocolMessage`, в котором поля `human_readable_body` нет (оно `skip_serializing`). JSON передаётся как есть, без base64url-кодирования.
 
 `ExtractedMailParts` предоставляет:
 
@@ -135,6 +135,7 @@ pub fn build_protocol_email(
     from: &str,
     to: &str,
     subject: &str,
+    body: Option<&str>,
     protocol_message: &ProtocolMessage,
 ) -> Result<OutgoingEmail, MimeError>
 ```

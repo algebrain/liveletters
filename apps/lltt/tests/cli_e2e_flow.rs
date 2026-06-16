@@ -1,5 +1,7 @@
 //! Полные e2e-сценарии с подтверждением подписки и пересылкой.
 
+mod common;
+
 use assert_cmd::Command;
 use liveletters_protocol::DomainEventPayload;
 use tempfile::TempDir;
@@ -76,9 +78,18 @@ fn find_outbox<'a>(
 fn build_direct_eml(from: &str, to: &str, record: &liveletters_store::OutboxRecord) -> String {
     let message = liveletters_protocol::decode_message(&record.message_body)
         .expect("decode outbox message_body");
-    liveletters_mime::build_protocol_email(from, to, &record.event_type, &message)
-        .expect("build email")
-        .raw_message
+    // Тело письма хранится в отдельной колонке `OutboxRecord.human_readable_body`
+    // (в JSON его нет — поле помечено `skip_serializing`, см. message.rs).
+    // `message.human_readable_body()` после десериализации == None.
+    let body = record.human_readable_body.as_deref();
+    let raw_message =
+        liveletters_mime::build_protocol_email(from, to, &record.event_type, body, &message)
+            .expect("build email")
+            .raw_message;
+    // Контракт письма: text/plain непустой, JSON без human_readable_body.
+    // См. common::assert_liveletters_email_contract.
+    common::assert_liveletters_email_contract(&raw_message);
+    raw_message
 }
 
 fn import_eml(home: &std::path::Path, raw_message: &str) {

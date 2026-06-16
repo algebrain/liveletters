@@ -294,10 +294,17 @@ fn sync_without_subcommand_runs_pull_then_push() {
         },
     )
     .unwrap();
-    let incoming_raw =
-        build_protocol_email("alice@example.test", "bob@example.test", "Тест", &incoming)
-            .expect("build")
-            .raw_message;
+    let incoming_raw = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Тест",
+        Some(incoming.human_readable_body().unwrap_or("")),
+        &incoming,
+    )
+    .expect("build")
+    .raw_message;
+    // Контракт письма: text/plain непустой, JSON без human_readable_body.
+    common::assert_liveletters_email_contract(&incoming_raw);
 
     let (imap_host, imap_port, served) = spawn_fake_imap(incoming_raw);
     let rcpts = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -336,6 +343,7 @@ fn sync_without_subcommand_runs_pull_then_push() {
             message_body: encode_message(&outgoing).expect("encode"),
             message_id: None,
             subject: None,
+            human_readable_body: None,
         })
         .expect("save outbox");
 
@@ -408,6 +416,7 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
             message_body: body,
             message_id: None,
             subject: None,
+            human_readable_body: None,
         })
         .expect("save outbox");
 
@@ -460,9 +469,17 @@ fn sync_pull_advances_cursor_idempotently() {
         },
     )
     .unwrap();
-    let outgoing = build_protocol_email("alice@example.test", "bob@example.test", "Тест", &message)
-        .expect("build");
+    let outgoing = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Тест",
+        Some(message.human_readable_body().unwrap_or("")),
+        &message,
+    )
+    .expect("build");
     let raw = outgoing.raw_message;
+    // Контракт письма: text/plain непустой, JSON без human_readable_body.
+    common::assert_liveletters_email_contract(&raw);
 
     let (host, port, served) = spawn_fake_imap(raw);
     set_mail_settings(&tmp, &host, port);
@@ -546,6 +563,7 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
             message_body: encode_message(&outgoing).expect("encode"),
             message_id: None,
             subject: None,
+            human_readable_body: None,
         })
         .expect("save outbox");
 
@@ -590,9 +608,17 @@ fn sync_pull_re_fetches_same_uid_when_imap_ignores_start_uid() {
         },
     )
     .unwrap();
-    let outgoing = build_protocol_email("alice@example.test", "bob@example.test", "Тест", &message)
-        .expect("build");
+    let outgoing = build_protocol_email(
+        "alice@example.test",
+        "bob@example.test",
+        "Тест",
+        Some(message.human_readable_body().unwrap_or("")),
+        &message,
+    )
+    .expect("build");
     let raw = outgoing.raw_message;
+    // Контракт письма: text/plain непустой, JSON без human_readable_body.
+    common::assert_liveletters_email_contract(&raw);
 
     let (host, port) = spawn_fake_imap_persistent_uid(raw);
     set_mail_settings(&tmp, &host, port);

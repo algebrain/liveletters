@@ -235,6 +235,7 @@ fn outbox_records_can_be_saved_and_listed() {
             message_body: "{\"kind\":\"post_created\"}".into(),
             message_id: None,
             subject: None,
+            human_readable_body: None,
         })
         .unwrap();
 

@@ -26,6 +26,7 @@ fn subscription_requested_email(
         "bob@example.test",
         resource_address,
         "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .unwrap();
@@ -56,6 +57,7 @@ fn subscription_revoked_email(
         "bob@example.test",
         resource_address,
         "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .unwrap();
@@ -86,6 +88,7 @@ fn post_created_email(event_id: &str, post_id: &str, resource_id: &str) -> Recei
         "alice@example.test",
         "bob@example.test",
         "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .unwrap();
@@ -120,8 +123,14 @@ fn comment_created_email(
     )
     .unwrap();
 
-    let outgoing =
-        build_protocol_email(author_email, resource_id, "Sync fixture", &message).unwrap();
+    let outgoing = build_protocol_email(
+        author_email,
+        resource_id,
+        "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
+        &message,
+    )
+    .unwrap();
 
     ReceivedEmail {
         message_id: format!("message-{event_id}"),
@@ -203,6 +212,7 @@ fn apply_subscription_confirmed_does_not_persist_record_yet() {
         "alice-publish@example.org",
         "bob-feed@example.org",
         "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .unwrap();
@@ -396,9 +406,13 @@ fn applied_comment_created_creates_outbox_redistribution_to_other_subscribers() 
         subject.contains("Новый комментарий"),
         "subject должен быть локализован, получили {subject:?}"
     );
-    // human_readable_body — локализованная строка с автором и post_id
-    let message = liveletters_protocol::decode_message(&redist[0].message_body).unwrap();
-    let body = message.human_readable_body();
+    // Тело теперь хранится в отдельной колонке outbox
+    // (OutboxRecord.human_readable_body), а не в JSON. Проверяем, что
+    // локализованная подстановка с автором и post_id сохранена.
+    let body = redist[0]
+        .human_readable_body
+        .as_deref()
+        .expect("redistribute должен сохранить тело в отдельной колонке outbox");
     assert!(body.contains("bob"), "body должен содержать автора: {body}");
     assert!(
         body.contains("post-1"),

@@ -115,7 +115,11 @@ fn send_one(
     // Subject — локализованная строка из `OutboxRecord.subject`,
     // с fallback на технический `event_type` (обратная совместимость).
     let subject = record.subject.as_deref().unwrap_or(&record.event_type);
-    let outgoing: OutgoingEmail = build_protocol_email(from, to, subject, message)?;
+    // Тело — из отдельной колонки `OutboxRecord.human_readable_body`.
+    // None допустимо для тестовых/синтетических записей: тогда
+    // text/plain под-часть будет пустой строкой.
+    let body = record.human_readable_body.as_deref();
+    let outgoing: OutgoingEmail = build_protocol_email(from, to, subject, body, message)?;
     transport.send(&outgoing)
 }
 

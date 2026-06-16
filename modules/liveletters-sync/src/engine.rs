@@ -841,7 +841,13 @@ impl<'a> SyncEngine<'a> {
             delivery: OutboxDelivery::Direct(vec![subscriber_delivery_address.to_owned()]),
             message_body,
             message_id: Some(message_id),
-            subject: Some(subject),
+            subject: Some(subject.clone()),
+            // Локализованное тело живёт в отдельной колонке outbox,
+            // а не в JSON. Поле `human_readable_body` в JSON пропущено
+            // через `skip_serializing`, поэтому берём body здесь
+            // (а не `message.human_readable_body()`, который
+            // десериализуется в None).
+            human_readable_body: Some(body),
         })
     }
 
@@ -977,7 +983,10 @@ impl<'a> SyncEngine<'a> {
             delivery: OutboxDelivery::Direct(recipients),
             message_body,
             message_id: None,
-            subject: Some(subject),
+            subject: Some(subject.clone()),
+            // Тело письма хранится в отдельной колонке outbox;
+            // в JSON оно не попадает (skip_serializing).
+            human_readable_body: Some(human_body),
         };
         self.store
             .save_outbox_record(&record)

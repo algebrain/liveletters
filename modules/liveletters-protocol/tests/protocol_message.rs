@@ -27,7 +27,11 @@ fn post_created_round_trip_keeps_envelope_and_payload() {
     assert_eq!(decoded.envelope().event_type(), "post_created");
     assert_eq!(decoded.envelope().resource_id(), "blog-1");
     assert_eq!(decoded.envelope().event_id(), "event-1");
-    assert_eq!(decoded.human_readable_body(), "Новая запись в блоге");
+    // human_readable_body намеренно не сериализуется в JSON
+    // (см. message.rs: skip_serializing default), чтобы не дублировать
+    // text/plain. После десериализации поле == None; тело хранится
+    // отдельно — в `OutboxRecord.human_readable_body`.
+    assert_eq!(decoded.human_readable_body(), None);
     assert_eq!(decoded.payload(), message.payload());
 }
 

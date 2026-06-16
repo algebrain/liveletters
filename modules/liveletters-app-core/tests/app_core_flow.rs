@@ -282,6 +282,7 @@ fn reprocesses_deferred_events_through_app_core_orchestration() {
         "alice@example.test",
         "bob@example.test",
         "Deferred comment",
+        Some(deferred_message.human_readable_body().unwrap_or("")),
         &deferred_message,
     )
     .unwrap();

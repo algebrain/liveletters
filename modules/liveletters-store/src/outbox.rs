@@ -7,9 +7,10 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO outbox
-                (event_id, event_type, resource_id, delivery_json, message_body, message_id, subject)
+                (event_id, event_type, resource_id, delivery_json, message_body,
+                 message_id, subject, human_readable_body)
             VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             "#,
             params![
                 record.event_id,
@@ -19,6 +20,7 @@ impl Store {
                 record.message_body,
                 record.message_id,
                 record.subject,
+                record.human_readable_body,
             ],
         )?;
 
@@ -28,7 +30,8 @@ impl Store {
     pub fn list_outbox_records(&self) -> Result<Vec<OutboxRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT event_id, event_type, resource_id, delivery_json, message_body, message_id, subject
+            SELECT event_id, event_type, resource_id, delivery_json, message_body,
+                   message_id, subject, human_readable_body
             FROM outbox
             ORDER BY rowid ASC
             "#,
@@ -43,6 +46,7 @@ impl Store {
                 row.get::<_, String>(4)?,
                 row.get::<_, Option<String>>(5)?,
                 row.get::<_, Option<String>>(6)?,
+                row.get::<_, Option<String>>(7)?,
             ))
         })?;
 
@@ -56,6 +60,7 @@ impl Store {
                 message_body,
                 message_id,
                 subject,
+                human_readable_body,
             ) = row?;
             let delivery = decode_delivery(&delivery_json)?;
             records.push(OutboxRecord {
@@ -66,6 +71,7 @@ impl Store {
                 message_body,
                 message_id,
                 subject,
+                human_readable_body,
             });
         }
 
@@ -78,7 +84,8 @@ impl Store {
     ) -> Result<Option<OutboxRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT event_id, event_type, resource_id, delivery_json, message_body, message_id, subject
+            SELECT event_id, event_type, resource_id, delivery_json, message_body,
+                   message_id, subject, human_readable_body
             FROM outbox
             WHERE message_id = ?1
             "#,
@@ -95,6 +102,7 @@ impl Store {
         let message_body: String = row.get(4)?;
         let message_id: Option<String> = row.get(5)?;
         let subject: Option<String> = row.get(6)?;
+        let human_readable_body: Option<String> = row.get(7)?;
         let delivery = decode_delivery(&delivery_json)?;
         Ok(Some(OutboxRecord {
             event_id,
@@ -104,6 +112,7 @@ impl Store {
             message_body,
             message_id,
             subject,
+            human_readable_body,
         }))
     }
 

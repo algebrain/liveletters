@@ -52,9 +52,18 @@ fn build_subscription_confirmed_eml(from: &str, to: &str, accepted: bool) -> Str
         },
     )
     .unwrap();
-    liveletters_mime::build_protocol_email(from, to, "Sync fixture", &message)
-        .unwrap()
-        .raw_message
+    let raw_message = liveletters_mime::build_protocol_email(
+        from,
+        to,
+        "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
+        &message,
+    )
+    .unwrap()
+    .raw_message;
+    // Контракт письма: text/plain непустой, JSON без human_readable_body.
+    common::assert_liveletters_email_contract(&raw_message);
+    raw_message
 }
 
 #[test]

@@ -109,6 +109,7 @@ fn configured_smtp_transport_sends_message_over_tcp() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись",
+        Some(protocol_message.human_readable_body().unwrap_or("")),
         &protocol_message,
     )
     .expect("raw email should be built");
@@ -152,6 +153,7 @@ fn configured_imap_mailbox_fetches_messages_with_cursor() {
         "alice@example.test",
         "bob@example.test",
         "IMAP письмо",
+        Some(protocol_message.human_readable_body().unwrap_or("")),
         &protocol_message,
     )
     .expect("raw email should be built");

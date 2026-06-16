@@ -43,7 +43,14 @@ fn build_subscription_requested_email(from: &str, to: &str, event_id: &str) -> R
         },
     )
     .unwrap();
-    let outgoing = build_protocol_email(from, to, "Sync fixture", &message).unwrap();
+    let outgoing = build_protocol_email(
+        from,
+        to,
+        "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
+        &message,
+    )
+    .unwrap();
     ReceivedEmail {
         message_id: format!("message-{event_id}"),
         raw_message: outgoing.raw_message,
@@ -73,7 +80,14 @@ fn build_subscription_confirmed_email(
         },
     )
     .unwrap();
-    let outgoing = build_protocol_email(from, to, "Sync fixture", &message).unwrap();
+    let outgoing = build_protocol_email(
+        from,
+        to,
+        "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
+        &message,
+    )
+    .unwrap();
     ReceivedEmail {
         message_id: format!("message-{event_id}"),
         raw_message: outgoing.raw_message,

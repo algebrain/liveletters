@@ -45,6 +45,7 @@ fn build_protocol_email_uses_multipart_with_named_json_attachment() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -88,6 +89,7 @@ fn build_and_decode_round_trip_preserves_payload() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -107,6 +109,7 @@ fn build_protocol_email_marks_liveletters_protocol_header() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -160,6 +163,7 @@ fn multipart_email_preserves_long_cyrillic_human_body() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись от alice в blog-1",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -204,6 +208,7 @@ fn build_protocol_email_encodes_cyrillic_subject_with_rfc2047() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись от alice",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -226,6 +231,7 @@ fn build_protocol_email_keeps_ascii_subject_unchanged() {
         "alice@example.test",
         "bob@example.test",
         "New post",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -242,6 +248,7 @@ fn encoded_subject_round_trips_through_parse() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");

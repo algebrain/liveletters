@@ -56,8 +56,16 @@ fn create_post_with_friends_only_persists_visibility() {
     assert_eq!(envelope["payload"]["visibility"], "friends_only");
     assert_eq!(envelope["payload"]["body"], "Привет, мир");
     assert_eq!(envelope["payload"]["body_format"], "plain");
+    // human_readable_body намеренно не сериализуется в JSON
+    // (см. message.rs: skip_serializing default). Локализованный текст
+    // хранится в отдельной колонке outbox.
+    assert!(envelope.get("human_readable_body").is_none());
+    let body = outbox[0]
+        .human_readable_body
+        .as_deref()
+        .expect("тело должно быть в отдельной колонке outbox");
     assert_eq!(
-        envelope["human_readable_body"],
+        body,
         "Новая запись в журнале blog-1:\n\nПривет, мир\n\n— LiveLetters"
     );
 }

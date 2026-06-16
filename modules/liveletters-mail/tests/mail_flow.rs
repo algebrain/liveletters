@@ -28,6 +28,7 @@ fn built_email_can_be_parsed_and_decoded() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -95,6 +96,7 @@ fn built_email_round_trips_through_multipart_with_named_json() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -129,6 +131,7 @@ fn multipart_filename_appears_in_part_header() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");
@@ -166,6 +169,7 @@ fn multipart_email_round_trips_long_cyrillic_body() {
         "alice@example.test",
         "bob@example.test",
         "Новая запись от alice в blog-1",
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("raw email should be built");

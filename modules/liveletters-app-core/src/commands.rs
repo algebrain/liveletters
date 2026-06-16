@@ -837,6 +837,11 @@ fn enqueue_message(
         .unwrap_or_else(|| "liveletters.invalid".to_owned());
     let message_id = format!("<{event_id}@{domain}>");
 
+    // Локализованное тело хранится в отдельной колонке outbox, а не
+    // в JSON. JSON хранит только `envelope` + `payload` (поле
+    // `human_readable_body` помечено `skip_serializing`).
+    let human_readable_body = message.human_readable_body().map(str::to_owned);
+
     store.save_outbox_record(&OutboxRecord {
         event_id: event_id.to_owned(),
         event_type: event_type.to_owned(),
@@ -849,6 +854,7 @@ fn enqueue_message(
         } else {
             Some(subject.to_owned())
         },
+        human_readable_body,
     })?;
 
     Ok(())

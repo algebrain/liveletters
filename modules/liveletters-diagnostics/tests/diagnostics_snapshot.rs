@@ -94,6 +94,7 @@ fn outbox_entries_are_exposed_through_stable_dto() {
             message_body: "{\"kind\":\"post_created\",\"actor\":\"alice@example.test\"}".into(),
             message_id: None,
             subject: None,
+            human_readable_body: None,
         })
         .unwrap();
 

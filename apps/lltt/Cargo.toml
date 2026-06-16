@@ -37,4 +37,5 @@ liveletters-protocol = { path = "../../modules/liveletters-protocol" }
 liveletters-store = { path = "../../modules/liveletters-store" }
 predicates = "3"
 rusqlite = { workspace = true }
+serde_json = { workspace = true }
 tempfile = { workspace = true }

@@ -54,11 +54,15 @@
 
 ## Основная идея протокольного сообщения
 
-На уровне этого модуля сообщение LiveLetters состоит из трех частей:
+На уровне этого модуля сообщение LiveLetters состоит из двух wire-частей
+плюс одна runtime-часть, которая не сериализуется:
 
 1. `envelope`
-2. `human_readable_body`
-3. `payload`
+2. `payload`
+3. `human_readable_body` — в памяти, но **не** в JSON; в outbox хранится
+   в отдельной колонке `OutboxRecord.human_readable_body` и попадает в
+   `text/plain` под-часть при сборке письма (см.
+   [`liveletters-mime::build_protocol_email`](../liveletters-mime/INTERFACE.md)).
 
 ### `envelope`
 
@@ -73,16 +77,20 @@
 
 То есть `envelope` это минимальный технический контекст сообщения.
 
-### `human_readable_body`
+### `human_readable_body` (только в памяти, в JSON — `None`)
 
 Это человекочитаемая часть.
 
 Она важна не потому, что по ней работает машина, а потому что архитектура LiveLetters исходит из идеи письма, которое в принципе остается читаемым для человека.
 
-На уровне этого модуля это просто обязательная строка, но смысл ее именно такой:
+Структура `ProtocolMessage` хранит поле `human_readable_body: Option<String>` в памяти, но **не** сериализует его в JSON (`#[serde(skip_serializing, default)]`). Канонический путь для локализованного тела в wire-формате — отдельная колонка `OutboxRecord.human_readable_body` (см. [liveletters-store/INTERFACE.md](../liveletters-store/INTERFACE.md#outboxrecord)). При сборке письма `liveletters-lltt-sync::send_outbox_record` читает `OutboxRecord.human_readable_body` и передаёт его в `liveletters-mime::build_protocol_email` как `body` параметр, который и попадает в `text/plain` под-часть.
+
+На уровне этого модуля это просто строка (в памяти), но смысл её именно такой:
 
 - сообщение не должно состоять только из машинного payload;
 - у него должен быть и человеческий слой.
+
+При десериализации JSON (где поля нет) `human_readable_body()` возвращает `None` — отправитель обязан положить тело в outbox-колонку, иначе `text/plain` будет пустым.
 
 ### `payload`
 

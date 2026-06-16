@@ -45,6 +45,7 @@ fn outbox_record_for(message: &ProtocolMessage) -> OutboxRecord {
         message_body: encode_message(message).expect("protocol serializes"),
         message_id: None,
         subject: None,
+        human_readable_body: None,
     }
 }
 
@@ -374,6 +375,7 @@ fn build_protocol_email_round_trip_for_push() {
         "alice@example.test",
         "bob@example.test",
         message.envelope().event_type(),
+        Some(message.human_readable_body().unwrap_or("")),
         &message,
     )
     .expect("build");

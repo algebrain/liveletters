@@ -905,6 +905,7 @@ dependencies = [
  "liveletters-thread",
  "predicates",
  "rusqlite",
+ "serde_json",
  "tempfile",
 ]
 

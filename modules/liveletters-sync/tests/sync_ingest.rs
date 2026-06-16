@@ -41,6 +41,7 @@ fn protocol_email(event_id: &str, payload: DomainEventPayload, human_body: &str)
         "alice@example.test",
         "bob@example.test",
         "Sync fixture",
+        Some(protocol_message.human_readable_body().unwrap_or("")),
         &protocol_message,
     )
     .unwrap();
@@ -293,6 +294,7 @@ fn invalid_event_with_mismatched_resource_id_is_rejected() {
         "alice@example.test",
         "bob@example.test",
         "Invalid event",
+        Some(protocol_message.human_readable_body().unwrap_or("")),
         &protocol_message,
     )
     .unwrap();
