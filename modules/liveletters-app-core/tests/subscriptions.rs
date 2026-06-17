@@ -11,9 +11,20 @@ fn open() -> (tempfile::TempDir, Store) {
     (dir, store)
 }
 
+fn save_default_user(store: &Store) {
+    store
+        .save_identity("default", "bob-feed@example.org", "Боб", None, "ru", true)
+        .unwrap();
+}
+
+fn save_author(store: &Store, email: &str) {
+    store.save_author(email, email, "test").unwrap();
+}
+
 #[test]
 fn subscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions_table() {
     let (_dir, store) = open();
+    save_default_user(&store);
     let core = AppCore::new(&store);
 
     let result: SubscribeResult = core
@@ -30,7 +41,10 @@ fn subscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions
 
     let outbox = store.list_outbox_records().unwrap();
     assert_eq!(outbox.len(), 1);
-    assert_eq!(outbox[0].resource_id, "alice-publish@example.org");
+    assert_eq!(
+        outbox[0].resource_email,
+        Some("alice-publish@example.org".to_owned())
+    );
     assert_eq!(
         outbox[0].delivery,
         OutboxDelivery::Direct(vec!["alice-publish@example.org".to_owned()])
@@ -50,6 +64,7 @@ fn subscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions
 #[test]
 fn unsubscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptions_table() {
     let (_dir, store) = open();
+    save_default_user(&store);
     let core = AppCore::new(&store);
 
     core.subscribe(SubscribeCommand {
@@ -97,17 +112,24 @@ fn unsubscribe_writes_outbox_with_direct_delivery_and_does_not_touch_subscriptio
 #[test]
 fn list_subscriptions_returns_owned_from_table_and_subscribed_from_query() {
     let (_dir, store) = open();
+    for email in [
+        "alice-publish@example.org",
+        "bob-feed@example.org",
+        "carol-feed@example.org",
+    ] {
+        save_author(&store, email);
+    }
 
     store
         .save_subscription(&SubscriptionRecord {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "bob-feed@example.org".into(),
+            resource_email: "alice-publish@example.org".into(),
+            subscriber_email: "bob-feed@example.org".into(),
         })
         .unwrap();
     store
         .save_subscription(&SubscriptionRecord {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "carol-feed@example.org".into(),
+            resource_email: "alice-publish@example.org".into(),
+            subscriber_email: "carol-feed@example.org".into(),
         })
         .unwrap();
 

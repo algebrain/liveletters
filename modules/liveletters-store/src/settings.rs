@@ -8,14 +8,13 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO user_settings
-                (profile_id, nickname, email_address, avatar_url, language, setup_completed)
+                (profile_id, author_email, avatar_url, language, setup_completed)
             VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6)
+                (?1, ?2, ?3, ?4, ?5)
             "#,
             params![
                 record.profile_id,
-                record.nickname,
-                record.email_address,
+                record.author_email,
                 record.avatar_url,
                 record.language,
                 record.setup_completed as i64,
@@ -31,7 +30,7 @@ impl Store {
     ) -> Result<Option<UserSettingsRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT profile_id, nickname, email_address, avatar_url, language, setup_completed
+            SELECT profile_id, author_email, avatar_url, language, setup_completed
             FROM user_settings
             WHERE profile_id = ?1
             "#,
@@ -44,11 +43,10 @@ impl Store {
 
         Ok(Some(UserSettingsRecord {
             profile_id: row.get(0)?,
-            nickname: row.get(1)?,
-            email_address: row.get(2)?,
-            avatar_url: row.get(3)?,
-            language: row.get(4)?,
-            setup_completed: row.get::<_, i64>(5)? != 0,
+            author_email: row.get(1)?,
+            avatar_url: row.get(2)?,
+            language: row.get(3)?,
+            setup_completed: row.get::<_, i64>(4)? != 0,
         }))
     }
 
@@ -173,18 +171,6 @@ impl Store {
         value: &str,
     ) -> Result<(), StoreError> {
         match field {
-            "nickname" => {
-                self.connection().execute(
-                    "UPDATE user_settings SET nickname = ?1 WHERE profile_id = ?2",
-                    rusqlite::params![value, profile_id],
-                )?;
-            }
-            "email_address" => {
-                self.connection().execute(
-                    "UPDATE user_settings SET email_address = ?1 WHERE profile_id = ?2",
-                    rusqlite::params![value, profile_id],
-                )?;
-            }
             "avatar_url" => {
                 let v: Option<&str> = if value.is_empty() { None } else { Some(value) };
                 self.connection().execute(
@@ -371,7 +357,7 @@ impl Store {
         )?;
         for r in resources {
             self.connection().execute(
-                "INSERT INTO resources_owned (profile_id, resource_address) VALUES (?1, ?2)",
+                "INSERT INTO resources_owned (profile_id, resource_email) VALUES (?1, ?2)",
                 params![profile_id, r],
             )?;
         }
@@ -381,7 +367,7 @@ impl Store {
     pub fn list_resources_owned(&self, profile_id: &str) -> Result<Vec<String>, StoreError> {
         let mut stmt = self
             .connection()
-            .prepare("SELECT resource_address FROM resources_owned WHERE profile_id = ?1")?;
+            .prepare("SELECT resource_email FROM resources_owned WHERE profile_id = ?1")?;
         let rows = stmt.query_map(params![profile_id], |r| r.get::<_, String>(0))?;
         let mut result = Vec::new();
         for row in rows {
@@ -401,7 +387,7 @@ impl Store {
         )?;
         for s in subscriptions {
             self.connection().execute(
-                "INSERT INTO local_subscriptions (profile_id, resource_address) VALUES (?1, ?2)",
+                "INSERT INTO local_subscriptions (profile_id, resource_email) VALUES (?1, ?2)",
                 params![profile_id, s],
             )?;
         }
@@ -411,7 +397,7 @@ impl Store {
     pub fn list_local_subscriptions(&self, profile_id: &str) -> Result<Vec<String>, StoreError> {
         let mut stmt = self
             .connection()
-            .prepare("SELECT resource_address FROM local_subscriptions WHERE profile_id = ?1")?;
+            .prepare("SELECT resource_email FROM local_subscriptions WHERE profile_id = ?1")?;
         let rows = stmt.query_map(params![profile_id], |r| r.get::<_, String>(0))?;
         let mut result = Vec::new();
         for row in rows {
@@ -420,14 +406,10 @@ impl Store {
         Ok(result)
     }
 
-    pub fn add_local_subscription(
-        &self,
-        profile_id: &str,
-        address: &str,
-    ) -> Result<(), StoreError> {
+    pub fn add_local_subscription(&self, profile_id: &str, email: &str) -> Result<(), StoreError> {
         self.connection().execute(
-            "INSERT OR IGNORE INTO local_subscriptions (profile_id, resource_address) VALUES (?1, ?2)",
-            params![profile_id, address],
+            "INSERT OR IGNORE INTO local_subscriptions (profile_id, resource_email) VALUES (?1, ?2)",
+            params![profile_id, email],
         )?;
         Ok(())
     }
@@ -435,11 +417,11 @@ impl Store {
     pub fn remove_local_subscription(
         &self,
         profile_id: &str,
-        address: &str,
+        email: &str,
     ) -> Result<(), StoreError> {
         self.connection().execute(
-            "DELETE FROM local_subscriptions WHERE profile_id = ?1 AND resource_address = ?2",
-            params![profile_id, address],
+            "DELETE FROM local_subscriptions WHERE profile_id = ?1 AND resource_email = ?2",
+            params![profile_id, email],
         )?;
         Ok(())
     }

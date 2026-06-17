@@ -154,6 +154,7 @@ fn subscription_requested_round_trip_keeps_payload() {
         DomainEventPayload::SubscriptionRequested {
             resource_address: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
+            subscriber_nickname: "Борис".into(),
             created_at: 1_710_000_400,
         },
     )
@@ -166,10 +167,12 @@ fn subscription_requested_round_trip_keeps_payload() {
         DomainEventPayload::SubscriptionRequested {
             resource_address,
             subscriber_delivery_address,
+            subscriber_nickname,
             created_at,
         } => {
             assert_eq!(resource_address, "alice-publish@example.org");
             assert_eq!(subscriber_delivery_address, "bob-feed@example.org");
+            assert_eq!(subscriber_nickname, "Борис");
             assert_eq!(*created_at, 1_710_000_400);
         }
         other => panic!("unexpected payload after decode: {other:?}"),

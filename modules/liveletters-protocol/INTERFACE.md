@@ -284,6 +284,7 @@ B отправляет A, чтобы заявить: «хочу получать
 - `resource_address` — адрес блога, на который B подписывается
 - `subscriber_delivery_address` — почтовый адрес B, на который A
   будет слать посты
+- `subscriber_nickname` — ник B, который A сохраняет в `authors`
 - `created_at`
 
 При получении A автоматически отвечает `SubscriptionConfirmed` со
@@ -303,9 +304,8 @@ A отвечает B после получения `SubscriptionRequested`. Пе
 - `created_at`
 
 B при получении `accepted=true` перемещает `pending` в подтверждённые
-подписки и сохраняет профиль A в `display_names` (для печати в
-`feed`/`thread` как «Алиса»). При `accepted=false` — `pending`
-удаляется.
+подписки и сохраняет профиль A в `authors` (для печати в `feed`/`thread`
+как «Алиса»). При `accepted=false` — `pending` удаляется.
 
 ### `SubscriptionRevoked`
 

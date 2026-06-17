@@ -43,10 +43,16 @@ fn run_uses_real_store() {
 fn run_reports_inserted_posts() {
     let (store, tmp) = common::open_temp_store();
     store
+        .save_author("blog-1", "blog", "test")
+        .expect("save author");
+    store
+        .save_author("alice", "alice", "test")
+        .expect("save author");
+    store
         .save_post_record(&liveletters_store::PostRecord {
             post_id: "post-1".into(),
-            resource_id: "blog-1".into(),
-            author_id: "alice".into(),
+            resource_email: "blog-1".into(),
+            author_email: "alice".into(),
             created_at: 1_700_000_000,
             body: "тело".into(),
             visibility: "public".into(),

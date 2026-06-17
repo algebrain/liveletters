@@ -97,7 +97,7 @@ impl<'a> DiagnosticsReader<'a> {
                 .map(|record| OutboxDiagnostic {
                     event_id: record.event_id,
                     event_type: record.event_type,
-                    resource_id: record.resource_id,
+                    resource_id: record.resource_email.unwrap_or_default(),
                     preview: sanitize_preview(&record.message_body),
                 })
                 .collect(),

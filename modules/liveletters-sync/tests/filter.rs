@@ -6,6 +6,10 @@ use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage}
 use liveletters_store::SubscriptionRecord;
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
+fn ensure_author(store: &liveletters_store::Store, email: &str, nickname: &str) {
+    store.save_author(email, nickname, "test").unwrap();
+}
+
 fn subscription_requested_email(
     event_id: &str,
     resource_address: &str,
@@ -17,6 +21,7 @@ fn subscription_requested_email(
         DomainEventPayload::SubscriptionRequested {
             resource_address: resource_address.into(),
             subscriber_delivery_address: subscriber_delivery_address.into(),
+            subscriber_nickname: "Test User".into(),
             created_at: 1_710_000_000,
         },
     )
@@ -143,14 +148,14 @@ fn apply_subscription_requested_persists_subscriber_for_redistribution() {
     let (store, _tmp) = open_temp_store();
     // A должен иметь user_settings, чтобы отправить SubscriptionConfirmed.
     store
-        .save_user_settings_record(&liveletters_store::UserSettingsRecord {
-            profile_id: "alice".into(),
-            nickname: "Алиса".into(),
-            email_address: "alice-publish@example.org".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity(
+            "alice",
+            "alice-publish@example.org",
+            "Алиса",
+            None,
+            "ru",
+            true,
+        )
         .unwrap();
     let engine = SyncEngine::new(&store).with_profile_id("alice");
 
@@ -178,10 +183,7 @@ fn apply_subscription_requested_persists_subscriber_for_redistribution() {
         "SubscriptionRequested должен фиксировать подписчика в subscriptions \
          (нужно для пересылки в ResourceSubscribers)"
     );
-    assert_eq!(
-        records[0].subscriber_delivery_address,
-        "bob-feed@example.org"
-    );
+    assert_eq!(records[0].subscriber_email, "bob-feed@example.org");
 }
 
 #[test]
@@ -278,6 +280,7 @@ fn post_created_is_filtered_when_not_subscribed() {
 #[test]
 fn post_created_is_applied_when_subscribed() {
     let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "alice-publish@example.org", "Alice");
     let subscribed = vec!["alice-publish@example.org".to_string()];
     let engine = SyncEngine::new_with_identity(&store, "bob-publish@example.org", &subscribed);
 
@@ -299,6 +302,7 @@ fn post_created_is_applied_when_subscribed() {
 #[test]
 fn post_created_is_applied_when_own_resource() {
     let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "alice-publish@example.org", "Alice");
     let engine = SyncEngine::new_with_identity(&store, "alice-publish@example.org", &[]);
 
     let report = engine
@@ -319,6 +323,7 @@ fn post_created_is_applied_when_own_resource() {
 #[test]
 fn post_created_is_applied_when_engine_has_no_identity_filter() {
     let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "alice-publish@example.org", "Alice");
     let engine = SyncEngine::new(&store);
 
     let report = engine
@@ -338,6 +343,9 @@ fn post_created_is_applied_when_engine_has_no_identity_filter() {
 #[test]
 fn applied_comment_created_creates_outbox_redistribution_to_other_subscribers() {
     let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "alice-publish@example.org", "Alice");
+    ensure_author(&store, "bob@example.org", "Bob");
+    ensure_author(&store, "eve@example.org", "Eve");
     let engine = SyncEngine::new(&store);
 
     // пост от alice в её блог
@@ -352,14 +360,14 @@ fn applied_comment_created_creates_outbox_redistribution_to_other_subscribers() 
     // bob и eve — подписчики blog-1 (alice-publish)
     store
         .save_subscription(&SubscriptionRecord {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "bob@example.org".into(),
+            resource_email: "alice-publish@example.org".into(),
+            subscriber_email: "bob@example.org".into(),
         })
         .unwrap();
     store
         .save_subscription(&SubscriptionRecord {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "eve@example.org".into(),
+            resource_email: "alice-publish@example.org".into(),
+            subscriber_email: "eve@example.org".into(),
         })
         .unwrap();
 
@@ -423,6 +431,8 @@ fn applied_comment_created_creates_outbox_redistribution_to_other_subscribers() 
 #[test]
 fn comment_by_only_subscriber_creates_no_outbox_redistribution() {
     let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "alice-publish@example.org", "Alice");
+    ensure_author(&store, "bob@example.org", "Bob");
     let engine = SyncEngine::new(&store);
 
     let _ = engine
@@ -436,8 +446,8 @@ fn comment_by_only_subscriber_creates_no_outbox_redistribution() {
     // bob — единственный подписчик, и он же автор комментария
     store
         .save_subscription(&SubscriptionRecord {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "bob@example.org".into(),
+            resource_email: "alice-publish@example.org".into(),
+            subscriber_email: "bob@example.org".into(),
         })
         .unwrap();
 

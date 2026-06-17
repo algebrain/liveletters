@@ -46,7 +46,7 @@ pub fn create(
         .get_user_settings_record(&ctx.identity_name)?
         .ok_or_else(|| CommentError::IdentityNotFound(ctx.identity_name.clone()))?;
     let identity = Identity {
-        publish: user.email_address,
+        publish: user.author_email,
     };
 
     let core = AppCore::new(&store);

@@ -117,22 +117,24 @@ pub fn print_identity(cfg: &liveletters_config::IdentityConfig, reveal: bool) {
 
 pub fn print_identity_from_db(
     user: &liveletters_store::UserSettingsRecord,
+    author: Option<&liveletters_store::AuthorRecord>,
     mail: Option<&liveletters_store::MailSettingsRecord>,
     receive: &[String],
     resources: &[String],
     local_subs: &[String],
     reveal: bool,
 ) {
+    let nickname = author.map(|a| a.nickname.as_str()).unwrap_or("");
     println!("[identity]");
     print_kv(&[
-        ("email", &user.email_address),
-        ("display_name", &user.nickname),
+        ("email", &user.author_email),
+        ("display_name", nickname),
         ("language", &user.language),
     ]);
 
     println!();
     println!("[mail]");
-    print_kv(&[("publish", &user.email_address)]);
+    print_kv(&[("publish", &user.author_email)]);
     if receive.is_empty() {
         print_kv(&[("receive", "-")]);
     } else {

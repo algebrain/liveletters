@@ -1,6 +1,6 @@
 use liveletters_output::CommandContext;
 use liveletters_settings::{Args, SettingsAction};
-use liveletters_store::{MailSettingsRecord, Store, UserSettingsRecord};
+use liveletters_store::{MailSettingsRecord, Store};
 
 mod common;
 
@@ -32,14 +32,7 @@ fn show_prints_empty_message_when_no_settings() {
 fn show_reflects_saved_settings() {
     let (store, tmp) = common::open_temp_store();
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "Алиса".into(),
-            email_address: "alice@example.org".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("default", "alice@example.org", "Алиса", None, "ru", true)
         .unwrap();
     store
         .save_mail_settings_record(&MailSettingsRecord {
@@ -114,7 +107,11 @@ fn set_user_field_then_show() {
     let store = Store::open_for_home_dir(tmp.path()).unwrap();
     liveletters_settings::run(&ctx_for(&tmp), &args_for_set("nickname", "Алиса")).unwrap();
     let user = store.get_user_settings_record("default").unwrap().unwrap();
-    assert_eq!(user.nickname, "Алиса");
+    let author = store
+        .get_author(&user.author_email)
+        .unwrap()
+        .expect("authors should contain current user");
+    assert_eq!(author.nickname, "Алиса");
     liveletters_settings::run(&ctx_for(&tmp), &args_for_show()).unwrap();
 }
 

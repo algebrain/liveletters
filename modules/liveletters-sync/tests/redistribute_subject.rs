@@ -6,7 +6,7 @@ mod common;
 use common::open_temp_store;
 use liveletters_mail::{ReceivedEmail, build_protocol_email};
 use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
-use liveletters_store::{OutboxDelivery, SubscriptionRecord, UserSettingsRecord};
+use liveletters_store::{OutboxDelivery, SubscriptionRecord};
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
 fn comment_created_email(
@@ -80,22 +80,23 @@ fn redistribute_writes_technical_event_type_and_localized_subject() {
     let (store, _tmp) = open_temp_store();
     // alice (отправитель пересылки) — на английском
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "Alice".into(),
-            email_address: "alice-publish@example.org".into(),
-            avatar_url: None,
-            language: "en".into(),
-            setup_completed: true,
-        })
+        .save_identity(
+            "default",
+            "alice-publish@example.org",
+            "Alice",
+            None,
+            "en",
+            true,
+        )
         .unwrap();
+    store.save_author("eve@example.org", "Eve", "test").unwrap();
     let engine = SyncEngine::new(&store).with_profile_id("default");
 
     // eve подписана на alice
     store
         .save_subscription(&SubscriptionRecord {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "eve@example.org".into(),
+            resource_email: "alice-publish@example.org".into(),
+            subscriber_email: "eve@example.org".into(),
         })
         .unwrap();
 
@@ -156,23 +157,24 @@ fn redistribute_writes_technical_event_type_and_localized_subject() {
 #[test]
 fn redistribute_subject_follows_sender_language_ru() {
     let (store, _tmp) = open_temp_store();
-    // alice (отправитель) — на русском
+    // alice (отправитель пересылки) — на русском
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "Алиса".into(),
-            email_address: "alice-publish@example.org".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity(
+            "default",
+            "alice-publish@example.org",
+            "Алиса",
+            None,
+            "ru",
+            true,
+        )
         .unwrap();
+    store.save_author("eve@example.org", "Eve", "test").unwrap();
     let engine = SyncEngine::new(&store).with_profile_id("default");
 
     store
         .save_subscription(&SubscriptionRecord {
-            resource_address: "alice-publish@example.org".into(),
-            subscriber_delivery_address: "eve@example.org".into(),
+            resource_email: "alice-publish@example.org".into(),
+            subscriber_email: "eve@example.org".into(),
         })
         .unwrap();
 

@@ -13,6 +13,12 @@ fn identity(name: &str) -> Identity {
     }
 }
 
+fn save_publish_author(store: &liveletters_store::Store, name: &str) {
+    store
+        .save_author(&format!("{name}-publish@example.org"), name, "test")
+        .unwrap();
+}
+
 #[test]
 fn thread_for_existing_post_prints_post_and_no_comments_marker() {
     let home = common::TestHome::new();
@@ -20,6 +26,7 @@ fn thread_for_existing_post_prints_post_and_no_comments_marker() {
     let ctx = home.ctx("alice");
 
     let store = home.open_store();
+    save_publish_author(&store, "alice");
     let core = AppCore::new(&store);
     let post = core
         .create_post_from_identity(CreatePostFromIdentityCommand {
@@ -44,6 +51,8 @@ fn thread_for_post_with_root_and_reply_prints_tree() {
     let ctx = home.ctx("alice");
 
     let store = home.open_store();
+    save_publish_author(&store, "alice");
+    save_publish_author(&store, "bob");
     let core = AppCore::new(&store);
     let post = core
         .create_post_from_identity(CreatePostFromIdentityCommand {

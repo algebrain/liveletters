@@ -461,15 +461,16 @@ impl<'a> SyncEngine<'a> {
         // Удаляем pending-подписку для текущего профиля. (B — единственный,
         // кто мог отправить этот `SubscriptionRequested` и получить bounce.)
         let profile_id = self.profile_id.unwrap_or("default");
+        let outgoing_resource = outgoing.resource_email.clone().unwrap_or_default();
         self.store
-            .remove_pending_subscription(profile_id, &outgoing.resource_id)
+            .remove_pending_subscription(profile_id, &outgoing_resource)
             .map_err(SyncError::Store)?;
         // Сохраняем bounce_record
         self.store
             .save_bounce_record(&BounceRecord {
                 original_message_id: message_id.clone(),
                 event_id: Some(outgoing.event_id.clone()),
-                final_recipient: Some(bounce.final_recipient.clone()),
+                final_recipient_email: Some(bounce.final_recipient.clone()),
                 status_code: Some(bounce.status.clone()),
                 diagnostic_code: Some(bounce.diagnostic_code.clone()),
                 received_at: std::time::SystemTime::now()
@@ -520,7 +521,7 @@ impl<'a> SyncEngine<'a> {
         match payload {
             DomainEventPayload::PostCreated {
                 post_id,
-                actor_id,
+                actor_id: _,
                 created_at,
                 body,
                 visibility,
@@ -538,8 +539,8 @@ impl<'a> SyncEngine<'a> {
                 self.store
                     .save_post_record(&PostRecord {
                         post_id: post_id.clone(),
-                        resource_id: resource_id.to_owned(),
-                        author_id: actor_id.clone(),
+                        resource_email: resource_id.to_owned(),
+                        author_email: resource_id.to_owned(),
                         created_at: *created_at,
                         body: body.clone(),
                         visibility: visibility.clone(),
@@ -583,7 +584,11 @@ impl<'a> SyncEngine<'a> {
                         comment_id: comment_id.clone(),
                         post_id: post_id.clone(),
                         parent_comment_id: parent_comment_id.clone(),
-                        author_id: actor_id.clone(),
+                        // Для CommentCreated email автора = resource_id блога
+                        // (комментарий публикуется от имени блог-владельца
+                        // в текущей модели). После введения поля `origin`
+                        // здесь будет лежать настоящий email комментатора.
+                        author_email: resource_id.to_owned(),
                         created_at: *created_at,
                         body: body.clone(),
                         visibility: visibility.clone(),
@@ -616,7 +621,7 @@ impl<'a> SyncEngine<'a> {
                 }
 
                 if let DomainEventPayload::PostHidden { actor_id, .. } = payload
-                    && existing.author_id != *actor_id
+                    && existing.author_email != *actor_id
                 {
                     return Err(ApplyEventError::Unauthorized(
                         "actor_cannot_hide_post".into(),
@@ -651,7 +656,7 @@ impl<'a> SyncEngine<'a> {
                     ..
                 } = payload
                 {
-                    if existing.author_id != *actor_id {
+                    if existing.author_email != *actor_id {
                         return Err(ApplyEventError::Unauthorized(
                             "actor_cannot_edit_comment".into(),
                         ));
@@ -683,16 +688,27 @@ impl<'a> SyncEngine<'a> {
             DomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
+                subscriber_nickname,
                 ..
             } => {
-                // A — владелец ресурса — фиксирует подписку у себя,
-                // чтобы знать подписчиков для последующих пересылок
-                // (PostCreated/CommentCreated) и чтобы SubscriptionConfirmed
-                // был идемпотентным.
+                // 1. Записать подписчика в authors, чтобы при следующих
+                //    пересылках render-слой мог достать его ник.
+                self.store
+                    .save_author(
+                        subscriber_delivery_address,
+                        subscriber_nickname,
+                        "subscription_requested",
+                    )
+                    .map_err(ApplyEventError::Store)?;
+
+                // 2. A — владелец ресурса — фиксирует подписку у себя,
+                //    чтобы знать подписчиков для последующих пересылок
+                //    (PostCreated/CommentCreated) и чтобы SubscriptionConfirmed
+                //    был идемпотентным.
                 self.store
                     .save_subscription(&SubscriptionRecord {
-                        resource_address: resource_address.clone(),
-                        subscriber_delivery_address: subscriber_delivery_address.clone(),
+                        resource_email: resource_address.clone(),
+                        subscriber_email: subscriber_delivery_address.clone(),
                     })
                     .map_err(ApplyEventError::Store)?;
 
@@ -714,12 +730,14 @@ impl<'a> SyncEngine<'a> {
                 ..
             } => {
                 if *accepted {
-                    // pending → subscriptions + local + display_names
+                    // 1. Записать владельца ресурса в authors.
+                    self.store
+                        .save_author(owner_email, owner_nickname, "subscription_confirmed")
+                        .map_err(ApplyEventError::Store)?;
+                    // 2. pending → subscriptions + local_subscriptions
                     self.accept_pending_subscription(
                         resource_address,
                         subscriber_delivery_address,
-                        owner_nickname,
-                        owner_email,
                     )?;
                 } else {
                     // A отклонил — удалить pending, ничего не создавать
@@ -764,16 +782,21 @@ impl<'a> SyncEngine<'a> {
                 ))
             })?;
 
-        let owner_nickname = if user.nickname.is_empty() {
-            // По решению пользователя: пустой профиль отправляем, логируем warning.
-            liveletters_log::log_warn(format!(
-                "user_settings.nickname пуст для {profile_id}; отправляем пустой профиль"
-            ));
-            String::new()
-        } else {
-            user.nickname.clone()
-        };
-        let owner_email = user.email_address.clone();
+        // Ник и email владельца берём из `authors` (центральный реестр).
+        // `user_settings.author_email` — это FK на `authors.email`.
+        let author = self
+            .store
+            .get_author(&user.author_email)
+            .map_err(ApplyEventError::Store)?
+            .ok_or_else(|| {
+                ApplyEventError::Invalid(format!(
+                    "user_settings.author_email={} отсутствует в authors",
+                    user.author_email
+                ))
+            })?;
+
+        let owner_nickname = author.nickname.clone();
+        let owner_email = author.email.clone();
         let domain = owner_email
             .split_once('@')
             .map(|(_, d)| d.to_owned())
@@ -793,8 +816,6 @@ impl<'a> SyncEngine<'a> {
             .unwrap_or(0);
 
         // Локализованный subject/body на языке A.
-        // (вызываем напрямую `liveletters_i18n`, чтобы не зависеть от
-        // `liveletters-app-core` — граф зависимостей циклический.)
         let locale = parse_locale(&user.language).unwrap_or_else(|_| detect_system_locale());
         let subject = translate(
             "subscription_confirmed_accepted.subject",
@@ -822,7 +843,7 @@ impl<'a> SyncEngine<'a> {
                 resource_address: resource_address.to_owned(),
                 subscriber_delivery_address: subscriber_delivery_address.to_owned(),
                 owner_nickname,
-                owner_email,
+                owner_email: owner_email.clone(),
                 accepted: true,
                 created_at,
             },
@@ -837,7 +858,8 @@ impl<'a> SyncEngine<'a> {
         Ok(OutboxRecord {
             event_id: event_id.as_str().to_owned(),
             event_type: "subscription_confirmed".to_owned(),
-            resource_id: resource_address.to_owned(),
+            author_email: owner_email.clone(),
+            resource_email: Some(resource_address.to_owned()),
             delivery: OutboxDelivery::Direct(vec![subscriber_delivery_address.to_owned()]),
             message_body,
             message_id: Some(message_id),
@@ -858,15 +880,14 @@ impl<'a> SyncEngine<'a> {
     }
 
     /// B: `SubscriptionConfirmed { accepted: true }` →
-    /// `pending → subscriptions + local_subscriptions + display_names`.
+    /// `pending → subscriptions + local_subscriptions`.
+    /// Запись в `authors` уже сделана на уровне `apply_payload`.
     /// Если pending нет (например, B уже отменил через `lltt sub cancel`),
     /// событие игнорируется с логом.
     fn accept_pending_subscription(
         &self,
         resource_address: &str,
         subscriber_delivery_address: &str,
-        owner_nickname: &str,
-        owner_email: &str,
     ) -> Result<(), ApplyEventError> {
         let profile_id = self.profile_id.unwrap_or("default");
 
@@ -882,17 +903,28 @@ impl<'a> SyncEngine<'a> {
             return Ok(());
         }
 
+        if self
+            .store
+            .get_author(subscriber_delivery_address)
+            .map_err(ApplyEventError::Store)?
+            .is_none()
+        {
+            self.store
+                .save_author(
+                    subscriber_delivery_address,
+                    subscriber_delivery_address,
+                    "subscription_confirmed",
+                )
+                .map_err(ApplyEventError::Store)?;
+        }
         self.store
             .save_subscription(&SubscriptionRecord {
-                resource_address: resource_address.to_owned(),
-                subscriber_delivery_address: subscriber_delivery_address.to_owned(),
+                resource_email: resource_address.to_owned(),
+                subscriber_email: subscriber_delivery_address.to_owned(),
             })
             .map_err(ApplyEventError::Store)?;
         self.store
             .add_local_subscription(profile_id, resource_address)
-            .map_err(ApplyEventError::Store)?;
-        self.store
-            .save_display_name(owner_email, owner_nickname, "subscription_confirmed")
             .map_err(ApplyEventError::Store)?;
         self.store
             .remove_pending_subscription(profile_id, resource_address)
@@ -918,7 +950,7 @@ impl<'a> SyncEngine<'a> {
 
     fn enqueue_redistribution(
         &self,
-        resource_id: &str,
+        resource_email: &str,
         envelope: &liveletters_protocol::MessageEnvelope,
         payload: &DomainEventPayload,
         author_id: &str,
@@ -927,11 +959,11 @@ impl<'a> SyncEngine<'a> {
     ) -> Result<(), ApplyEventError> {
         let subs = self
             .store
-            .list_subscriptions_for_resource(resource_id)
+            .list_subscriptions_for_resource(resource_email)
             .map_err(ApplyEventError::Store)?;
         let recipients: Vec<String> = subs
             .into_iter()
-            .map(|s| s.subscriber_delivery_address)
+            .map(|s| s.subscriber_email)
             .filter(|addr| addr != author_id)
             .collect();
         if recipients.is_empty() {
@@ -951,7 +983,7 @@ impl<'a> SyncEngine<'a> {
         let subject = translate(
             "comment_created_redistribute.subject",
             locale,
-            Vars(&[("resource", resource_id)]),
+            Vars(&[("resource", resource_email)]),
         )
         .expect("шаблон comment_created_redistribute.subject присутствует в таблице");
         let human_body = translate(
@@ -965,7 +997,7 @@ impl<'a> SyncEngine<'a> {
         let new_envelope = liveletters_protocol::MessageEnvelope::new(
             "1",
             envelope.event_type(),
-            resource_id,
+            resource_email,
             &new_event_id,
         )
         .map_err(|e| ApplyEventError::Invalid(format!("envelope: {e:?}")))?;
@@ -975,11 +1007,22 @@ impl<'a> SyncEngine<'a> {
         let message_body = liveletters_protocol::encode_message(&message)
             .map_err(|e| ApplyEventError::Invalid(format!("encode: {e:?}")))?;
 
+        // `author_email` — кто шлёт (владелец ресурса, profile_id движка).
+        let user = self
+            .store
+            .get_user_settings_record(profile_id)
+            .ok()
+            .flatten();
+        let author_email = user
+            .map(|u| u.author_email)
+            .unwrap_or_else(|| resource_email.to_owned());
+
         let record = OutboxRecord {
             event_id: new_event_id,
             // event_type — технический идентификатор (Subject живёт в `subject`).
             event_type: envelope.event_type().to_owned(),
-            resource_id: resource_id.to_owned(),
+            author_email,
+            resource_email: Some(resource_email.to_owned()),
             delivery: OutboxDelivery::Direct(recipients),
             message_body,
             message_id: None,

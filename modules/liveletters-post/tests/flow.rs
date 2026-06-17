@@ -27,8 +27,8 @@ fn post_new_creates_persisted_post_with_default_visibility() {
     assert_eq!(posts.len(), 1);
     assert_eq!(posts[0].body, "Текст первой записи");
     assert_eq!(posts[0].visibility, "public");
-    assert_eq!(posts[0].resource_id, "alice-publish@example.org");
-    assert_eq!(posts[0].author_id, "alice-publish@example.org");
+    assert_eq!(posts[0].resource_email, "alice-publish@example.org");
+    assert_eq!(posts[0].author_email, "alice-publish@example.org");
 }
 
 #[test]

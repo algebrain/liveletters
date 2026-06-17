@@ -15,6 +15,9 @@ fn inbox_show_prints_full_body_after_import() {
     let tmp = TempDir::new().expect("tempdir");
     let home = tmp.path().to_path_buf();
     common::init_user(&home, "alice");
+    let store =
+        liveletters_store::Store::open_for_home_dir(home.join("users/alice")).expect("store");
+    store.save_author("blog-1", "blog", "test").unwrap();
 
     let eml = common::write_post_eml(&home, "p-1", "hello body");
     lltt()

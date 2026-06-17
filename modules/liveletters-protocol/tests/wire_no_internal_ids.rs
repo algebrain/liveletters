@@ -62,6 +62,7 @@ fn subscription_requested_does_not_leak_acct_prefix() {
     let payload = DomainEventPayload::SubscriptionRequested {
         resource_address: "blog-1".into(),
         subscriber_delivery_address: "carol@example.org".into(),
+        subscriber_nickname: "Кирилл".into(),
         created_at: 1_710_000_000,
     };
     let encoded = json_of(payload);

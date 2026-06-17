@@ -40,6 +40,7 @@ pub enum DomainEventPayload {
     SubscriptionRequested {
         resource_address: String,
         subscriber_delivery_address: String,
+        subscriber_nickname: String,
         created_at: u64,
     },
     SubscriptionConfirmed {
@@ -102,6 +103,7 @@ enum WireDomainEventPayload {
     SubscriptionRequested {
         resource_address: String,
         subscriber_delivery_address: String,
+        subscriber_nickname: String,
         created_at: u64,
     },
     SubscriptionConfirmed {
@@ -210,10 +212,12 @@ impl From<&DomainEventPayload> for WireDomainEventPayload {
             DomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
+                subscriber_nickname,
                 created_at,
             } => Self::SubscriptionRequested {
                 resource_address: resource_address.clone(),
                 subscriber_delivery_address: subscriber_delivery_address.clone(),
+                subscriber_nickname: subscriber_nickname.clone(),
                 created_at: *created_at,
             },
             DomainEventPayload::SubscriptionConfirmed {
@@ -318,10 +322,12 @@ impl TryFrom<WireDomainEventPayload> for DomainEventPayload {
             WireDomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
+                subscriber_nickname,
                 created_at,
             } => Ok(Self::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
+                subscriber_nickname,
                 created_at,
             }),
             WireDomainEventPayload::SubscriptionConfirmed {

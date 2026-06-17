@@ -5,7 +5,7 @@ use std::path::Path;
 
 use liveletters_config::{IdentityConfig, IdentityMeta, MailSettings};
 use liveletters_output::CommandContext;
-use liveletters_store::{MailSettingsRecord, Store, UserSettingsRecord};
+use liveletters_store::{MailSettingsRecord, Store};
 use tempfile::TempDir;
 
 pub struct TestHome {
@@ -34,14 +34,14 @@ impl TestHome {
         let cfg = sample_identity(name);
         let store = Store::open_for_home_dir(self.dir.path().join("users").join(name)).unwrap();
         store
-            .save_user_settings_record(&UserSettingsRecord {
-                profile_id: name.to_owned(),
-                nickname: cfg.display_name.clone(),
-                email_address: cfg.mail.publish.clone(),
-                avatar_url: None,
-                language: "ru".to_owned(),
-                setup_completed: true,
-            })
+            .save_identity(
+                name,
+                cfg.mail.publish.as_str(),
+                cfg.display_name.as_str(),
+                None,
+                "ru",
+                true,
+            )
             .unwrap();
         if cfg.mail.smtp().is_some() || cfg.mail.imap().is_some() {
             let smtp = cfg.mail.smtp();

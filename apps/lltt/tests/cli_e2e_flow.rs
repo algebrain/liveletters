@@ -151,9 +151,7 @@ fn import_all_direct_emails(
             let subs = store
                 .list_subscriptions_for_resource(&resource_id)
                 .expect("list subscriptions for resource");
-            subs.into_iter()
-                .map(|s| s.subscriber_delivery_address)
-                .collect()
+            subs.into_iter().map(|s| s.subscriber_email).collect()
         }
     };
     assert!(
@@ -181,8 +179,7 @@ fn import_all_direct_emails(
 }
 
 /// B подписывается на A, A автоматически отвечает `SubscriptionConfirmed`,
-/// B принимает. После этого B видит A в `local_subscriptions` и
-/// `display_names` (ник A).
+/// B принимает. После этого B видит A в `local_subscriptions` и `authors`.
 ///
 /// Это утилита для тестов, которые полагались на старое поведение
 /// «B сразу подписан после `lltt sub`».
@@ -400,10 +397,7 @@ fn bob_comments_alice_post_alice_distributes_to_subscriber() {
         let subs = alice_store
             .list_subscriptions_for_resource("alice@example.org")
             .expect("list subscriptions");
-        let addrs: Vec<&str> = subs
-            .iter()
-            .map(|s| s.subscriber_delivery_address.as_str())
-            .collect();
+        let addrs: Vec<&str> = subs.iter().map(|s| s.subscriber_email.as_str()).collect();
         assert!(
             addrs.contains(&"bob@example.org"),
             "alice должна знать bob как подписчика, получили {addrs:?}"

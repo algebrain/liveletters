@@ -182,13 +182,17 @@ mailbox = "INBOX"
         .get_user_settings_record("alice")
         .unwrap()
         .expect("UserSettingsRecord должен быть создан");
-    // Инвариант: после `lltt user add` оба поля непустые.
+    // Инвариант: после `lltt user add` e-mail непустой, а ник лежит в authors.
     // display_name было пустым → берём локальную часть `publish`.
+    let author = store
+        .get_author(&s.author_email)
+        .unwrap()
+        .expect("authors должен содержать добавленную идентичность");
     assert_eq!(
-        s.nickname, "alice",
+        author.nickname, "alice",
         "nickname должен быть извлечён из локальной части publish"
     );
-    assert_eq!(s.email_address, "alice@example.org");
+    assert_eq!(s.author_email, "alice@example.org");
 }
 
 #[test]

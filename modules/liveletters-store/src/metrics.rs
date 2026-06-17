@@ -1,6 +1,7 @@
 use crate::{Store, StoreError};
 
 const ALLOWED_TABLES: &[&str] = &[
+    "authors",
     "posts",
     "comments",
     "outbox",
@@ -9,7 +10,6 @@ const ALLOWED_TABLES: &[&str] = &[
     "subscriptions",
     "user_settings",
     "mail_settings",
-    "identity_subscriptions",
 ];
 
 impl Store {

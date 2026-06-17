@@ -3,7 +3,7 @@ use std::path::Path;
 use liveletters_config::{IdentityConfig, IdentityMeta, MailSettings};
 use liveletters_i18n::detect_system_locale;
 use liveletters_output::CommandContext;
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 use tempfile::TempDir;
 
 pub struct TestHome {
@@ -31,14 +31,14 @@ impl TestHome {
         let cfg = sample_identity(name);
         let store = Store::open_for_home_dir(self.dir.path()).unwrap();
         store
-            .save_user_settings_record(&UserSettingsRecord {
-                profile_id: name.to_owned(),
-                nickname: cfg.display_name.clone(),
-                email_address: cfg.mail.publish.clone(),
-                avatar_url: None,
-                language: detect_system_locale().as_str().to_owned(),
-                setup_completed: true,
-            })
+            .save_identity(
+                name,
+                cfg.mail.publish.as_str(),
+                cfg.display_name.as_str(),
+                None,
+                detect_system_locale().as_str(),
+                true,
+            )
             .unwrap();
         store
             .save_receive_addresses(name, &cfg.mail.receive)

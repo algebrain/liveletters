@@ -1,4 +1,4 @@
-//! Проверка CRUD для `pending_subscriptions` и `display_names`.
+//! Проверка CRUD для `pending_subscriptions` и `authors`.
 
 mod common;
 
@@ -7,6 +7,7 @@ use common::open_temp_store;
 #[test]
 fn pending_subscription_round_trip() {
     let (store, _tmp) = open_temp_store();
+    common::ensure_author(&store, "bob@example.org", "bob");
 
     store
         .save_pending_subscription("alice", "bob@example.org", 1_700_000_000)
@@ -18,7 +19,7 @@ fn pending_subscription_round_trip() {
     let list = store.list_pending_subscriptions("alice").unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].profile_id, "alice");
-    assert_eq!(list[0].resource_address, "bob@example.org");
+    assert_eq!(list[0].resource_email, "bob@example.org");
     assert_eq!(list[0].requested_at, 1_700_000_000);
     assert_eq!(list[0].last_attempt_at, 1_700_000_100);
 
@@ -41,6 +42,7 @@ fn pending_subscription_round_trip() {
 #[test]
 fn repeated_save_pending_does_not_duplicate() {
     let (store, _tmp) = open_temp_store();
+    common::ensure_author(&store, "bob@example.org", "bob");
 
     store
         .save_pending_subscription("alice", "bob@example.org", 1_700_000_000)
@@ -56,26 +58,26 @@ fn repeated_save_pending_does_not_duplicate() {
 }
 
 #[test]
-fn display_name_round_trip_and_overwrite() {
+fn author_round_trip_and_overwrite() {
     let (store, _tmp) = open_temp_store();
 
     store
-        .save_display_name("alice@example.org", "Алиса", "subscription_confirmed")
+        .save_author("alice@example.org", "Алиса", "subscription_confirmed")
         .unwrap();
-    let name = store.get_display_name("alice@example.org").unwrap();
-    assert_eq!(name.as_deref(), Some("Алиса"));
+    let author = store.get_author("alice@example.org").unwrap();
+    assert_eq!(author.as_ref().map(|a| a.nickname.as_str()), Some("Алиса"));
 
     store
-        .save_display_name("alice@example.org", "Алина", "post_created")
+        .save_author("alice@example.org", "Алина", "post_created")
         .unwrap();
-    let name = store.get_display_name("alice@example.org").unwrap();
+    let author = store.get_author("alice@example.org").unwrap();
     assert_eq!(
-        name.as_deref(),
+        author.as_ref().map(|a| a.nickname.as_str()),
         Some("Алина"),
         "новый источник должен перезаписывать имя"
     );
 
-    let list = store.list_display_names().unwrap();
+    let list = store.list_authors().unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].source, "post_created");
 }

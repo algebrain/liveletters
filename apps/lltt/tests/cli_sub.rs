@@ -31,7 +31,7 @@ fn sub_subscribe_writes_pending_and_outbox() {
     assert!(
         pending
             .iter()
-            .any(|r| r.resource_address == "alice-publish@example.org")
+            .any(|r| r.resource_email == "alice-publish@example.org")
     );
     let local = store.list_local_subscriptions("bob").unwrap();
     assert!(local.is_empty());

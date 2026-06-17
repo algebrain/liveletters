@@ -35,7 +35,7 @@ fn print_post(post: &PostRecord) {
     let created = format_unix_iso8601_utc(post.created_at);
     println!(
         "┌─ пост #{} от {}{hidden_marker}",
-        post.post_id, post.author_id
+        post.post_id, post.author_email
     );
     println!("│  visibility: {visibility}");
     println!("│  {created}");

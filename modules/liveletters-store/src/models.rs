@@ -1,8 +1,8 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PostRecord {
     pub post_id: String,
-    pub resource_id: String,
-    pub author_id: String,
+    pub resource_email: String,
+    pub author_email: String,
     pub created_at: u64,
     pub body: String,
     pub visibility: String,
@@ -14,7 +14,7 @@ pub struct CommentRecord {
     pub comment_id: String,
     pub post_id: String,
     pub parent_comment_id: Option<String>,
-    pub author_id: String,
+    pub author_email: String,
     pub created_at: u64,
     pub body: String,
     pub visibility: String,
@@ -31,7 +31,8 @@ pub enum OutboxDelivery {
 pub struct OutboxRecord {
     pub event_id: String,
     pub event_type: String,
-    pub resource_id: String,
+    pub author_email: String,
+    pub resource_email: Option<String>,
     pub delivery: OutboxDelivery,
     pub message_body: String,
     pub message_id: Option<String>,
@@ -72,11 +73,19 @@ pub struct DeferredEventRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserSettingsRecord {
     pub profile_id: String,
-    pub nickname: String,
-    pub email_address: String,
+    pub author_email: String,
     pub avatar_url: Option<String>,
     pub language: String,
     pub setup_completed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthorRecord {
+    pub email: String,
+    pub nickname: String,
+    pub source: String,
+    pub first_seen_at: u64,
+    pub updated_at: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,31 +132,23 @@ impl Default for MailSettingsRecord {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscriptionRecord {
-    pub resource_address: String,
-    pub subscriber_delivery_address: String,
+    pub resource_email: String,
+    pub subscriber_email: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingSubscriptionRecord {
     pub profile_id: String,
-    pub resource_address: String,
+    pub resource_email: String,
     pub requested_at: u64,
     pub last_attempt_at: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DisplayNameRecord {
-    pub display_email: String,
-    pub display_name: String,
-    pub source: String,
-    pub updated_at: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BounceRecord {
     pub original_message_id: String,
     pub event_id: Option<String>,
-    pub final_recipient: Option<String>,
+    pub final_recipient_email: Option<String>,
     pub status_code: Option<String>,
     pub diagnostic_code: Option<String>,
     pub received_at: u64,

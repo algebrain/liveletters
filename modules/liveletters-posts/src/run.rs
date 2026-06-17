@@ -16,13 +16,18 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), PostsError> {
     let user = store
         .get_user_settings_record(&ctx.identity_name)?
         .ok_or_else(|| PostsError::IdentityNotFound(ctx.identity_name.clone()))?;
-    let account_id = user.email_address.clone();
+    let account_id = user.author_email.clone();
+    // Ник берём из authors.
+    let nickname = store
+        .get_author(&user.author_email)?
+        .map(|a| a.nickname)
+        .unwrap_or_default();
     let posts = get_current_user_posts(
         &store,
         GetCurrentUserPostsQuery {
             author_id: &account_id,
         },
     )?;
-    print_posts(&posts, &user.nickname, args.limit);
+    print_posts(&posts, &nickname, args.limit);
     Ok(())
 }

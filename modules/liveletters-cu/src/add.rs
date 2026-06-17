@@ -2,7 +2,7 @@ use std::path::Path;
 
 use liveletters_config::IdentityConfig;
 use liveletters_i18n::detect_system_locale;
-use liveletters_store::{MailSettingsRecord, Store, UserSettingsRecord};
+use liveletters_store::{MailSettingsRecord, Store};
 
 use crate::{
     error::CuError,
@@ -61,14 +61,17 @@ pub fn run(
 }
 
 fn save_identity_to_db(store: &Store, name: &str, cfg: &IdentityConfig) -> Result<(), CuError> {
-    store.save_user_settings_record(&UserSettingsRecord {
-        profile_id: name.to_owned(),
-        nickname: cfg.display_name.clone(),
-        email_address: cfg.mail.publish.clone(),
-        avatar_url: None,
-        language: detect_system_locale().as_str().to_owned(),
-        setup_completed: true,
-    })?;
+    // Атомарное сохранение: UPSERT в `authors` (email + nickname) +
+    // UPSERT в `user_settings` (FK на authors.email). После Этапа 1
+    // оба поля непустые (валидируется выше).
+    store.save_identity(
+        name,
+        cfg.mail.publish.as_str(),
+        cfg.display_name.as_str(),
+        None,
+        detect_system_locale().as_str(),
+        true,
+    )?;
 
     if cfg.mail.smtp().is_some() || cfg.mail.imap().is_some() {
         let smtp = cfg.mail.smtp();

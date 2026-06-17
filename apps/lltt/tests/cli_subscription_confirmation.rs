@@ -12,19 +12,14 @@ fn lltt() -> Command {
 
 fn save_user_to_db(home: &std::path::Path, name: &str) {
     let store = liveletters_store::Store::open_for_home_dir(home.join("users").join(name)).unwrap();
+    let nickname = match name {
+        "alice" => "Алиса",
+        "bob" => "Боб",
+        other => other,
+    };
+    let email = format!("{name}@example.org");
     store
-        .save_user_settings_record(&liveletters_store::UserSettingsRecord {
-            profile_id: name.into(),
-            nickname: match name {
-                "alice" => "Алиса".into(),
-                "bob" => "Боб".into(),
-                other => other.to_owned(),
-            },
-            email_address: format!("{name}@example.org"),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity(name, &email, nickname, None, "ru", true)
         .unwrap();
 }
 
@@ -116,7 +111,7 @@ fn subscribe_with_auto_confirmation_moves_pending_to_subscribed() {
         .assert()
         .success();
 
-    // Теперь: pending пуст, local_subscriptions содержит, display_names есть
+    // Теперь: pending пуст, local_subscriptions содержит, authors содержит профиль A.
     let bob_store =
         liveletters_store::Store::open_for_home_dir(home.path().join("users/bob")).unwrap();
     assert!(
@@ -131,8 +126,12 @@ fn subscribe_with_auto_confirmation_moves_pending_to_subscribed() {
         local.contains(&"alice@example.org".to_string()),
         "local_subscriptions должен содержать alice@example.org: {local:?}"
     );
-    let name = bob_store.get_display_name("alice@example.org").unwrap();
-    assert_eq!(name.as_deref(), Some("Алиса"));
+    let author = bob_store
+        .get_author("alice@example.org")
+        .unwrap()
+        .expect("authors должен содержать профиль A");
+    assert_eq!(author.nickname, "Алиса");
+    assert_eq!(author.source, "subscription_confirmed");
 }
 
 #[test]

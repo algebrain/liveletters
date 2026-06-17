@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, Error as SqliteError};
+use rusqlite::Connection;
 
 use crate::StoreError;
 
@@ -33,6 +33,7 @@ impl Store {
         }
 
         let connection = Connection::open(database_path)?;
+        connection.execute_batch("PRAGMA foreign_keys = ON;")?;
         let store = Self {
             connection,
             data_dir,
@@ -52,241 +53,143 @@ impl Store {
     fn initialize_schema(&self) -> Result<(), StoreError> {
         self.connection.execute_batch(
             r#"
+            CREATE TABLE IF NOT EXISTS authors (
+                email         TEXT NOT NULL PRIMARY KEY,
+                nickname      TEXT NOT NULL,
+                source        TEXT NOT NULL,
+                first_seen_at INTEGER NOT NULL,
+                updated_at    INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_authors_nickname ON authors(nickname);
+
+            CREATE TABLE IF NOT EXISTS user_settings (
+                profile_id       TEXT PRIMARY KEY,
+                author_email     TEXT NOT NULL UNIQUE REFERENCES authors(email),
+                avatar_url       TEXT,
+                language         TEXT NOT NULL DEFAULT 'ru',
+                setup_completed  INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS mail_settings (
+                profile_id            TEXT PRIMARY KEY,
+                smtp_host             TEXT NOT NULL,
+                smtp_port             INTEGER NOT NULL,
+                smtp_security         TEXT NOT NULL DEFAULT 'starttls',
+                smtp_username         TEXT NOT NULL,
+                smtp_password         TEXT NOT NULL,
+                smtp_hello_domain     TEXT NOT NULL,
+                imap_host             TEXT NOT NULL,
+                imap_port             INTEGER NOT NULL,
+                imap_security         TEXT NOT NULL DEFAULT 'starttls',
+                imap_username         TEXT NOT NULL,
+                imap_password         TEXT NOT NULL,
+                imap_mailbox          TEXT NOT NULL,
+                initial_lookback_days INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                resource_email   TEXT NOT NULL REFERENCES authors(email),
+                subscriber_email TEXT NOT NULL REFERENCES authors(email),
+                PRIMARY KEY (resource_email, subscriber_email)
+            );
+
+            CREATE TABLE IF NOT EXISTS local_subscriptions (
+                profile_id       TEXT NOT NULL,
+                resource_email   TEXT NOT NULL REFERENCES authors(email),
+                PRIMARY KEY (profile_id, resource_email)
+            );
+
+            CREATE TABLE IF NOT EXISTS pending_subscriptions (
+                profile_id       TEXT NOT NULL,
+                resource_email   TEXT NOT NULL REFERENCES authors(email),
+                requested_at     INTEGER NOT NULL,
+                last_attempt_at  INTEGER NOT NULL,
+                PRIMARY KEY (profile_id, resource_email)
+            );
+
+            CREATE TABLE IF NOT EXISTS resources_owned (
+                profile_id       TEXT NOT NULL,
+                resource_email   TEXT NOT NULL REFERENCES authors(email),
+                PRIMARY KEY (profile_id, resource_email)
+            );
+
             CREATE TABLE IF NOT EXISTS posts (
-                post_id TEXT PRIMARY KEY,
-                resource_id TEXT NOT NULL,
-                author_id TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                body TEXT NOT NULL,
-                visibility TEXT NOT NULL,
-                hidden INTEGER NOT NULL
+                post_id        TEXT PRIMARY KEY,
+                resource_email TEXT NOT NULL REFERENCES authors(email),
+                author_email   TEXT NOT NULL REFERENCES authors(email),
+                created_at     INTEGER NOT NULL,
+                body           TEXT NOT NULL,
+                visibility     TEXT NOT NULL,
+                hidden         INTEGER NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS comments (
-                comment_id TEXT PRIMARY KEY,
-                post_id TEXT NOT NULL,
-                parent_comment_id TEXT,
-                author_id TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                body TEXT NOT NULL,
-                visibility TEXT NOT NULL,
-                hidden INTEGER NOT NULL
+                comment_id          TEXT PRIMARY KEY,
+                post_id             TEXT NOT NULL REFERENCES posts(post_id),
+                parent_comment_id   TEXT REFERENCES comments(comment_id),
+                author_email        TEXT NOT NULL REFERENCES authors(email),
+                created_at          INTEGER NOT NULL,
+                body                TEXT NOT NULL,
+                visibility          TEXT NOT NULL,
+                hidden              INTEGER NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS outbox (
-                event_id TEXT PRIMARY KEY,
-                event_type TEXT NOT NULL,
-                resource_id TEXT NOT NULL,
-                delivery_json TEXT NOT NULL,
-                message_body TEXT NOT NULL,
-                message_id TEXT,
-                subject TEXT,
-                human_readable_body TEXT
+                event_id             TEXT PRIMARY KEY,
+                event_type           TEXT NOT NULL,
+                author_email         TEXT NOT NULL REFERENCES authors(email),
+                resource_email       TEXT REFERENCES authors(email),
+                delivery_json        TEXT NOT NULL,
+                message_body         TEXT NOT NULL,
+                message_id           TEXT,
+                subject              TEXT,
+                human_readable_body  TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS bounce_records (
+                original_message_id   TEXT PRIMARY KEY,
+                event_id              TEXT,
+                final_recipient_email TEXT REFERENCES authors(email),
+                status_code           TEXT,
+                diagnostic_code       TEXT,
+                received_at           INTEGER NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS raw_messages (
-                message_id TEXT PRIMARY KEY,
-                raw_message TEXT NOT NULL,
-                status TEXT NOT NULL
+                message_id   TEXT PRIMARY KEY,
+                raw_message  TEXT NOT NULL,
+                status       TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS raw_events (
-                event_id TEXT PRIMARY KEY,
-                event_type TEXT NOT NULL,
-                resource_id TEXT NOT NULL,
-                payload_json TEXT NOT NULL,
-                apply_status TEXT NOT NULL DEFAULT 'pending',
+                event_id      TEXT PRIMARY KEY,
+                event_type    TEXT NOT NULL,
+                resource_id   TEXT NOT NULL,
+                payload_json  TEXT NOT NULL,
+                apply_status  TEXT NOT NULL DEFAULT 'pending',
                 failure_reason TEXT
             );
 
             CREATE TABLE IF NOT EXISTS deferred_events (
-                event_id TEXT PRIMARY KEY,
-                event_type TEXT NOT NULL,
-                reason TEXT NOT NULL,
-                payload_json TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS user_settings (
-                profile_id TEXT PRIMARY KEY,
-                nickname TEXT NOT NULL,
-                email_address TEXT NOT NULL,
-                avatar_url TEXT,
-                language TEXT NOT NULL DEFAULT 'ru',
-                setup_completed INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS subscriptions (
-                resource_address TEXT NOT NULL,
-                subscriber_delivery_address TEXT NOT NULL,
-                PRIMARY KEY (resource_address, subscriber_delivery_address)
-            );
-
-            CREATE TABLE IF NOT EXISTS mail_settings (
-                profile_id TEXT PRIMARY KEY,
-                smtp_host TEXT NOT NULL,
-                smtp_port INTEGER NOT NULL,
-                smtp_security TEXT NOT NULL DEFAULT 'starttls',
-                smtp_username TEXT NOT NULL,
-                smtp_password TEXT NOT NULL,
-                smtp_hello_domain TEXT NOT NULL,
-                imap_host TEXT NOT NULL,
-                imap_port INTEGER NOT NULL,
-                imap_security TEXT NOT NULL DEFAULT 'starttls',
-                imap_username TEXT NOT NULL,
-                imap_password TEXT NOT NULL,
-                imap_mailbox TEXT NOT NULL
+                event_id      TEXT PRIMARY KEY,
+                event_type    TEXT NOT NULL,
+                reason        TEXT NOT NULL,
+                payload_json  TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS sync_cursors (
-                profile_id TEXT PRIMARY KEY,
-                last_imap_uid INTEGER NOT NULL
+                profile_id     TEXT PRIMARY KEY,
+                last_imap_uid  INTEGER NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS receive_addresses (
-                profile_id TEXT NOT NULL,
-                address TEXT NOT NULL,
+                profile_id  TEXT NOT NULL,
+                address     TEXT NOT NULL,
                 PRIMARY KEY (profile_id, address)
             );
-
-            CREATE TABLE IF NOT EXISTS resources_owned (
-                profile_id TEXT NOT NULL,
-                resource_address TEXT NOT NULL,
-                PRIMARY KEY (profile_id, resource_address)
-            );
-
-            CREATE TABLE IF NOT EXISTS local_subscriptions (
-                profile_id TEXT NOT NULL,
-                resource_address TEXT NOT NULL,
-                PRIMARY KEY (profile_id, resource_address)
-            );
-
-            CREATE TABLE IF NOT EXISTS pending_subscriptions (
-                profile_id TEXT NOT NULL,
-                resource_address TEXT NOT NULL,
-                requested_at INTEGER NOT NULL,
-                last_attempt_at INTEGER NOT NULL,
-                PRIMARY KEY (profile_id, resource_address)
-            );
-
-            CREATE TABLE IF NOT EXISTS display_names (
-                display_email TEXT PRIMARY KEY,
-                display_name TEXT NOT NULL,
-                source TEXT NOT NULL,
-                updated_at INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS bounce_records (
-                original_message_id TEXT PRIMARY KEY,
-                event_id TEXT,
-                final_recipient TEXT,
-                status_code TEXT,
-                diagnostic_code TEXT,
-                received_at INTEGER NOT NULL
-            );
-            "#,
-        )?;
-
-        self.ensure_mail_settings_security_columns()?;
-        self.ensure_mail_settings_initial_lookback_column()?;
-        self.ensure_user_settings_language_column()?;
-        self.ensure_subscriptions_use_delivery_address_key()?;
-        self.ensure_outbox_message_id_column()?;
-
-        Ok(())
-    }
-
-    fn ensure_mail_settings_security_columns(&self) -> Result<(), StoreError> {
-        self.add_column_if_missing(
-            "ALTER TABLE mail_settings ADD COLUMN smtp_security TEXT NOT NULL DEFAULT 'starttls'",
-        )?;
-        self.add_column_if_missing(
-            "ALTER TABLE mail_settings ADD COLUMN imap_security TEXT NOT NULL DEFAULT 'starttls'",
-        )?;
-        Ok(())
-    }
-
-    fn ensure_mail_settings_initial_lookback_column(&self) -> Result<(), StoreError> {
-        self.add_column_if_missing(
-            "ALTER TABLE mail_settings \
-             ADD COLUMN initial_lookback_days INTEGER NOT NULL DEFAULT 1",
-        )?;
-        Ok(())
-    }
-
-    fn ensure_user_settings_language_column(&self) -> Result<(), StoreError> {
-        self.add_column_if_missing(
-            "ALTER TABLE user_settings ADD COLUMN language TEXT NOT NULL DEFAULT 'ru'",
-        )?;
-        Ok(())
-    }
-
-    fn add_column_if_missing(&self, sql: &str) -> Result<(), StoreError> {
-        match self.connection.execute(sql, []) {
-            Ok(_) => Ok(()),
-            Err(SqliteError::SqliteFailure(_, Some(message)))
-                if message.contains("duplicate column name") =>
-            {
-                Ok(())
-            }
-            Err(error) => Err(error.into()),
-        }
-    }
-
-    fn ensure_subscriptions_use_delivery_address_key(&self) -> Result<(), StoreError> {
-        if !self.table_has_column("subscriptions", "subscriber_account_id")? {
-            return Ok(());
-        }
-
-        self.connection.execute_batch(
-            r#"
-            CREATE TABLE IF NOT EXISTS subscriptions_new (
-                resource_address TEXT NOT NULL,
-                subscriber_delivery_address TEXT NOT NULL,
-                PRIMARY KEY (resource_address, subscriber_delivery_address)
-            );
-
-            INSERT OR IGNORE INTO subscriptions_new
-                (resource_address, subscriber_delivery_address)
-            SELECT resource_address, subscriber_delivery_address
-            FROM subscriptions
-            WHERE subscriber_delivery_address <> '';
-
-            DROP TABLE subscriptions;
-            ALTER TABLE subscriptions_new RENAME TO subscriptions;
             "#,
         )?;
 
         Ok(())
-    }
-
-    fn ensure_outbox_message_id_column(&self) -> Result<(), StoreError> {
-        if !self.table_has_column("outbox", "message_id")? {
-            self.connection
-                .execute("ALTER TABLE outbox ADD COLUMN message_id TEXT", [])?;
-        }
-        if !self.table_has_column("outbox", "subject")? {
-            self.connection
-                .execute("ALTER TABLE outbox ADD COLUMN subject TEXT", [])?;
-        }
-        if !self.table_has_column("outbox", "human_readable_body")? {
-            self.connection
-                .execute("ALTER TABLE outbox ADD COLUMN human_readable_body TEXT", [])?;
-        }
-        Ok(())
-    }
-
-    fn table_has_column(&self, table: &str, column: &str) -> Result<bool, StoreError> {
-        let mut stmt = self
-            .connection
-            .prepare(&format!("PRAGMA table_info({table})"))?;
-        let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
-
-        for row in rows {
-            if row? == column {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
     }
 }

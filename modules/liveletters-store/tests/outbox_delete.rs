@@ -10,10 +10,18 @@ fn open_store() -> (TempDir, Store) {
 #[test]
 fn delete_removes_record() {
     let (_tmp, store) = open_store();
+    // Создаём автора для FK.
+    store
+        .save_author("alice@example.org", "alice", "self")
+        .expect("save author");
+    store
+        .save_author("blog-1", "blog", "test")
+        .expect("save resource author");
     let record = OutboxRecord {
         event_id: "ev-1".into(),
         event_type: "post_created".into(),
-        resource_id: "blog-1".into(),
+        author_email: "alice@example.org".into(),
+        resource_email: Some("blog-1".into()),
         delivery: OutboxDelivery::ResourceSubscribers,
         message_body: "{}".into(),
         message_id: None,

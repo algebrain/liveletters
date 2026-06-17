@@ -5,7 +5,7 @@ use liveletters_app_core::{
     AppCore, CreateCommentCommand, CreatePostCommand, EditCommentCommand, HidePostCommand,
     SubscribeCommand, UnsubscribeCommand, Visibility,
 };
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 use tempfile::tempdir;
 
 fn open() -> (tempfile::TempDir, Store) {
@@ -16,15 +16,24 @@ fn open() -> (tempfile::TempDir, Store) {
 
 fn save_user(store: &Store, language: &str) {
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "alice".into(),
-            email_address: "alice@example.org".into(),
-            avatar_url: None,
-            language: language.into(),
-            setup_completed: true,
-        })
+        .save_identity(
+            "default",
+            "alice@example.org",
+            "alice",
+            None,
+            language,
+            true,
+        )
         .unwrap();
+    for (email, nickname) in [
+        ("blog-1", "blog"),
+        ("alice", "alice"),
+        ("Алиса", "Алиса"),
+        ("alice-publish@example.org", "Алиса"),
+        ("bob-feed@example.org", "Боб"),
+    ] {
+        store.save_author(email, nickname, "test").unwrap();
+    }
 }
 
 fn outbox_subject_and_body(store: &Store, event_id: &str) -> (String, String) {

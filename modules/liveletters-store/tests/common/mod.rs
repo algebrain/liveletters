@@ -9,3 +9,12 @@ pub fn open_temp_store() -> (Store, tempfile::TempDir) {
     let store = Store::open_for_home_dir(tmp.path()).unwrap();
     (store, tmp)
 }
+
+/// Создаёт автора в таблице `authors` для удовлетворения FK-ограничений.
+/// Используется в тестах перед сохранением записей, ссылающихся на авторов.
+#[allow(dead_code)]
+pub fn ensure_author(store: &Store, email: &str, nickname: &str) {
+    store
+        .save_author(email, nickname, "test")
+        .expect("save author");
+}

@@ -6,7 +6,6 @@
 use liveletters_app_core::{AppCore, SubscribeCommand};
 use liveletters_protocol::decode_message;
 use liveletters_store::OutboxDelivery;
-use liveletters_store::UserSettingsRecord;
 use tempfile::tempdir;
 
 fn open() -> (tempfile::TempDir, liveletters_store::Store) {
@@ -17,14 +16,7 @@ fn open() -> (tempfile::TempDir, liveletters_store::Store) {
 
 fn save_user(store: &liveletters_store::Store) {
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "default".into(),
-            email_address: "alice@example.org".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("default", "alice@example.org", "default", None, "ru", true)
         .unwrap();
 }
 
@@ -59,7 +51,7 @@ fn subscribe_creates_outbox_pending_does_not_create_subscription() {
     // pending_subscriptions содержит запись
     let pending = store.list_pending_subscriptions("default").unwrap();
     assert_eq!(pending.len(), 1, "должна быть одна pending-подписка");
-    assert_eq!(pending[0].resource_address, "bob@example.org");
+    assert_eq!(pending[0].resource_email, "bob@example.org");
     assert_eq!(pending[0].requested_at, 1_700_000_000);
 
     // subscriptions пуст

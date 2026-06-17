@@ -62,7 +62,7 @@ pub fn list_subscriptions(
 ) -> Result<(), SubError> {
     let publish = store
         .get_user_settings_record(&ctx.identity_name)?
-        .map(|r| r.email_address)
+        .map(|r| r.author_email)
         .unwrap_or_default();
     let subscribed: Vec<String> = store.list_local_subscriptions(&ctx.identity_name)?;
     let core = liveletters_app_core::AppCore::new(store);
@@ -98,7 +98,7 @@ fn delivery_address_for(store: &Store, profile_id: &str) -> Result<String, SubEr
     }
     let email = store
         .get_user_settings_record(profile_id)?
-        .map(|r| r.email_address)
+        .map(|r| r.author_email)
         .unwrap_or_default();
     Ok(email)
 }
@@ -128,7 +128,7 @@ fn list_pending(ctx: &liveletters_output::CommandContext, store: &Store) -> Resu
         println!("  (пусто)");
     } else {
         for r in &pending {
-            println!("  {}", r.resource_address);
+            println!("  {}", r.resource_email);
         }
     }
     Ok(())

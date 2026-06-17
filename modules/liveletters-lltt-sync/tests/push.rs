@@ -40,7 +40,8 @@ fn outbox_record_for(message: &ProtocolMessage) -> OutboxRecord {
     OutboxRecord {
         event_id: message.envelope().event_id().to_owned(),
         event_type: message.envelope().event_type().to_owned(),
-        resource_id: message.envelope().resource_id().to_owned(),
+        author_email: message.envelope().resource_id().to_owned(),
+        resource_email: Some(message.envelope().resource_id().to_owned()),
         delivery: OutboxDelivery::ResourceSubscribers,
         message_body: encode_message(message).expect("protocol serializes"),
         message_id: None,
@@ -246,23 +247,24 @@ fn make_transport(port: u16) -> ConfiguredSmtpTransport {
     ))
 }
 
+fn save_subscription(store: &Store, resource: &str, subscriber: &str) {
+    store.save_author(resource, resource, "test").unwrap();
+    store.save_author(subscriber, subscriber, "test").unwrap();
+    store
+        .save_subscription(&SubscriptionRecord {
+            resource_email: resource.into(),
+            subscriber_email: subscriber.into(),
+        })
+        .expect("save sub");
+}
+
 #[test]
 fn resource_subscribers_sends_one_email_per_subscriber() {
     let (_tmp, store) = open_store();
     let (_host, port, rx) = spawn_smtp_capture();
 
-    store
-        .save_subscription(&SubscriptionRecord {
-            resource_address: "blog-1".into(),
-            subscriber_delivery_address: "bob@example.test".into(),
-        })
-        .expect("save sub bob");
-    store
-        .save_subscription(&SubscriptionRecord {
-            resource_address: "blog-1".into(),
-            subscriber_delivery_address: "carol@example.test".into(),
-        })
-        .expect("save sub carol");
+    save_subscription(&store, "blog-1", "bob@example.test");
+    save_subscription(&store, "blog-1", "carol@example.test");
 
     let message = sample_protocol_message("event-1");
     let record = outbox_record_for(&message);
@@ -302,12 +304,7 @@ fn resource_subscribers_propagates_smtp_error() {
     let port = listener.local_addr().expect("addr").port();
     drop(listener);
 
-    store
-        .save_subscription(&SubscriptionRecord {
-            resource_address: "blog-1".into(),
-            subscriber_delivery_address: "bob@example.test".into(),
-        })
-        .expect("save sub");
+    save_subscription(&store, "blog-1", "bob@example.test");
 
     let message = sample_protocol_message("event-3");
     let record = outbox_record_for(&message);
@@ -322,12 +319,7 @@ fn direct_delivery_sends_only_to_declared_recipients() {
     let (_tmp, store) = open_store();
     let (_host, port, rx) = spawn_smtp_capture();
 
-    store
-        .save_subscription(&SubscriptionRecord {
-            resource_address: "blog-1".into(),
-            subscriber_delivery_address: "bob@example.test".into(),
-        })
-        .expect("save sub");
+    save_subscription(&store, "blog-1", "bob@example.test");
 
     let message = sample_protocol_message("event-direct");
     let record = OutboxRecord {
@@ -388,12 +380,7 @@ fn push_uses_localized_subject_when_present() {
     let (_host, port, rx_subjects) = spawn_smtp_capture_subjects();
     let transport = make_transport(port);
 
-    store
-        .save_subscription(&SubscriptionRecord {
-            resource_address: "blog-1".into(),
-            subscriber_delivery_address: "bob@example.test".into(),
-        })
-        .expect("save sub");
+    save_subscription(&store, "blog-1", "bob@example.test");
 
     let message = sample_protocol_message("event-loc");
     let mut record = outbox_record_for(&message);
@@ -428,12 +415,7 @@ fn push_falls_back_to_event_type_when_subject_missing() {
     let (_host, port, rx_subjects) = spawn_smtp_capture_subjects();
     let transport = make_transport(port);
 
-    store
-        .save_subscription(&SubscriptionRecord {
-            resource_address: "blog-1".into(),
-            subscriber_delivery_address: "bob@example.test".into(),
-        })
-        .expect("save sub");
+    save_subscription(&store, "blog-1", "bob@example.test");
 
     let message = sample_protocol_message("event-fallback");
     let record = outbox_record_for(&message); // subject: None

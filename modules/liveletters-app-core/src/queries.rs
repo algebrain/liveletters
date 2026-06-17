@@ -29,7 +29,7 @@ pub fn get_current_user_posts(
     let posts = store
         .list_posts()?
         .into_iter()
-        .filter(|post| post.author_id == query.author_id)
+        .filter(|post| post.author_email == query.author_id)
         .map(post_summary_from_record)
         .collect();
 
@@ -89,8 +89,13 @@ pub fn get_settings(store: &Store, _query: GetSettingsQuery) -> Result<AppSettin
     let mut settings = AppSettings::empty();
 
     if let Some(user) = user {
-        settings.nickname = user.nickname;
-        settings.email_address = user.email_address;
+        // Ник и e-mail берём из `authors` (FK user_settings.author_email → authors.email).
+        let author = store.get_author(&user.author_email)?;
+        settings.nickname = author
+            .as_ref()
+            .map(|a| a.nickname.clone())
+            .unwrap_or_default();
+        settings.email_address = user.author_email.clone();
         settings.avatar_url = user.avatar_url;
         settings.language = user.language;
         settings.setup_completed = user.setup_completed;
@@ -117,8 +122,8 @@ pub fn get_settings(store: &Store, _query: GetSettingsQuery) -> Result<AppSettin
 fn post_summary_from_record(record: PostRecord) -> PostSummary {
     PostSummary {
         post_id: record.post_id,
-        resource_id: record.resource_id,
-        author_id: record.author_id,
+        resource_id: record.resource_email,
+        author_id: record.author_email,
         created_at: record.created_at,
         body: record.body,
         visibility: decode_visibility_name(&record.visibility),
@@ -131,7 +136,7 @@ fn comment_summary_from_record(record: CommentRecord) -> CommentSummary {
         comment_id: record.comment_id,
         post_id: record.post_id,
         parent_comment_id: record.parent_comment_id,
-        author_id: record.author_id,
+        author_id: record.author_email,
         created_at: record.created_at,
         body: record.body,
         visibility: decode_visibility_name(&record.visibility),
@@ -143,7 +148,7 @@ fn outbox_entry_from_record(record: OutboxRecord) -> OutboxEntry {
     OutboxEntry {
         event_id: record.event_id,
         event_type: record.event_type,
-        resource_id: record.resource_id,
+        resource_id: record.resource_email.unwrap_or_default(),
         delivery: record.delivery,
         message_body: record.message_body,
         subject: record.subject,
@@ -163,7 +168,7 @@ pub fn list_subscriptions(
     let owned_subscribers = records
         .into_iter()
         .map(|record| SubscriberEntry {
-            subscriber_delivery_address: record.subscriber_delivery_address,
+            subscriber_delivery_address: record.subscriber_email,
         })
         .collect();
     Ok(SubscriptionsList::new(

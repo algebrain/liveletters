@@ -201,8 +201,8 @@ pub fn create_post(
 
     store.save_post_record(&PostRecord {
         post_id: post.id().as_str().to_owned(),
-        resource_id: post.resource_id().as_str().to_owned(),
-        author_id: post.author_id().as_str().to_owned(),
+        resource_email: post.resource_id().as_str().to_owned(),
+        author_email: post.author_id().as_str().to_owned(),
         created_at: post.created_at().as_unix_seconds(),
         body: post.body().as_str().to_owned(),
         visibility: encode_visibility(post.visibility()),
@@ -219,7 +219,7 @@ pub fn create_post(
     );
 
     let record = store.get_user_settings_record(command.profile_id)?;
-    let author_name = display_author(record.as_ref())?;
+    let author_name = display_author(store, record.as_ref())?;
 
     let i18n = post_created(
         record.as_ref(),
@@ -246,7 +246,10 @@ pub fn create_post(
             DomainEventPayload::PostCreated {
                 post_id: post.id().as_str().to_owned(),
                 resource_id: post.resource_id().as_str().to_owned(),
-                actor_id: author_name.to_owned(),
+                actor_id: record
+                    .as_ref()
+                    .map(|r| r.author_email.clone())
+                    .unwrap_or_else(|| author_name.clone()),
                 created_at: post.created_at().as_unix_seconds(),
                 body: post.body().as_str().to_owned(),
                 body_format: "plain".to_owned(),
@@ -293,7 +296,7 @@ pub fn create_comment(
         parent_comment_id: comment
             .parent_comment_id()
             .map(|parent_id| parent_id.as_str().to_owned()),
-        author_id: comment.author_id().as_str().to_owned(),
+        author_email: comment.author_id().as_str().to_owned(),
         created_at: comment.created_at().as_unix_seconds(),
         body: comment.body().as_str().to_owned(),
         visibility: encode_visibility(comment.visibility()),
@@ -305,14 +308,14 @@ pub fn create_comment(
         comment_id: comment.id().clone(),
         post_id: comment.post_id().clone(),
         parent_comment_id: comment.parent_comment_id().cloned(),
-        resource_id: ResourceId::new(&post_record.resource_id)?,
+        resource_id: ResourceId::new(&post_record.resource_email)?,
         actor_id: comment.author_id().clone(),
         created_at: comment.created_at(),
         visibility: comment.visibility(),
     });
 
     let record = store.get_user_settings_record(command.profile_id)?;
-    let author_name = display_author(record.as_ref())?;
+    let author_name = display_author(store, record.as_ref())?;
 
     let i18n = comment_created(
         record.as_ref(),
@@ -321,7 +324,7 @@ pub fn create_comment(
         comment.body().as_str(),
     );
 
-    let delivery = if author_id.as_str() == post_record.author_id.as_str() {
+    let delivery = if author_id.as_str() == post_record.author_email.as_str() {
         OutboxDelivery::ResourceSubscribers
     } else {
         OutboxDelivery::Direct(vec![event.resource_id().as_str().to_owned()])
@@ -352,7 +355,7 @@ pub fn create_comment(
                 resource_id: event.resource_id().as_str().to_owned(),
                 actor_id: record
                     .as_ref()
-                    .map(|r| r.email_address.clone())
+                    .map(|r| r.author_email.clone())
                     .unwrap_or_else(|| author_name.clone()),
                 created_at: comment.created_at().as_unix_seconds(),
                 body: comment.body().as_str().to_owned(),
@@ -419,8 +422,8 @@ pub fn hide_post(
 
     let post = Post::new(
         PostId::new(&record.post_id)?,
-        ResourceId::new(&record.resource_id)?,
-        AccountId::new(&record.author_id)?,
+        ResourceId::new(&record.resource_email)?,
+        AccountId::new(&record.author_email)?,
         Timestamp::from_unix_seconds(record.created_at),
         PostBody::new(&record.body)?,
         decode_visibility(&record.visibility),
@@ -429,8 +432,8 @@ pub fn hide_post(
 
     store.save_post_record(&PostRecord {
         post_id: post.id().as_str().to_owned(),
-        resource_id: post.resource_id().as_str().to_owned(),
-        author_id: post.author_id().as_str().to_owned(),
+        resource_email: post.resource_id().as_str().to_owned(),
+        author_email: post.author_id().as_str().to_owned(),
         created_at: post.created_at().as_unix_seconds(),
         body: post.body().as_str().to_owned(),
         visibility: encode_visibility(post.visibility()),
@@ -446,7 +449,7 @@ pub fn hide_post(
     );
 
     let record = store.get_user_settings_record(command.profile_id)?;
-    let author_name = display_author(record.as_ref())?;
+    let author_name = display_author(store, record.as_ref())?;
 
     let i18n = post_hidden(record.as_ref(), &author_name, event.post_id().as_str());
 
@@ -469,7 +472,10 @@ pub fn hide_post(
             DomainEventPayload::PostHidden {
                 post_id: event.post_id().as_str().to_owned(),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: author_name.to_owned(),
+                actor_id: record
+                    .as_ref()
+                    .map(|r| r.author_email.clone())
+                    .unwrap_or_else(|| author_name.clone()),
                 created_at: event.created_at().as_unix_seconds(),
             },
         )?,
@@ -496,7 +502,7 @@ pub fn edit_comment(
             .as_deref()
             .map(CommentId::new)
             .transpose()?,
-        AccountId::new(&record.author_id)?,
+        AccountId::new(&record.author_email)?,
         Timestamp::from_unix_seconds(record.created_at),
         CommentBody::new(&record.body)?,
         decode_visibility(&record.visibility),
@@ -515,7 +521,7 @@ pub fn edit_comment(
         parent_comment_id: comment
             .parent_comment_id()
             .map(|parent_id| parent_id.as_str().to_owned()),
-        author_id: comment.author_id().as_str().to_owned(),
+        author_email: comment.author_id().as_str().to_owned(),
         created_at: comment.created_at().as_unix_seconds(),
         body: comment.body().as_str().to_owned(),
         visibility: encode_visibility(comment.visibility()),
@@ -526,13 +532,13 @@ pub fn edit_comment(
         EventId::new(&format!("comment-edited:{}", comment.id().as_str()))?,
         comment.id().clone(),
         comment.post_id().clone(),
-        ResourceId::new(&post_record.resource_id)?,
+        ResourceId::new(&post_record.resource_email)?,
         AccountId::new(command.actor_id)?,
         Timestamp::from_unix_seconds(command.created_at),
     );
 
     let record = store.get_user_settings_record(command.profile_id)?;
-    let author_name = display_author(record.as_ref())?;
+    let author_name = display_author(store, record.as_ref())?;
 
     let i18n = comment_edited(
         record.as_ref(),
@@ -561,7 +567,10 @@ pub fn edit_comment(
                 comment_id: event.comment_id().as_str().to_owned(),
                 post_id: event.post_id().as_str().to_owned(),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: author_name.to_owned(),
+                actor_id: record
+                    .as_ref()
+                    .map(|r| r.author_email.clone())
+                    .unwrap_or_else(|| author_name.clone()),
                 created_at: event.created_at().as_unix_seconds(),
                 body: comment.body().as_str().to_owned(),
                 visibility: encode_visibility(comment.visibility()),
@@ -662,14 +671,16 @@ pub fn save_settings(
         setup_completed: true,
     };
 
-    store.save_user_settings_record(&UserSettingsRecord {
-        profile_id: default_profile_id().to_owned(),
-        nickname: settings.nickname.clone(),
-        email_address: settings.email_address.clone(),
-        avatar_url: settings.avatar_url.clone(),
-        language: settings.language.clone(),
-        setup_completed: settings.setup_completed,
-    })?;
+    // Атомарное сохранение идентичности: UPSERT в `authors` + UPSERT
+    // в `user_settings` (последний хранит FK на authors.email).
+    store.save_identity(
+        default_profile_id(),
+        settings.email_address.as_str(),
+        settings.nickname.as_str(),
+        settings.avatar_url.as_deref(),
+        settings.language.as_str(),
+        settings.setup_completed,
+    )?;
     store.save_mail_settings_record(&MailSettingsRecord {
         profile_id: default_profile_id().to_owned(),
         smtp_host: settings.smtp_host.clone(),
@@ -690,29 +701,36 @@ pub fn save_settings(
     Ok(SaveSettingsResult { settings })
 }
 
-fn display_author(record: Option<&UserSettingsRecord>) -> Result<String, AppCoreError> {
-    record
-        .and_then(|r| {
-            if r.nickname.is_empty() {
-                None
-            } else {
-                Some(r.nickname.clone())
-            }
-        })
-        .or_else(|| {
-            record.and_then(|r| {
-                if r.email_address.is_empty() {
-                    None
-                } else {
-                    Some(r.email_address.clone())
-                }
-            })
-        })
+fn display_author(
+    store: &Store,
+    record: Option<&UserSettingsRecord>,
+) -> Result<String, AppCoreError> {
+    let user = record.ok_or_else(|| {
+        AppCoreError::ProfileIncomplete(
+            "user_settings отсутствует; задайте профиль: lltt set nickname \"Имя\"".into(),
+        )
+    })?;
+    let author = store
+        .get_author(&user.author_email)
+        .map_err(AppCoreError::Store)?
         .ok_or_else(|| {
-            AppCoreError::ProfileIncomplete(
-                "nickname и email_address пусты — задайте их: lltt set nickname \"Имя\"".into(),
-            )
-        })
+            AppCoreError::ProfileIncomplete(format!(
+                "user_settings.author_email={} отсутствует в authors",
+                user.author_email
+            ))
+        })?;
+    if author.nickname.is_empty() {
+        // Фоллбэк: локальная часть e-mail до @.
+        let local = author.email.split('@').next().unwrap_or("").trim();
+        if !local.is_empty() {
+            return Ok(local.to_owned());
+        }
+        return Err(AppCoreError::ProfileIncomplete(format!(
+            "authors.nickname для {} пуст и e-mail не содержит локальной части",
+            author.email
+        )));
+    }
+    Ok(author.nickname)
 }
 
 fn encode_visibility(visibility: Visibility) -> String {
@@ -825,15 +843,18 @@ fn enqueue_message(
         ));
     }
 
-    // Домен для Message-ID берём из `user_settings.email_address` текущего профиля
+    // Домен для Message-ID берём из `user_settings.author_email` → `authors.email`
     // (часть после `@`). Если email пустой или не содержит `@`, используем
     // `liveletters.invalid` — DSN-сопоставление всё равно будет искать по
     // `event_id` внутри Message-ID, а не по самому домену.
-    let domain = store
-        .get_user_settings_record(profile_id)
-        .ok()
-        .flatten()
-        .and_then(|r| r.email_address.split_once('@').map(|(_, d)| d.to_owned()))
+    let user = store.get_user_settings_record(profile_id).ok().flatten();
+    let author_email_for_msg = user
+        .as_ref()
+        .map(|u| u.author_email.clone())
+        .unwrap_or_else(|| resource_id.to_owned());
+    let domain = user
+        .as_ref()
+        .and_then(|u| u.author_email.split_once('@').map(|(_, d)| d.to_owned()))
         .unwrap_or_else(|| "liveletters.invalid".to_owned());
     let message_id = format!("<{event_id}@{domain}>");
 
@@ -845,7 +866,8 @@ fn enqueue_message(
     store.save_outbox_record(&OutboxRecord {
         event_id: event_id.to_owned(),
         event_type: event_type.to_owned(),
-        resource_id: resource_id.to_owned(),
+        author_email: author_email_for_msg,
+        resource_email: Some(resource_id.to_owned()),
         delivery,
         message_body: encode_message(&message)?,
         message_id: Some(message_id),
@@ -887,6 +909,17 @@ pub fn subscribe(
     let resource = ResourceAddress::new(command.resource_address)?;
     let _subscriber = AccountId::new(command.subscriber_delivery_address)?;
     let delivery = ResourceAddress::new(command.subscriber_delivery_address)?;
+    let resource_nickname = resource
+        .as_str()
+        .split('@')
+        .next()
+        .filter(|local| !local.is_empty())
+        .unwrap_or(resource.as_str());
+    store.save_author(
+        resource.as_str(),
+        resource_nickname,
+        "subscription_requested",
+    )?;
 
     // UPSERT-семантика: при существующей pending-подписке `requested_at`
     // сохраняется, обновляется только `last_attempt_at`. Это позволяет
@@ -903,11 +936,23 @@ pub fn subscribe(
     let event_id = EventId::new(&event_id_str)?;
     let _created_at = Timestamp::from_unix_seconds(command.created_at);
 
-    let i18n = subscription_requested(
-        store.get_user_settings_record(command.profile_id)?.as_ref(),
-        delivery.as_str(),
-        resource.as_str(),
-    );
+    let user = store.get_user_settings_record(command.profile_id)?;
+    let i18n = subscription_requested(user.as_ref(), delivery.as_str(), resource.as_str());
+
+    // Ник подписчика берём из authors (FK user_settings.author_email → authors.email).
+    // Этот ник попадёт в payload и будет записан в authors на стороне A.
+    let author = store
+        .get_author(
+            user.as_ref()
+                .ok_or_else(|| AppCoreError::ProfileIncomplete("нет user_settings".into()))?
+                .author_email
+                .as_str(),
+        )
+        .map_err(AppCoreError::Store)?
+        .ok_or_else(|| {
+            AppCoreError::ProfileIncomplete("user_settings.author_email нет в authors".into())
+        })?;
+    let subscriber_nickname = author.nickname.clone();
 
     let message = ProtocolMessage::new(
         MessageEnvelope::new(
@@ -920,6 +965,7 @@ pub fn subscribe(
         DomainEventPayload::SubscriptionRequested {
             resource_address: resource.as_str().to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
+            subscriber_nickname,
             created_at: command.created_at,
         },
     )?;

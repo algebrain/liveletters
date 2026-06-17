@@ -21,14 +21,16 @@ fn table_size_zero_on_empty() {
 #[test]
 fn table_size_grows_after_insert() {
     let (store, _tmp) = common::open_temp_store();
+    common::ensure_author(&store, "blog-1", "blog");
+    common::ensure_author(&store, "alice", "alice");
 
     let before = store.table_size("posts").unwrap();
     for i in 0..50 {
         store
             .save_post_record(&PostRecord {
                 post_id: format!("post-{i}"),
-                resource_id: "blog-1".to_owned(),
-                author_id: "alice".to_owned(),
+                resource_email: "blog-1".to_owned(),
+                author_email: "alice".to_owned(),
                 created_at: 1_710_000_000 + i,
                 body: format!("Тело записи номер {i} {}", "x".repeat(200)),
                 visibility: "public".to_owned(),

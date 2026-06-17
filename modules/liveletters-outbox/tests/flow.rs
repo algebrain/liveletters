@@ -7,7 +7,7 @@ use liveletters_app_core::{
     PendingOutbox, Visibility,
 };
 use liveletters_outbox::{Args, OutboxAction, print_summary, run};
-use liveletters_store::{OutboxDelivery, UserSettingsRecord};
+use liveletters_store::OutboxDelivery;
 
 #[test]
 fn outbox_list_empty_store_succeeds() {
@@ -28,14 +28,10 @@ fn outbox_list_shows_pending_post_created() {
 
     let store = home.open_store();
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "alice".into(),
-            nickname: "alice".into(),
-            email_address: "alice@example.test".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("alice", "alice@example.test", "alice", None, "ru", true)
+        .unwrap();
+    store
+        .save_author("alice-publish@example.org", "alice", "test")
         .unwrap();
     let core = AppCore::new(&store);
     core.create_post_from_identity(CreatePostFromIdentityCommand {

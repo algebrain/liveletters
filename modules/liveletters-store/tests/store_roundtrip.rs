@@ -6,7 +6,7 @@ use std::{
 
 use liveletters_store::{
     CommentRecord, DeferredEventRecord, MailSettingsRecord, OutboxDelivery, OutboxRecord,
-    PostRecord, RawEventRecord, RawMessageRecord, Store, StorePaths, UserSettingsRecord,
+    PostRecord, RawEventRecord, RawMessageRecord, Store, StorePaths,
 };
 use rusqlite::Connection;
 
@@ -55,11 +55,14 @@ fn in_memory_store_starts_with_empty_state() {
 fn saved_post_can_be_read_back() {
     let (store, _tmp) = common::open_temp_store();
 
+    common::ensure_author(&store, "blog-1", "blog");
+    common::ensure_author(&store, "alice", "alice");
+
     store
         .save_post_record(&PostRecord {
             post_id: "post-1".into(),
-            resource_id: "blog-1".into(),
-            author_id: "alice".into(),
+            resource_email: "blog-1".into(),
+            author_email: "alice".into(),
             created_at: 1_710_000_000,
             body: "Первая запись".into(),
             visibility: "public".into(),
@@ -80,11 +83,14 @@ fn list_posts_returns_newest_first() {
     let (store, _tmp) = common::open_temp_store();
 
     for (post_id, created_at) in [("old", 1_710_000_000), ("new", 1_710_000_100)] {
+        common::ensure_author(&store, "blog-1", "blog");
+        common::ensure_author(&store, "alice", "alice");
+
         store
             .save_post_record(&PostRecord {
                 post_id: post_id.into(),
-                resource_id: "blog-1".into(),
-                author_id: "alice".into(),
+                resource_email: "blog-1".into(),
+                author_email: "alice".into(),
                 created_at,
                 body: post_id.into(),
                 visibility: "public".into(),
@@ -108,13 +114,31 @@ fn list_posts_returns_newest_first() {
 fn saved_comment_is_returned_for_its_post() {
     let (store, _tmp) = common::open_temp_store();
 
+    common::ensure_author(&store, "blog-1", "blog");
+    common::ensure_author(&store, "alice", "alice");
+
     store
         .save_post_record(&PostRecord {
             post_id: "post-1".into(),
-            resource_id: "blog-1".into(),
-            author_id: "alice".into(),
+            resource_email: "blog-1".into(),
+            author_email: "alice".into(),
             created_at: 1_710_000_000,
             body: "Первая запись".into(),
+            visibility: "public".into(),
+            hidden: false,
+        })
+        .unwrap();
+
+    common::ensure_author(&store, "alice", "alice");
+
+    store
+        .save_comment_record(&CommentRecord {
+            comment_id: "comment-root".into(),
+            post_id: "post-1".into(),
+            parent_comment_id: None,
+            author_email: "alice".into(),
+            created_at: 1_710_000_050,
+            body: "Корневой".into(),
             visibility: "public".into(),
             hidden: false,
         })
@@ -125,7 +149,7 @@ fn saved_comment_is_returned_for_its_post() {
             comment_id: "comment-1".into(),
             post_id: "post-1".into(),
             parent_comment_id: Some("comment-root".into()),
-            author_id: "alice".into(),
+            author_email: "alice".into(),
             created_at: 1_710_000_100,
             body: "Ответ".into(),
             visibility: "friends_only".into(),
@@ -135,13 +159,13 @@ fn saved_comment_is_returned_for_its_post() {
 
     let comments = store.list_comments_for_post("post-1").unwrap();
 
-    assert_eq!(comments.len(), 1);
-    assert_eq!(comments[0].comment_id, "comment-1");
-    assert_eq!(
-        comments[0].parent_comment_id.as_deref(),
-        Some("comment-root")
-    );
-    assert_eq!(comments[0].body, "Ответ");
+    assert_eq!(comments.len(), 2);
+    let child = comments
+        .iter()
+        .find(|comment| comment.comment_id == "comment-1")
+        .expect("child comment must be listed");
+    assert_eq!(child.parent_comment_id.as_deref(), Some("comment-root"));
+    assert_eq!(child.body, "Ответ");
 }
 
 #[test]
@@ -170,11 +194,14 @@ fn file_store_can_open_for_home_dir_and_create_missing_home_tree() {
 
     {
         let store = Store::open_for_home_dir(&home_dir).unwrap();
+        common::ensure_author(&store, "blog-1", "blog");
+        common::ensure_author(&store, "alice", "alice");
+
         store
             .save_post_record(&PostRecord {
                 post_id: "post-1".into(),
-                resource_id: "blog-1".into(),
-                author_id: "alice".into(),
+                resource_email: "blog-1".into(),
+                author_email: "alice".into(),
                 created_at: 1_710_000_000,
                 body: "Первая запись".into(),
                 visibility: "public".into(),
@@ -198,11 +225,14 @@ fn file_store_persists_records_under_temp_home() {
 
     {
         let store = Store::open_at(paths.database_path()).unwrap();
+        common::ensure_author(&store, "blog-1", "blog");
+        common::ensure_author(&store, "alice", "alice");
+
         store
             .save_post_record(&PostRecord {
                 post_id: "post-1".into(),
-                resource_id: "blog-1".into(),
-                author_id: "alice".into(),
+                resource_email: "blog-1".into(),
+                author_email: "alice".into(),
                 created_at: 1_710_000_000,
                 body: "Первая запись".into(),
                 visibility: "public".into(),
@@ -225,12 +255,15 @@ fn file_store_persists_records_under_temp_home() {
 #[test]
 fn outbox_records_can_be_saved_and_listed() {
     let (store, _tmp) = common::open_temp_store();
+    common::ensure_author(&store, "blog-1", "blog");
+    common::ensure_author(&store, "alice@example.org", "alice");
 
     store
         .save_outbox_record(&OutboxRecord {
             event_id: "event-1".into(),
             event_type: "post_created".into(),
-            resource_id: "blog-1".into(),
+            author_email: "alice@example.org".into(),
+            resource_email: Some("blog-1".into()),
             delivery: OutboxDelivery::ResourceSubscribers,
             message_body: "{\"kind\":\"post_created\"}".into(),
             message_id: None,
@@ -320,14 +353,14 @@ fn user_and_mail_settings_can_be_saved_and_read_back() {
     let (store, _tmp) = common::open_temp_store();
 
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "alice".into(),
-            email_address: "alice@example.com".into(),
-            avatar_url: Some("https://example.com/avatar.png".into()),
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity(
+            "default",
+            "alice@example.com",
+            "alice",
+            Some("https://example.com/avatar.png"),
+            "ru",
+            true,
+        )
         .unwrap();
 
     store
@@ -365,8 +398,10 @@ fn user_and_mail_settings_can_be_saved_and_read_back() {
     let got = store.get_mail_settings_record("default").unwrap().unwrap();
     assert_eq!(got.initial_lookback_days, 7);
 
-    assert_eq!(user.nickname, "alice");
-    assert_eq!(user.email_address, "alice@example.com");
+    // Ник берём из authors.
+    let author = store.get_author(&user.author_email).unwrap().unwrap();
+    assert_eq!(author.nickname, "alice");
+    assert_eq!(user.author_email, "alice@example.com");
     assert!(user.setup_completed);
     assert_eq!(mail.smtp_host, "smtp.example.com");
     assert_eq!(mail.smtp_port, 587);
@@ -383,14 +418,7 @@ fn file_store_persists_user_and_mail_settings_under_temp_home() {
     {
         let store = Store::open_at(paths.database_path()).unwrap();
         store
-            .save_user_settings_record(&UserSettingsRecord {
-                profile_id: "default".into(),
-                nickname: "alice".into(),
-                email_address: "alice@example.com".into(),
-                avatar_url: None,
-                language: "ru".into(),
-                setup_completed: true,
-            })
+            .save_identity("default", "alice@example.com", "alice", None, "ru", true)
             .unwrap();
         store
             .save_mail_settings_record(&MailSettingsRecord {
@@ -422,7 +450,9 @@ fn file_store_persists_user_and_mail_settings_under_temp_home() {
         .unwrap()
         .unwrap();
 
-    assert_eq!(user.nickname, "alice");
+    // Ник берём из authors.
+    let author = reopened.get_author(&user.author_email).unwrap().unwrap();
+    assert_eq!(author.nickname, "alice");
     assert!(user.setup_completed);
     assert_eq!(mail.smtp_username, "alice");
     assert_eq!(mail.imap_security, "starttls");
@@ -601,49 +631,6 @@ fn file_store_reports_error_when_obfuscated_password_cannot_be_recovered() {
     ));
 
     fs::remove_dir_all(home_dir).unwrap();
-}
-
-#[test]
-fn user_settings_language_column_is_added_by_migration() {
-    // Проверяет, что миграция добавляет колонку `language` со статическим
-    // SQL-дефолтом `'ru'` в legacy-БД. Это сознательно: миграция SQL не
-    // может вызвать `detect_system_locale()`, поэтому для уже существующих
-    // рядов используется фиксированная строка. Приложение при первом
-    // сохранении настроек перезаписывает значение через
-    // `liveletters_i18n::detect_system_locale()`.
-    let tmp = tempfile::tempdir().unwrap();
-    let db_path = tmp.path().join("liveletters.sqlite3");
-    {
-        let connection = Connection::open(&db_path).unwrap();
-        connection
-            .execute(
-                r#"
-                CREATE TABLE user_settings (
-                    profile_id TEXT PRIMARY KEY,
-                    nickname TEXT NOT NULL,
-                    email_address TEXT NOT NULL,
-                    avatar_url TEXT,
-                    setup_completed INTEGER NOT NULL
-                )
-                "#,
-                [],
-            )
-            .unwrap();
-        connection
-            .execute(
-                "INSERT INTO user_settings (profile_id, nickname, email_address, avatar_url, setup_completed) VALUES ('default', 'legacy', 'legacy@example.org', NULL, 1)",
-                [],
-            )
-            .unwrap();
-    }
-
-    let store = Store::open_for_home_dir(tmp.path()).unwrap();
-    let record = store
-        .get_user_settings_record("default")
-        .unwrap()
-        .expect("legacy user_settings row must be readable after migration");
-    assert_eq!(record.language, "ru");
-    assert_eq!(record.nickname, "legacy");
 }
 
 #[test]

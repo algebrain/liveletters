@@ -7,15 +7,16 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO outbox
-                (event_id, event_type, resource_id, delivery_json, message_body,
-                 message_id, subject, human_readable_body)
+                (event_id, event_type, author_email, resource_email, delivery_json,
+                 message_body, message_id, subject, human_readable_body)
             VALUES
-                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             "#,
             params![
                 record.event_id,
                 record.event_type,
-                record.resource_id,
+                record.author_email,
+                record.resource_email,
                 encode_delivery(&record.delivery),
                 record.message_body,
                 record.message_id,
@@ -30,8 +31,8 @@ impl Store {
     pub fn list_outbox_records(&self) -> Result<Vec<OutboxRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT event_id, event_type, resource_id, delivery_json, message_body,
-                   message_id, subject, human_readable_body
+            SELECT event_id, event_type, author_email, resource_email, delivery_json,
+                   message_body, message_id, subject, human_readable_body
             FROM outbox
             ORDER BY rowid ASC
             "#,
@@ -42,11 +43,12 @@ impl Store {
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(3)?,
                 row.get::<_, String>(4)?,
-                row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(5)?,
                 row.get::<_, Option<String>>(6)?,
                 row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
             ))
         })?;
 
@@ -55,7 +57,8 @@ impl Store {
             let (
                 event_id,
                 event_type,
-                resource_id,
+                author_email,
+                resource_email,
                 delivery_json,
                 message_body,
                 message_id,
@@ -66,7 +69,8 @@ impl Store {
             records.push(OutboxRecord {
                 event_id,
                 event_type,
-                resource_id,
+                author_email,
+                resource_email,
                 delivery,
                 message_body,
                 message_id,
@@ -84,8 +88,8 @@ impl Store {
     ) -> Result<Option<OutboxRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT event_id, event_type, resource_id, delivery_json, message_body,
-                   message_id, subject, human_readable_body
+            SELECT event_id, event_type, author_email, resource_email, delivery_json,
+                   message_body, message_id, subject, human_readable_body
             FROM outbox
             WHERE message_id = ?1
             "#,
@@ -97,17 +101,19 @@ impl Store {
         };
         let event_id: String = row.get(0)?;
         let event_type: String = row.get(1)?;
-        let resource_id: String = row.get(2)?;
-        let delivery_json: String = row.get(3)?;
-        let message_body: String = row.get(4)?;
-        let message_id: Option<String> = row.get(5)?;
-        let subject: Option<String> = row.get(6)?;
-        let human_readable_body: Option<String> = row.get(7)?;
+        let author_email: String = row.get(2)?;
+        let resource_email: Option<String> = row.get(3)?;
+        let delivery_json: String = row.get(4)?;
+        let message_body: String = row.get(5)?;
+        let message_id: Option<String> = row.get(6)?;
+        let subject: Option<String> = row.get(7)?;
+        let human_readable_body: Option<String> = row.get(8)?;
         let delivery = decode_delivery(&delivery_json)?;
         Ok(Some(OutboxRecord {
             event_id,
             event_type,
-            resource_id,
+            author_email,
+            resource_email,
             delivery,
             message_body,
             message_id,

@@ -16,7 +16,7 @@ fn read_pending_subscriptions(home: &std::path::Path, name: &str) -> Vec<String>
         .list_pending_subscriptions(name)
         .unwrap()
         .into_iter()
-        .map(|r| r.resource_address)
+        .map(|r| r.resource_email)
         .collect()
 }
 

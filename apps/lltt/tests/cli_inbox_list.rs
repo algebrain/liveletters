@@ -10,6 +10,12 @@ fn lltt() -> Command {
     Command::cargo_bin("lltt").expect("бинарь lltt должен собираться")
 }
 
+fn init_alice_with_blog_author(home: &std::path::Path) {
+    common::init_user(home, "alice");
+    let store = liveletters_store::Store::open_for_home_dir(home.join("users/alice")).unwrap();
+    store.save_author("blog-1", "blog", "test").unwrap();
+}
+
 #[test]
 fn inbox_list_prints_empty_when_no_messages() {
     let tmp = TempDir::new().expect("tempdir");
@@ -29,7 +35,7 @@ fn inbox_list_prints_empty_when_no_messages() {
 fn inbox_list_with_status_filter() {
     let tmp = TempDir::new().expect("tempdir");
     let home = tmp.path().to_path_buf();
-    common::init_user(&home, "alice");
+    init_alice_with_blog_author(&home);
     let eml = common::write_post_eml(&home, "post-1", "Привет, мир");
     lltt()
         .env("LIVELETTERS_HOME", &home)
@@ -59,7 +65,7 @@ fn inbox_list_with_status_filter() {
 fn inbox_list_does_not_show_other_users_messages() {
     let tmp = TempDir::new().expect("tempdir");
     let home = tmp.path().to_path_buf();
-    common::init_user(&home, "alice");
+    init_alice_with_blog_author(&home);
     common::write_identity(&home, "bob");
 
     let eml = common::write_post_eml(&home, "post-1", "Привет, мир");
@@ -109,7 +115,7 @@ fn inbox_list_rejects_unknown_status() {
 fn inbox_list_respects_limit() {
     let tmp = TempDir::new().expect("tempdir");
     let home = tmp.path().to_path_buf();
-    common::init_user(&home, "alice");
+    init_alice_with_blog_author(&home);
 
     for i in 0..3 {
         let eml = common::write_post_eml(&home, &format!("p-{i}"), &format!("body {i}"));

@@ -21,9 +21,11 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), FeedError> {
         .list_resources_owned(&ctx.identity_name)?
         .into_iter()
         .collect();
+    // Ник берём из authors (user_settings.author_email → authors.email).
     let display_name = store
         .get_user_settings_record(&ctx.identity_name)?
-        .map(|r| r.nickname)
+        .and_then(|r| store.get_author(&r.author_email).ok().flatten())
+        .map(|a| a.nickname)
         .unwrap_or_default();
 
     let posts = store
@@ -41,5 +43,5 @@ fn is_subscription_post(
     subscribed: &HashSet<String>,
     owned: &HashSet<String>,
 ) -> bool {
-    subscribed.contains(&post.resource_id) && !owned.contains(&post.resource_id)
+    subscribed.contains(&post.resource_email) && !owned.contains(&post.resource_email)
 }

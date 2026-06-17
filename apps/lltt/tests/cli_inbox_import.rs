@@ -16,6 +16,9 @@ fn lltt() -> Command {
 
 fn init_home(tmp: &TempDir) {
     common::init_user(tmp.path(), "alice");
+    let store =
+        liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store.save_author("blog-1", "blog", "test").unwrap();
 }
 
 #[test]

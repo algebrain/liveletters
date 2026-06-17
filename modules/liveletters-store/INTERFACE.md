@@ -13,6 +13,7 @@
 Это не просто “обертка над SQLite”, а boundary, через который верхние слои читают и пишут:
 
 - материализованные посты и комментарии;
+- центральный реестр авторов и адресов;
 - outbox;
 - журнал сырых входящих сообщений;
 - журнал сырых событий;
@@ -223,6 +224,7 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 Сюда сейчас относятся:
 
+- авторы и адреса;
 - посты;
 - комментарии.
 
@@ -287,6 +289,8 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 `liveletters-store` экспортирует набор record-типов:
 
+- `AuthorRecord`
+- `UserSettingsRecord`
 - `PostRecord`
 - `CommentRecord`
 - `OutboxRecord`
@@ -308,6 +312,35 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 ## Что означает каждый record-тип
 
+### `AuthorRecord`
+
+Запись центрального реестра адресов и отображаемых имён.
+
+Поля:
+
+- `email` — почтовый адрес, первичный ключ
+- `nickname` — отображаемое имя
+- `source` — откуда пришла запись (`"self"`, `"subscription_requested"`,
+  `"subscription_confirmed"`, `"test"`)
+- `first_seen_at`
+- `updated_at`
+
+На `authors.email` ссылаются настройки профиля, подписки, посты,
+комментарии, исходящая очередь и записи о недоставке. Ник и почтовый адрес
+пользователя хранятся здесь, а не отдельными полями `user_settings`.
+
+### `UserSettingsRecord`
+
+Локальные настройки профиля.
+
+Поля:
+
+- `profile_id`
+- `author_email` — ссылка на `authors.email`
+- `avatar_url`
+- `language`
+- `setup_completed`
+
 ### `PostRecord`
 
 Это сохраненный материализованный пост.
@@ -319,17 +352,24 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 Он хранит:
 
-- идентификаторы;
+- `post_id`;
+- `resource_email` — адрес ресурса, к которому относится пост;
+- `author_email` — адрес автора поста;
 - время;
 - body;
 - visibility как строку;
 - hidden-флаг.
+
+`resource_email` и `author_email` ссылаются на `authors.email`. Перед
+сохранением поста соответствующие адреса должны быть известны хранилищу.
 
 ### `CommentRecord`
 
 Это сохраненный материализованный комментарий.
 
 Он нужен для тех же целей, что и `PostRecord`, но для комментариев, включая поддержку `parent_comment_id`.
+
+`author_email` ссылается на `authors.email`.
 
 ### `OutboxRecord`
 
@@ -339,7 +379,8 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 - `event_id`
 - `event_type` — литерал-идентификатор (`"post_created"`, `"subscription_requested"`, …)
-- `resource_id`
+- `author_email` — адрес автора исходящего события
+- `resource_email` — адрес ресурса, если событие привязано к ресурсу
 - `message_body` — JSON-сериализованный `ProtocolMessage` (без поля
   `human_readable_body` — оно намеренно не в JSON)
 - `delivery: OutboxDelivery` — куда именно отправлять запись
@@ -363,7 +404,7 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 Перечисление способа адресации записи из `outbox`.
 
 - `Direct(Vec<String>)` — письмо отправляется каждому адресу из списка (в порядке списка). Пустой список запрещён на границе `AppCore` и считается ошибкой `AppCoreError::InvalidDelivery`.
-- `ResourceSubscribers` — письмо отправляется каждому подписчику ресурса, указанного в `resource_id`.
+- `ResourceSubscribers` — письмо отправляется каждому подписчику ресурса, указанного в `resource_email`.
 
 В таблице `outbox` поле хранится в виде `delivery_json TEXT NOT NULL` (ручная сериализация: `{"kind":"direct","addresses":[...]}` или `{"kind":"resource_subscribers"}`).
 
@@ -429,26 +470,12 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 Поля:
 
 - `profile_id` — локальный идентификатор текущего пользователя
-- `resource_address` — адрес блога, на который подписываемся
+- `resource_email` — адрес блога, на который подписываемся
 - `requested_at` — момент отправки `SubscriptionRequested`
 - `last_attempt_at` — момент последней повторной отправки
 
 Создаётся командой `lltt sub <addr>`. Удаляется при получении
 `SubscriptionConfirmed` (через `pending → subscriptions`) или DSN-bounce.
-
-### `DisplayNameRecord`
-
-Кеш профилей чужих пользователей, на которых мы подписаны.
-
-Поля:
-
-- `display_email` — почтовый адрес владельца блога
-- `display_name` — ник (для отображения в `feed`/`thread` как «Алиса»)
-- `source` — откуда пришёл (`"subscription_confirmed"`, `"post_created"`, …)
-- `updated_at`
-
-Используется `print_thread`/`print_posts` для отображения автора поста
-ником вместо почтового адреса.
 
 ### `BounceRecord`
 
@@ -458,7 +485,7 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 - `original_message_id` — `Message-ID` нашего исходящего (PK)
 - `event_id` — наш `event_id` исходящего (для трассировки)
-- `final_recipient` — кому не доставлено (из DSN)
+- `final_recipient_email` — кому не доставлено (из DSN)
 - `status_code` — например, `"5.1.1"`
 - `diagnostic_code` — подробности от SMTP-сервера
 - `received_at`
@@ -469,6 +496,28 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 ## Какие операции предоставляет `Store`
 
 Ниже важно не просто перечислить методы, а понимать, для чего предназначена каждая группа операций.
+
+### Операции с авторами
+
+#### `save_author(email, nickname, source)`
+
+Создаёт или обновляет запись в `authors`. При обновлении сохраняет
+`first_seen_at` и освежает `nickname`, `source`, `updated_at`.
+
+#### `get_author(email)`
+
+Возвращает автора по почтовому адресу или `None`, если такой адрес ещё не
+известен.
+
+#### `list_authors()`
+
+Возвращает всех известных авторов, отсортированных по адресу.
+
+#### `save_identity(profile_id, author_email, nickname, avatar_url, language, setup_completed)`
+
+Сохраняет локальную личность: сначала обновляет `authors`, затем
+`user_settings.author_email`. Поэтому `user_settings` всегда указывает на
+существующего автора.
 
 ### Операции с постами
 

@@ -1,9 +1,9 @@
 //! Sync: A автоотвечает `SubscriptionConfirmed` на `SubscriptionRequested`,
-//! B применяет подтверждение (pending → subscriptions + local + display_names).
+//! B применяет подтверждение (pending → subscriptions + local + authors).
 
 use liveletters_mail::{ReceivedEmail, build_protocol_email};
 use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 use liveletters_sync::SyncEngine;
 
 mod common;
@@ -21,14 +21,14 @@ fn _open_temp_store() -> (Store, tempfile::TempDir) {
 
 fn save_alice(store: &Store) {
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "alice".into(),
-            nickname: "Алиса".into(),
-            email_address: "alice-publish@example.org".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity(
+            "alice",
+            "alice-publish@example.org",
+            "Алиса",
+            None,
+            "ru",
+            true,
+        )
         .unwrap();
 }
 
@@ -39,6 +39,7 @@ fn build_subscription_requested_email(from: &str, to: &str, event_id: &str) -> R
         DomainEventPayload::SubscriptionRequested {
             resource_address: to.into(),
             subscriber_delivery_address: from.into(),
+            subscriber_nickname: "Алиса".into(),
             created_at: 1_710_000_000,
         },
     )
@@ -149,14 +150,14 @@ fn auto_confirm_uses_sender_language_for_subject() {
     let (store, _tmp) = open();
     // alice настроена на английский
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "alice".into(),
-            nickname: "Alice".into(),
-            email_address: "alice-publish@example.org".into(),
-            avatar_url: None,
-            language: "en".into(),
-            setup_completed: true,
-        })
+        .save_identity(
+            "alice",
+            "alice-publish@example.org",
+            "Alice",
+            None,
+            "en",
+            true,
+        )
         .unwrap();
     let engine = SyncEngine::new(&store).with_profile_id("alice");
 
@@ -190,17 +191,13 @@ fn b_accepts_confirmed_and_moves_pending_to_subscriptions() {
 
     // B имеет pending-подписку
     store
+        .save_author("alice-publish@example.org", "Алиса", "test")
+        .unwrap();
+    store
         .save_pending_subscription("bob", "alice-publish@example.org", 1_710_000_000)
         .unwrap();
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "bob".into(),
-            nickname: "Боб".into(),
-            email_address: "bob-feed@example.org".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("bob", "bob-feed@example.org", "Боб", None, "ru", true)
         .unwrap();
 
     let raw = build_subscription_confirmed_email(
@@ -226,20 +223,58 @@ fn b_accepts_confirmed_and_moves_pending_to_subscriptions() {
         .list_subscriptions_for_resource("alice-publish@example.org")
         .unwrap();
     assert_eq!(subs.len(), 1);
-    assert_eq!(subs[0].subscriber_delivery_address, "bob-feed@example.org");
+    assert_eq!(subs[0].subscriber_email, "bob-feed@example.org");
     // local_subscriptions содержит
     assert_eq!(
         store.list_local_subscriptions("bob").unwrap(),
         vec!["alice-publish@example.org".to_string()]
     );
-    // display_names содержит профиль A
-    assert_eq!(
-        store
-            .get_display_name("alice-publish@example.org")
-            .unwrap()
-            .as_deref(),
-        Some("Алиса")
+    // authors содержит профиль A.
+    let author = store
+        .get_author("alice-publish@example.org")
+        .unwrap()
+        .expect("authors должен содержать профиль A");
+    assert_eq!(author.nickname, "Алиса");
+    assert_eq!(author.source, "subscription_confirmed");
+}
+
+#[test]
+fn b_accepts_confirmed_creates_missing_subscriber_author() {
+    let (store, _tmp) = open();
+    let engine = SyncEngine::new(&store).with_profile_id("bob");
+
+    store
+        .save_author("alice-publish@example.org", "Алиса", "test")
+        .unwrap();
+    store
+        .save_pending_subscription("bob", "alice-publish@example.org", 1_710_000_000)
+        .unwrap();
+
+    let raw = build_subscription_confirmed_email(
+        "alice-publish@example.org",
+        "bob-feed@example.org",
+        "sub-missing-subscriber-author",
+        true,
     );
+
+    let report = engine.ingest_batch(vec![raw]).expect("ingest ok");
+    assert!(matches!(
+        report.outcomes()[0],
+        liveletters_sync::SyncMessageOutcome::Applied { .. }
+    ));
+
+    let subscriber = store
+        .get_author("bob-feed@example.org")
+        .unwrap()
+        .expect("подтверждение подписки должно создать автора подписчика");
+    assert_eq!(subscriber.nickname, "bob-feed@example.org");
+    assert_eq!(subscriber.source, "subscription_confirmed");
+
+    let subs = store
+        .list_subscriptions_for_resource("alice-publish@example.org")
+        .unwrap();
+    assert_eq!(subs.len(), 1);
+    assert_eq!(subs[0].subscriber_email, "bob-feed@example.org");
 }
 
 #[test]
@@ -247,6 +282,9 @@ fn b_declines_confirmed_and_removes_pending() {
     let (store, _tmp) = open();
     let engine = SyncEngine::new(&store).with_profile_id("bob");
 
+    store
+        .save_author("alice-publish@example.org", "Алиса", "test")
+        .unwrap();
     store
         .save_pending_subscription("bob", "alice-publish@example.org", 1_710_000_000)
         .unwrap();

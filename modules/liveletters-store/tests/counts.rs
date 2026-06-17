@@ -1,15 +1,16 @@
-use liveletters_store::{
-    CommentRecord, DeferredEventRecord, PostRecord, Store, UserSettingsRecord,
-};
+use liveletters_store::{CommentRecord, DeferredEventRecord, PostRecord, Store};
 
 mod common;
 
 fn save_post(store: &Store, id: &str, created_at: u64) {
+    common::ensure_author(store, "blog-1", "blog");
+    common::ensure_author(store, "alice", "alice");
+
     store
         .save_post_record(&PostRecord {
             post_id: id.into(),
-            resource_id: "blog-1".into(),
-            author_id: "alice".into(),
+            resource_email: "blog-1".into(),
+            author_email: "alice".into(),
             created_at,
             body: "тело".into(),
             visibility: "public".into(),
@@ -19,12 +20,14 @@ fn save_post(store: &Store, id: &str, created_at: u64) {
 }
 
 fn save_comment(store: &Store, id: &str, post_id: &str) {
+    common::ensure_author(store, "alice", "alice");
+
     store
         .save_comment_record(&CommentRecord {
             comment_id: id.into(),
             post_id: post_id.into(),
             parent_comment_id: None,
-            author_id: "alice".into(),
+            author_email: "alice".into(),
             created_at: 1_710_000_100,
             body: "ответ".into(),
             visibility: "public".into(),
@@ -95,17 +98,12 @@ fn count_increments_after_save() {
 fn user_settings_roundtrip_via_save() {
     let (store, _tmp) = common::open_temp_store();
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "Алиса".into(),
-            email_address: "alice@example.org".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: false,
-        })
+        .save_identity("default", "alice@example.org", "Алиса", None, "ru", false)
         .unwrap();
     let record = store.get_user_settings_record("default").unwrap().unwrap();
-    assert_eq!(record.nickname, "Алиса");
+    // Ник берём из authors.
+    let author = store.get_author(&record.author_email).unwrap().unwrap();
+    assert_eq!(author.nickname, "Алиса");
     assert_eq!(record.language, "ru");
     assert!(!record.setup_completed);
 }

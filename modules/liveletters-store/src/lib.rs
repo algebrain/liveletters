@@ -1,6 +1,8 @@
+mod authors;
 mod comments;
 mod error;
 mod extras;
+mod introspection;
 mod metrics;
 mod models;
 mod outbox;
@@ -14,8 +16,9 @@ mod subscriptions;
 mod sync_state;
 
 pub use error::StoreError;
+pub use introspection::{ColumnInfo, ForeignKeyInfo};
 pub use models::{
-    BounceRecord, CommentRecord, DeferredEventRecord, DisplayNameRecord, MailSettingsRecord,
+    AuthorRecord, BounceRecord, CommentRecord, DeferredEventRecord, MailSettingsRecord,
     OutboxDelivery, OutboxRecord, PendingSubscriptionRecord, PostRecord, RawEventRecord,
     RawMessageRecord, SubscriptionRecord, UserSettingsRecord,
 };

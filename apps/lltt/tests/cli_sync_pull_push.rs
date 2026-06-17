@@ -38,6 +38,21 @@ fn set_mail_settings(tmp: &TempDir, host: &str, port: u16) {
     set_split_mail_settings(tmp, host, port, host, port);
 }
 
+fn save_author(store: &liveletters_store::Store, email: &str) {
+    store.save_author(email, email, "test").unwrap();
+}
+
+fn save_subscription_fixture(store: &liveletters_store::Store, resource: &str, subscriber: &str) {
+    save_author(store, resource);
+    save_author(store, subscriber);
+    store
+        .save_subscription(&liveletters_store::SubscriptionRecord {
+            resource_email: resource.into(),
+            subscriber_email: subscriber.into(),
+        })
+        .expect("save sub");
+}
+
 fn set_split_mail_settings(
     tmp: &TempDir,
     smtp_host: &str,
@@ -313,12 +328,7 @@ fn sync_without_subcommand_runs_pull_then_push() {
 
     let store =
         liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).expect("store");
-    store
-        .save_subscription(&liveletters_store::SubscriptionRecord {
-            resource_address: "blog-1".into(),
-            subscriber_delivery_address: "bob@example.test".into(),
-        })
-        .expect("save sub");
+    save_subscription_fixture(&store, "blog-1", "bob@example.test");
 
     let outgoing = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-push-all").unwrap(),
@@ -338,7 +348,8 @@ fn sync_without_subcommand_runs_pull_then_push() {
         .save_outbox_record(&liveletters_store::OutboxRecord {
             event_id: "event-push-all".into(),
             event_type: "post_created".into(),
-            resource_id: "blog-1".into(),
+            author_email: "blog-1".into(),
+            resource_email: Some("blog-1".into()),
             delivery: liveletters_store::OutboxDelivery::ResourceSubscribers,
             message_body: encode_message(&outgoing).expect("encode"),
             message_id: None,
@@ -382,12 +393,7 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
 
     let store =
         liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).expect("store");
-    store
-        .save_subscription(&liveletters_store::SubscriptionRecord {
-            resource_address: "blog-1".into(),
-            subscriber_delivery_address: "bob@example.test".into(),
-        })
-        .expect("save sub");
+    save_subscription_fixture(&store, "blog-1", "bob@example.test");
 
     use liveletters_protocol::{
         DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message,
@@ -411,7 +417,8 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
         .save_outbox_record(&liveletters_store::OutboxRecord {
             event_id: "event-push-1".into(),
             event_type: "post_created".into(),
-            resource_id: "blog-1".into(),
+            author_email: "blog-1".into(),
+            resource_email: Some("blog-1".into()),
             delivery: liveletters_store::OutboxDelivery::ResourceSubscribers,
             message_body: body,
             message_id: None,
@@ -483,6 +490,9 @@ fn sync_pull_advances_cursor_idempotently() {
 
     let (host, port, served) = spawn_fake_imap(raw);
     set_mail_settings(&tmp, &host, port);
+    let store =
+        liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).expect("store");
+    save_author(&store, "blog-1");
 
     let assert1 = lltt()
         .env("LIVELETTERS_HOME", tmp.path())
@@ -526,12 +536,7 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
     let store =
         liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).expect("store");
 
-    store
-        .save_subscription(&liveletters_store::SubscriptionRecord {
-            resource_address: "algebrain@example.org".into(),
-            subscriber_delivery_address: "alice@example.test".into(),
-        })
-        .expect("save sub");
+    save_subscription_fixture(&store, "algebrain@example.org", "alice@example.test");
 
     use liveletters_protocol::{
         DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message,
@@ -548,6 +553,7 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
         DomainEventPayload::SubscriptionRequested {
             resource_address: "algebrain@example.org".into(),
             subscriber_delivery_address: "alice@example.test".into(),
+            subscriber_nickname: "Алиса".into(),
             created_at: 1_710_000_000,
         },
     )
@@ -556,7 +562,8 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
         .save_outbox_record(&liveletters_store::OutboxRecord {
             event_id: "event-sub-direct".into(),
             event_type: "subscription_requested".into(),
-            resource_id: "algebrain@example.org".into(),
+            author_email: "alice@example.test".into(),
+            resource_email: Some("algebrain@example.org".into()),
             delivery: liveletters_store::OutboxDelivery::Direct(vec![
                 "algebrain@example.org".into(),
             ]),
@@ -622,6 +629,9 @@ fn sync_pull_re_fetches_same_uid_when_imap_ignores_start_uid() {
 
     let (host, port) = spawn_fake_imap_persistent_uid(raw);
     set_mail_settings(&tmp, &host, port);
+    let store =
+        liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).expect("store");
+    save_author(&store, "blog-1");
 
     let assert1 = lltt()
         .env("LIVELETTERS_HOME", tmp.path())

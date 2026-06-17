@@ -7,6 +7,10 @@ use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
 use common::open_temp_store;
 
+fn ensure_author(store: &liveletters_store::Store, email: &str, nickname: &str) {
+    store.save_author(email, nickname, "test").unwrap();
+}
+
 fn protocol_email(event_id: &str, payload: DomainEventPayload, human_body: &str) -> ReceivedEmail {
     let (event_type, resource_id) = match &payload {
         DomainEventPayload::PostCreated { resource_id, .. } => {
@@ -55,6 +59,7 @@ fn protocol_email(event_id: &str, payload: DomainEventPayload, human_body: &str)
 #[test]
 fn valid_post_created_message_is_applied() {
     let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "blog-1", "blog");
     let engine = SyncEngine::new(&store);
 
     let report = engine
@@ -87,6 +92,7 @@ fn valid_post_created_message_is_applied() {
 #[test]
 fn duplicate_event_is_detected_without_reapplying() {
     let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "blog-1", "blog");
     let engine = SyncEngine::new(&store);
     let email_1 = protocol_email(
         "event-1",
@@ -176,11 +182,18 @@ fn comment_without_post_is_deferred() {
 #[test]
 fn replayed_post_created_is_reported_separately_from_duplicate_event_id() {
     let (store, _tmp) = open_temp_store();
+    // Создаём автора для FK.
+    store
+        .save_author("blog-1", "blog", "self")
+        .expect("save resource author");
+    store
+        .save_author("alice", "alice", "self")
+        .expect("save author");
     store
         .save_post_record(&PostRecord {
             post_id: "post-1".into(),
-            resource_id: "blog-1".into(),
-            author_id: "alice".into(),
+            resource_email: "blog-1".into(),
+            author_email: "alice".into(),
             created_at: 1,
             body: "Existing post".into(),
             visibility: "public".into(),
@@ -217,11 +230,18 @@ fn replayed_post_created_is_reported_separately_from_duplicate_event_id() {
 #[test]
 fn unauthorized_comment_edit_is_rejected() {
     let (store, _tmp) = open_temp_store();
+    // Создаём автора для FK.
+    store
+        .save_author("blog-1", "blog", "self")
+        .expect("save resource author");
+    store
+        .save_author("alice", "alice", "self")
+        .expect("save author");
     store
         .save_post_record(&PostRecord {
             post_id: "post-1".into(),
-            resource_id: "blog-1".into(),
-            author_id: "alice".into(),
+            resource_email: "blog-1".into(),
+            author_email: "alice".into(),
             created_at: 1,
             body: "Post".into(),
             visibility: "public".into(),
@@ -233,7 +253,7 @@ fn unauthorized_comment_edit_is_rejected() {
             comment_id: "comment-1".into(),
             post_id: "post-1".into(),
             parent_comment_id: None,
-            author_id: "alice".into(),
+            author_email: "alice".into(),
             created_at: 2,
             body: "Original".into(),
             visibility: "public".into(),
@@ -374,6 +394,7 @@ fn invalid_post_created_with_unknown_body_format_is_rejected() {
 #[test]
 fn deferred_events_can_be_reprocessed_after_dependencies_appear() {
     let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "blog-1", "blog");
     let engine = SyncEngine::new(&store);
 
     engine

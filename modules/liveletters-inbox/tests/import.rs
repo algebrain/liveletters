@@ -14,7 +14,8 @@ fn open_store(home: &Path) -> Store {
 }
 
 fn init_home_with_store(home: &Path) {
-    let _ = open_store(home);
+    let store = open_store(home);
+    store.save_author("blog-1", "blog", "test").unwrap();
 }
 
 #[test]

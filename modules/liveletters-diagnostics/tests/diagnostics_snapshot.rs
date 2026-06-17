@@ -86,10 +86,14 @@ fn raw_message_preview_masks_email_addresses() {
 fn outbox_entries_are_exposed_through_stable_dto() {
     let (store, _tmp) = common::open_temp_store();
     store
+        .save_author("blog-1", "blog", "test")
+        .expect("save author");
+    store
         .save_outbox_record(&OutboxRecord {
             event_id: "event-1".into(),
             event_type: "post_created".into(),
-            resource_id: "blog-1".into(),
+            author_email: "blog-1".into(),
+            resource_email: Some("blog-1".into()),
             delivery: OutboxDelivery::ResourceSubscribers,
             message_body: "{\"kind\":\"post_created\",\"actor\":\"alice@example.test\"}".into(),
             message_id: None,

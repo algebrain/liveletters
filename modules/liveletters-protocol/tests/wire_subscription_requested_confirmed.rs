@@ -27,6 +27,7 @@ fn subscription_requested_round_trip() {
     let payload = DomainEventPayload::SubscriptionRequested {
         resource_address: "alice@example.org".into(),
         subscriber_delivery_address: "bob@example.org".into(),
+        subscriber_nickname: "Борис".into(),
         created_at: 1_710_000_000,
     };
     let encoded = json_of(payload.clone());
@@ -34,6 +35,10 @@ fn subscription_requested_round_trip() {
     assert!(
         json.contains("subscription_requested"),
         "JSON должен содержать kind=subscription_requested: {json}"
+    );
+    assert!(
+        json.contains("\"subscriber_nickname\":\"Борис\""),
+        "JSON должен содержать ник подписчика: {json}"
     );
     assert!(!json.contains("acct_"), "json: {json}");
     assert!(!encoded.contains("acct_"), "encoded: {encoded}");

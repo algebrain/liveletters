@@ -108,14 +108,14 @@ fn cu_show_masks_smtp_password_in_stdout() {
     common::init_user(tmp.path(), "alice");
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
     store
-        .save_user_settings_record(&liveletters_store::UserSettingsRecord {
-            profile_id: "alice".into(),
-            nickname: "Alice".into(),
-            email_address: "https://example.com/alice/".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity(
+            "alice",
+            "alice@example.org",
+            "Alice",
+            Some("https://example.com/alice/"),
+            "ru",
+            true,
+        )
         .unwrap();
     store
         .save_mail_settings_record(&liveletters_store::MailSettingsRecord {
@@ -313,11 +313,14 @@ fn cu_posts_prints_current_users_posts_newest_first() {
         ("new-alice", "alice@example.org", 1_710_000_100),
         ("bob-post", "bob@example.org", 1_710_000_200),
     ] {
+        let resource = format!("{author_id}-blog");
+        store.save_author(&resource, &resource, "test").unwrap();
+        store.save_author(author_id, author_id, "test").unwrap();
         store
             .save_post_record(&PostRecord {
                 post_id: post_id.into(),
-                resource_id: format!("{author_id}-blog"),
-                author_id: author_id.into(),
+                resource_email: resource,
+                author_email: author_id.into(),
                 created_at,
                 body: post_id.into(),
                 visibility: "public".into(),
@@ -350,10 +353,16 @@ fn cu_posts_works_with_db_only_identity_no_toml() {
 
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
     store
+        .save_author("alice-blog", "alice-blog", "test")
+        .unwrap();
+    store
+        .save_author("alice@example.org", "alice", "test")
+        .unwrap();
+    store
         .save_post_record(&PostRecord {
             post_id: "post-1".into(),
-            resource_id: "alice-blog".into(),
-            author_id: "alice@example.org".into(),
+            resource_email: "alice-blog".into(),
+            author_email: "alice@example.org".into(),
             created_at: 1_710_000_000,
             body: "Мой пост".into(),
             visibility: "public".into(),

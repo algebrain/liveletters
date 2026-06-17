@@ -25,7 +25,7 @@ fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), PostError> {
         .get_user_settings_record(&ctx.identity_name)?
         .ok_or_else(|| PostError::IdentityNotFound(ctx.identity_name.clone()))?;
     let identity = Identity {
-        publish: user.email_address,
+        publish: user.author_email,
     };
 
     let body = read_body(args.body_file.as_deref(), &mut io::stdin().lock())

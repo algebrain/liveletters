@@ -5,7 +5,7 @@ use std::path::Path;
 use liveletters_config::{IdentityConfig, IdentityMeta, MailSettings, save_identity};
 use liveletters_i18n::detect_system_locale;
 use liveletters_output::CommandContext;
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 use tempfile::TempDir;
 
 pub struct TestHome {
@@ -35,16 +35,17 @@ impl TestHome {
         let cfg = sample_identity(name);
         save_identity(self.dir.path(), name, &cfg).expect("save identity");
         let store = Store::open_for_home_dir(self.dir.path()).expect("store opens");
+        // Атомарно: UPSERT в authors + UPSERT в user_settings (FK).
         store
-            .save_user_settings_record(&UserSettingsRecord {
-                profile_id: name.to_owned(),
-                nickname: cfg.display_name.clone(),
-                email_address: cfg.mail.publish.clone(),
-                avatar_url: None,
-                language: detect_system_locale().as_str().to_owned(),
-                setup_completed: true,
-            })
-            .expect("save user settings");
+            .save_identity(
+                name,
+                cfg.mail.publish.as_str(),
+                cfg.display_name.as_str(),
+                None,
+                detect_system_locale().as_str(),
+                true,
+            )
+            .expect("save identity record");
     }
 
     pub fn open_store(&self) -> Store {

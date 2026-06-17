@@ -10,10 +10,17 @@ use liveletters_sync::SyncEngine;
 
 mod common;
 
+fn save_flow_authors(store: &liveletters_store::Store) {
+    store.save_author("blog-1", "blog", "test").unwrap();
+    store.save_author("alice", "alice", "test").unwrap();
+    store.save_author("bob", "bob", "test").unwrap();
+}
+
 #[test]
 fn creates_post_and_exposes_it_in_current_user_posts() {
     let (store, _tmp) = common::open_temp_store();
     common::save_user(&store);
+    save_flow_authors(&store);
     let app = AppCore::new(&store);
 
     let created = app
@@ -65,6 +72,7 @@ fn creates_post_and_exposes_it_in_current_user_posts() {
 fn creates_comment_and_exposes_thread_for_post() {
     let (store, _tmp) = common::open_temp_store();
     common::save_user(&store);
+    save_flow_authors(&store);
     let app = AppCore::new(&store);
 
     app.create_post(CreatePostCommand {
@@ -161,6 +169,7 @@ fn rejects_comment_for_missing_post() {
 fn hides_post_and_keeps_hidden_state_in_current_user_posts() {
     let (store, _tmp) = common::open_temp_store();
     common::save_user(&store);
+    save_flow_authors(&store);
     let app = AppCore::new(&store);
 
     app.create_post(CreatePostCommand {
@@ -202,6 +211,7 @@ fn hides_post_and_keeps_hidden_state_in_current_user_posts() {
 fn edits_comment_and_returns_updated_thread() {
     let (store, _tmp) = common::open_temp_store();
     common::save_user(&store);
+    save_flow_authors(&store);
     let app = AppCore::new(&store);
 
     app.create_post(CreatePostCommand {
@@ -260,6 +270,7 @@ fn edits_comment_and_returns_updated_thread() {
 fn reprocesses_deferred_events_through_app_core_orchestration() {
     let (store, _tmp) = common::open_temp_store();
     common::save_user(&store);
+    save_flow_authors(&store);
     let sync = SyncEngine::new(&store);
 
     let deferred_message = ProtocolMessage::new(

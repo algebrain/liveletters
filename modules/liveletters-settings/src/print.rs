@@ -1,8 +1,14 @@
 use liveletters_config::LogConfig;
 use liveletters_output::{mask_password, print_kv};
-use liveletters_store::{MailSettingsRecord, UserSettingsRecord};
+use liveletters_store::{AuthorRecord, MailSettingsRecord, UserSettingsRecord};
 
-pub fn print_settings(user: Option<&UserSettingsRecord>, mail: Option<&MailSettingsRecord>) {
+pub fn print_settings(
+    user: Option<&UserSettingsRecord>,
+    author: Option<&AuthorRecord>,
+    mail: Option<&MailSettingsRecord>,
+) {
+    let nickname = author.map(|a| a.nickname.as_str()).unwrap_or("");
+    let email = user.map(|u| u.author_email.as_str()).unwrap_or("");
     match user {
         None => println!(
             "[user_settings] отсутствует (запустите `lltt settings set …` или `lltt init --force`)"
@@ -11,8 +17,8 @@ pub fn print_settings(user: Option<&UserSettingsRecord>, mail: Option<&MailSetti
             println!("[user_settings]");
             print_kv(&[
                 ("profile_id", &u.profile_id),
-                ("nickname", &u.nickname),
-                ("email_address", &u.email_address),
+                ("nickname", nickname),
+                ("email_address", email),
                 ("avatar_url", u.avatar_url.as_deref().unwrap_or("")),
                 ("language", &u.language),
                 ("setup_completed", &u.setup_completed.to_string()),

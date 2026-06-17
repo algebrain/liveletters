@@ -4,7 +4,7 @@ mod common;
 
 use liveletters_app_core::{AppCore, CreatePostFromIdentityCommand, Identity, Visibility};
 use liveletters_comment::{Args, CommentAction, NewArgs, run};
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 
 fn post_id_from(store: &Store) -> String {
     let posts = store.list_posts().expect("list posts");
@@ -15,14 +15,10 @@ fn post_id_from(store: &Store) -> String {
 fn make_post(home: &common::TestHome) -> String {
     let store = home.open_store();
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "alice".into(),
-            nickname: "alice".into(),
-            email_address: "alice@example.test".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("alice", "alice@example.test", "alice", None, "ru", true)
+        .unwrap();
+    store
+        .save_author("alice-publish@example.org", "alice", "test")
         .unwrap();
     let core = AppCore::new(&store);
     let ident = Identity {
@@ -63,7 +59,7 @@ fn comment_new_creates_persisted_comment_with_default_visibility() {
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].body, "Первый комментарий");
     assert_eq!(comments[0].visibility, "public");
-    assert_eq!(comments[0].author_id, "bob-publish@example.org");
+    assert_eq!(comments[0].author_email, "bob-publish@example.org");
 }
 
 #[test]

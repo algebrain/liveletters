@@ -71,8 +71,7 @@ fn print_doctor_with_handcrafted_snapshot() {
     print_doctor(&snap);
     let _ = UserSettingsRecord {
         profile_id: "default".into(),
-        nickname: String::new(),
-        email_address: String::new(),
+        author_email: String::new(),
         avatar_url: None,
         language: "ru".into(),
         setup_completed: false,

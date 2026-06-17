@@ -7,14 +7,14 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO posts
-                (post_id, resource_id, author_id, created_at, body, visibility, hidden)
+                (post_id, resource_email, author_email, created_at, body, visibility, hidden)
             VALUES
                 (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             "#,
             params![
                 post.post_id,
-                post.resource_id,
-                post.author_id,
+                post.resource_email,
+                post.author_email,
                 post.created_at as i64,
                 post.body,
                 post.visibility,
@@ -28,7 +28,7 @@ impl Store {
     pub fn list_posts(&self) -> Result<Vec<PostRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT post_id, resource_id, author_id, created_at, body, visibility, hidden
+            SELECT post_id, resource_email, author_email, created_at, body, visibility, hidden
             FROM posts
             ORDER BY created_at DESC, post_id DESC
             "#,
@@ -37,8 +37,8 @@ impl Store {
         let rows = stmt.query_map([], |row| {
             Ok(PostRecord {
                 post_id: row.get(0)?,
-                resource_id: row.get(1)?,
-                author_id: row.get(2)?,
+                resource_email: row.get(1)?,
+                author_email: row.get(2)?,
                 created_at: row.get::<_, i64>(3)? as u64,
                 body: row.get(4)?,
                 visibility: row.get(5)?,
@@ -71,7 +71,7 @@ impl Store {
     pub fn get_post_record(&self, post_id: &str) -> Result<Option<PostRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT post_id, resource_id, author_id, created_at, body, visibility, hidden
+            SELECT post_id, resource_email, author_email, created_at, body, visibility, hidden
             FROM posts
             WHERE post_id = ?1
             "#,
@@ -84,8 +84,8 @@ impl Store {
 
         Ok(Some(PostRecord {
             post_id: row.get(0)?,
-            resource_id: row.get(1)?,
-            author_id: row.get(2)?,
+            resource_email: row.get(1)?,
+            author_email: row.get(2)?,
             created_at: row.get::<_, i64>(3)? as u64,
             body: row.get(4)?,
             visibility: row.get(5)?,

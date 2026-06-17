@@ -1,4 +1,4 @@
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 
 pub fn open_temp_store() -> (Store, tempfile::TempDir) {
     let tmp = tempfile::tempdir().unwrap();
@@ -8,13 +8,6 @@ pub fn open_temp_store() -> (Store, tempfile::TempDir) {
 
 pub fn save_user(store: &Store) {
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "alice".into(),
-            email_address: "alice@example.test".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("default", "alice@example.test", "alice", None, "ru", true)
         .unwrap();
 }

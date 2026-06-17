@@ -1,7 +1,7 @@
 //! Тесты команды `create_comment` с фокусом на видимость (`public` / `friends_only`).
 
 use liveletters_app_core::{AppCore, CreateCommentCommand, CreatePostCommand, Visibility};
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 use serde_json::Value;
 use tempfile::tempdir;
 
@@ -13,14 +13,7 @@ fn open() -> (tempfile::TempDir, Store) {
 
 fn save_user(store: &Store) {
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "alice".into(),
-            email_address: "alice@example.test".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("default", "alice@example.test", "alice", None, "ru", true)
         .unwrap();
 }
 
@@ -29,8 +22,8 @@ fn setup_post(store: &Store) {
     core.create_post(CreatePostCommand {
         profile_id: "default",
         post_id: "post-1",
-        resource_id: "blog-1",
-        author_id: "alice@example.org",
+        resource_id: "alice@example.test",
+        author_id: "alice@example.test",
         created_at: 1_700_000_000,
         body: "Тело",
         visibility: Visibility::Public,
@@ -39,6 +32,9 @@ fn setup_post(store: &Store) {
 }
 
 fn create_with(store: &Store, visibility: Visibility) {
+    store
+        .save_author("bob@example.org", "bob", "test")
+        .expect("save comment author");
     let core = AppCore::new(store);
     core.create_comment(CreateCommentCommand {
         profile_id: "default",

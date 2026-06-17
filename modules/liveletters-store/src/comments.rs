@@ -5,7 +5,7 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO comments
-                (comment_id, post_id, parent_comment_id, author_id, created_at, body, visibility, hidden)
+                (comment_id, post_id, parent_comment_id, author_email, created_at, body, visibility, hidden)
             VALUES
                 (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             "#,
@@ -13,7 +13,7 @@ impl Store {
                 comment.comment_id,
                 comment.post_id,
                 comment.parent_comment_id,
-                comment.author_id,
+                comment.author_email,
                 comment.created_at as i64,
                 comment.body,
                 comment.visibility,
@@ -27,7 +27,7 @@ impl Store {
     pub fn list_comments_for_post(&self, post_id: &str) -> Result<Vec<CommentRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT comment_id, post_id, parent_comment_id, author_id, created_at, body, visibility, hidden
+            SELECT comment_id, post_id, parent_comment_id, author_email, created_at, body, visibility, hidden
             FROM comments
             WHERE post_id = ?1
             ORDER BY created_at ASC, comment_id ASC
@@ -39,7 +39,7 @@ impl Store {
                 comment_id: row.get(0)?,
                 post_id: row.get(1)?,
                 parent_comment_id: row.get(2)?,
-                author_id: row.get(3)?,
+                author_email: row.get(3)?,
                 created_at: row.get::<_, i64>(4)? as u64,
                 body: row.get(5)?,
                 visibility: row.get(6)?,
@@ -68,7 +68,7 @@ impl Store {
     ) -> Result<Option<CommentRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT comment_id, post_id, parent_comment_id, author_id, created_at, body, visibility, hidden
+            SELECT comment_id, post_id, parent_comment_id, author_email, created_at, body, visibility, hidden
             FROM comments
             WHERE comment_id = ?1
             "#,
@@ -83,7 +83,7 @@ impl Store {
             comment_id: row.get(0)?,
             post_id: row.get(1)?,
             parent_comment_id: row.get(2)?,
-            author_id: row.get(3)?,
+            author_email: row.get(3)?,
             created_at: row.get::<_, i64>(4)? as u64,
             body: row.get(5)?,
             visibility: row.get(6)?,

@@ -35,30 +35,31 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
     let mut failed = 0_usize;
 
     for record in &records {
+        let resource_id = record.resource_email.as_deref().unwrap_or("");
         match send_outbox_record(&store, &transport, &mail.smtp_username, record) {
             Ok(n) if n > 0 => {
                 store.delete_outbox_record(&record.event_id)?;
                 sent += n;
                 liveletters_log::log_info(format!(
                     "sync.push event_id={} resource_id={} sent={}",
-                    record.event_id, record.resource_id, n,
+                    record.event_id, resource_id, n,
                 ));
             }
             Ok(_) => {
                 eprintln!(
                     "предупреждение: нет адресатов для {}, outbox-запись {} оставлена",
-                    record.resource_id, record.event_id
+                    resource_id, record.event_id
                 );
                 liveletters_log::log_warn(format!(
                     "sync.push event_id={} resource_id={} recipients=0",
-                    record.event_id, record.resource_id,
+                    record.event_id, resource_id,
                 ));
             }
             Err(error) => {
                 eprintln!("ошибка отправки {}: {error}", record.event_id);
                 liveletters_log::log_error(format!(
                     "sync.push event_id={} resource_id={} error={error:?}",
-                    record.event_id, record.resource_id,
+                    record.event_id, resource_id,
                 ));
                 failed += 1;
             }
@@ -97,11 +98,14 @@ pub fn send_outbox_record(
 fn resolve_recipients(store: &Store, record: &OutboxRecord) -> Result<Vec<String>, SyncError> {
     match &record.delivery {
         OutboxDelivery::Direct(addrs) => Ok(addrs.clone()),
-        OutboxDelivery::ResourceSubscribers => Ok(store
-            .list_subscriptions_for_resource(&record.resource_id)?
-            .into_iter()
-            .map(|sub| sub.subscriber_delivery_address)
-            .collect()),
+        OutboxDelivery::ResourceSubscribers => {
+            let resource = record.resource_email.as_deref().unwrap_or("");
+            Ok(store
+                .list_subscriptions_for_resource(resource)?
+                .into_iter()
+                .map(|sub| sub.subscriber_email)
+                .collect())
+        }
     }
 }
 

@@ -68,7 +68,36 @@ pub fn run_db_field(
 
     let store = Store::open_for_home_dir(state_home)?;
     ensure_records_exist(&store, home, identity_name, key)?;
-    if is_user_field(key) {
+    if key == "nickname" {
+        let user = store
+            .get_user_settings_record(identity_name)?
+            .ok_or_else(|| {
+                SettingsError::Store(liveletters_store::StoreError::InvalidColumn(
+                    "user_settings отсутствует".to_owned(),
+                ))
+            })?;
+        store.save_author(&user.author_email, value, "self")?;
+    } else if key == "email_address" {
+        let user = store
+            .get_user_settings_record(identity_name)?
+            .ok_or_else(|| {
+                SettingsError::Store(liveletters_store::StoreError::InvalidColumn(
+                    "user_settings отсутствует".to_owned(),
+                ))
+            })?;
+        let nickname = store
+            .get_author(&user.author_email)?
+            .map(|author| author.nickname)
+            .unwrap_or_else(|| identity_name.to_owned());
+        store.save_identity(
+            identity_name,
+            value,
+            &nickname,
+            user.avatar_url.as_deref(),
+            &user.language,
+            user.setup_completed,
+        )?;
+    } else if is_user_field(key) {
         store.update_user_settings_field(identity_name, key, value)?;
     } else {
         store.update_mail_settings_field(identity_name, key, value)?;
@@ -110,10 +139,15 @@ fn ensure_records_exist(
     field_key: &str,
 ) -> Result<(), SettingsError> {
     if store.get_user_settings_record(profile_id)?.is_none() {
+        // user_settings.author_email — это FK на authors.email.
+        // Создаём placeholder-запись, чтобы удовлетворить FK.
+        // Дальнейшие команды (`lltt set nickname "Имя"` / `lltt user add`)
+        // перепишут эту запись полноценным профилем.
+        let placeholder_email = format!("{profile_id}@local.invalid");
+        store.save_author(&placeholder_email, profile_id, "self")?;
         store.save_user_settings_record(&UserSettingsRecord {
             profile_id: profile_id.into(),
-            nickname: String::new(),
-            email_address: String::new(),
+            author_email: placeholder_email,
             avatar_url: None,
             language: detect_system_locale().as_str().to_owned(),
             setup_completed: false,

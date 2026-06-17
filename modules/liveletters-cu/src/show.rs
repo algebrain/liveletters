@@ -10,6 +10,8 @@ pub fn run(
     let user = store
         .get_user_settings_record(name)?
         .ok_or_else(|| CuError::UnknownIdentity(name.to_owned()))?;
+    // Ник берём из `authors` (FK user_settings.author_email → authors.email).
+    let author = store.get_author(&user.author_email)?;
     let mail = store.get_mail_settings_record(name)?;
     let receive = store.list_receive_addresses(name)?;
     let resources = store.list_resources_owned(name)?;
@@ -17,6 +19,7 @@ pub fn run(
 
     print_identity_from_db(
         &user,
+        author.as_ref(),
         mail.as_ref(),
         &receive,
         &resources,

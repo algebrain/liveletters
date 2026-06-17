@@ -1,7 +1,7 @@
 //! Тесты команды `create_post` с фокусом на видимость (`public` / `friends_only`).
 
 use liveletters_app_core::{AppCore, CreatePostCommand, CreatePostResult, Visibility};
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 use serde_json::Value;
 use tempfile::tempdir;
 
@@ -14,14 +14,7 @@ fn open() -> (tempfile::TempDir, Store) {
 
 fn save_user(store: &Store) {
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "alice".into(),
-            email_address: "alice@example.test".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("default", "alice@example.test", "alice", None, "ru", true)
         .unwrap();
 }
 
@@ -30,8 +23,8 @@ fn create_with(store: &Store, visibility: Visibility) -> CreatePostResult {
     core.create_post(CreatePostCommand {
         profile_id: "default",
         post_id: "post-1",
-        resource_id: "blog-1",
-        author_id: "alice@example.org",
+        resource_id: "alice@example.test",
+        author_id: "alice@example.test",
         created_at: 1_700_000_000,
         body: "Привет, мир",
         visibility,
@@ -66,7 +59,7 @@ fn create_post_with_friends_only_persists_visibility() {
         .expect("тело должно быть в отдельной колонке outbox");
     assert_eq!(
         body,
-        "Новая запись в журнале blog-1:\n\nПривет, мир\n\n— LiveLetters"
+        "Новая запись в журнале alice@example.test:\n\nПривет, мир\n\n— LiveLetters"
     );
 }
 
@@ -93,8 +86,8 @@ fn create_post_fails_when_nickname_and_email_are_both_empty() {
     let result = core.create_post(CreatePostCommand {
         profile_id: "default",
         post_id: "post-1",
-        resource_id: "blog-1",
-        author_id: "alice@example.org",
+        resource_id: "alice@example.test",
+        author_id: "alice@example.test",
         created_at: 1_700_000_000,
         body: "Привет, мир",
         visibility: Visibility::Public,
@@ -109,21 +102,14 @@ fn create_post_fails_when_nickname_and_email_are_both_empty() {
 fn create_post_uses_email_when_nickname_is_empty() {
     let (_dir, store) = open();
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "default".into(),
-            nickname: "".into(),
-            email_address: "alice@example.test".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("default", "alice@example.test", "", None, "ru", true)
         .unwrap();
     let core = AppCore::new(&store);
     core.create_post(CreatePostCommand {
         profile_id: "default",
         post_id: "post-1",
-        resource_id: "blog-1",
-        author_id: "alice@example.org",
+        resource_id: "alice@example.test",
+        author_id: "alice@example.test",
         created_at: 1_700_000_000,
         body: "Привет, мир",
         visibility: Visibility::Public,

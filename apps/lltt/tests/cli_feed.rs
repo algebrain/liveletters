@@ -18,22 +18,28 @@ fn init_home(tmp: &TempDir) {
     common::init_user(tmp.path(), "alice");
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
     store
+        .save_author("alice@example.org", "alice", "test")
+        .unwrap();
+    store
         .save_resources_owned("alice", &["alice@example.org".to_owned()])
         .unwrap();
 }
 
 fn subscribe_alice_to(tmp: &TempDir, resource: &str) {
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store.save_author(resource, resource, "test").unwrap();
     store.add_local_subscription("alice", resource).unwrap();
 }
 
 fn save_post(tmp: &TempDir, post_id: &str, resource_id: &str, author_id: &str, created_at: u64) {
     let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store.save_author(resource_id, resource_id, "test").unwrap();
+    store.save_author(author_id, author_id, "test").unwrap();
     store
         .save_post_record(&PostRecord {
             post_id: post_id.into(),
-            resource_id: resource_id.into(),
-            author_id: author_id.into(),
+            resource_email: resource_id.into(),
+            author_email: author_id.into(),
             created_at,
             body: post_id.into(),
             visibility: "public".into(),
@@ -168,6 +174,12 @@ fn feed_does_not_read_posts_from_shared_home_database() {
     // subscribe austin to algebrain
     let austin_store = Store::open_for_home_dir(tmp.path().join("users/austin")).unwrap();
     austin_store
+        .save_author("algebrain@example.org", "algebrain", "test")
+        .unwrap();
+    austin_store
+        .save_author("austin@example.org", "austin", "test")
+        .unwrap();
+    austin_store
         .add_local_subscription("austin", "algebrain@example.org")
         .unwrap();
     austin_store
@@ -176,10 +188,13 @@ fn feed_does_not_read_posts_from_shared_home_database() {
 
     let shared_store = Store::open_for_home_dir(tmp.path()).unwrap();
     shared_store
+        .save_author("algebrain@example.org", "algebrain", "test")
+        .unwrap();
+    shared_store
         .save_post_record(&PostRecord {
             post_id: "shared-db-post".into(),
-            resource_id: "algebrain@example.org".into(),
-            author_id: "algebrain@example.org".into(),
+            resource_email: "algebrain@example.org".into(),
+            author_email: "algebrain@example.org".into(),
             created_at: 1_710_000_400,
             body: "shared-db-post".into(),
             visibility: "public".into(),

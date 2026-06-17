@@ -5,7 +5,7 @@ use std::path::Path;
 use liveletters_config::{IdentityConfig, IdentityMeta, MailSettings, save_identity};
 use liveletters_i18n::detect_system_locale;
 use liveletters_output::CommandContext;
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 use tempfile::TempDir;
 
 pub struct TestHome {
@@ -18,15 +18,15 @@ impl TestHome {
         std::fs::create_dir_all(dir.path().join("identities")).expect("identities dir");
         let store = Store::open_for_home_dir(dir.path()).expect("store opens");
         store
-            .save_user_settings_record(&UserSettingsRecord {
-                profile_id: "default".into(),
-                nickname: "test".into(),
-                email_address: "test@example.test".into(),
-                avatar_url: None,
-                language: detect_system_locale().as_str().to_owned(),
-                setup_completed: true,
-            })
-            .expect("save default user settings");
+            .save_identity(
+                "default",
+                "test@example.test",
+                "test",
+                None,
+                detect_system_locale().as_str(),
+                true,
+            )
+            .expect("save default identity");
         Self { dir }
     }
 
@@ -47,15 +47,15 @@ impl TestHome {
         save_identity(self.dir.path(), name, &cfg).expect("save identity");
         let store = Store::open_for_home_dir(self.dir.path()).expect("store opens");
         store
-            .save_user_settings_record(&UserSettingsRecord {
-                profile_id: name.to_owned(),
-                nickname: cfg.display_name.clone(),
-                email_address: cfg.mail.publish.clone(),
-                avatar_url: None,
-                language: detect_system_locale().as_str().to_owned(),
-                setup_completed: true,
-            })
-            .expect("save user settings");
+            .save_identity(
+                name,
+                cfg.mail.publish.as_str(),
+                cfg.display_name.as_str(),
+                None,
+                detect_system_locale().as_str(),
+                true,
+            )
+            .expect("save identity record");
     }
 
     pub fn open_store(&self) -> Store {

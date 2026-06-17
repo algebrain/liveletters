@@ -1,9 +1,9 @@
-//! Тесты `create_comment_from_identity`: автоподстановка `comment_id`, `author_id`, `created_at`.
+//! Тесты `create_comment_from_identity`: автоподстановка `comment_id`, `author_email`, `created_at`.
 
 use liveletters_app_core::{
     AppCore, CreateCommentFromIdentityCommand, CreatePostFromIdentityCommand, Identity, Visibility,
 };
-use liveletters_store::{Store, UserSettingsRecord};
+use liveletters_store::Store;
 use tempfile::tempdir;
 
 fn open() -> (tempfile::TempDir, Store) {
@@ -15,14 +15,10 @@ fn open() -> (tempfile::TempDir, Store) {
 
 fn save_user(store: &Store) {
     store
-        .save_user_settings_record(&UserSettingsRecord {
-            profile_id: "alice".into(),
-            nickname: "alice".into(),
-            email_address: "alice@example.test".into(),
-            avatar_url: None,
-            language: "ru".into(),
-            setup_completed: true,
-        })
+        .save_identity("alice", "alice@example.test", "alice", None, "ru", true)
+        .unwrap();
+    store
+        .save_author("alice-publish@example.org", "alice", "test")
         .unwrap();
 }
 
@@ -68,7 +64,7 @@ fn create_comment_from_identity_derives_fields_and_persists_comment() {
         .get_comment_record(comment.id().as_str())
         .unwrap()
         .expect("comment must be persisted");
-    assert_eq!(record.author_id, "alice-publish@example.org");
+    assert_eq!(record.author_email, "alice-publish@example.org");
     assert_eq!(record.visibility, "friends_only");
     assert_eq!(record.post_id, post.post().id().as_str());
 }
