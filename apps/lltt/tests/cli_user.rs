@@ -325,3 +325,41 @@ mailbox = "INBOX"
         .failure()
         .stderr(contains("publish"));
 }
+
+#[test]
+fn user_add_warns_and_skips_self_subscription() {
+    let tmp = TempDir::new().unwrap();
+    init_home(&tmp);
+    let source = tmp.path().join("alice.toml");
+    fs::write(
+        &source,
+        r#"
+display_name = "Алиса"
+
+[mail]
+publish = "alice@example.org"
+receive = ["alice@example.org"]
+
+[meta]
+subscriptions = ["alice@example.org", "external-blog@example.org"]
+"#,
+    )
+    .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["user", "add", "alice", "--from"])
+        .arg(&source)
+        .assert()
+        .success()
+        .stderr(contains("alice@example.org"));
+
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    let mut subs = store.list_local_subscriptions("alice").unwrap();
+    subs.sort();
+    assert_eq!(
+        subs,
+        vec!["external-blog@example.org".to_owned()],
+        "собственный адрес должен быть пропущен, внешний — записан"
+    );
+}

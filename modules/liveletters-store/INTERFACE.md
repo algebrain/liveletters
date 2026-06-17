@@ -320,14 +320,30 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 - `email` — почтовый адрес, первичный ключ
 - `nickname` — отображаемое имя
-- `source` — откуда пришла запись (`"self"`, `"subscription_requested"`,
-  `"subscription_confirmed"`, `"test"`)
+- `source` — откуда пришла запись (`"self"`, `"origin"`,
+  `"subscription_requested"`, `"subscription_confirmed"`, `"test"`)
 - `first_seen_at`
 - `updated_at`
 
 На `authors.email` ссылаются настройки профиля, подписки, посты,
 комментарии, исходящая очередь и записи о недоставке. Ник и почтовый адрес
 пользователя хранятся здесь, а не отдельными полями `user_settings`.
+
+Допустимые значения `source`:
+
+- `self` — запись создана как локальная идентичность (`lltt user add` →
+  `save_identity`).
+- `origin` — адрес предзаписан из черновика `IdentityConfig.meta` до
+  прихода протокольного события. Ник берётся из локальной части e-mail
+  (то, что до `@`). При получении конкретного события
+  (`SubscriptionConfirmed`, `PostCreated`, `CommentCreated`) запись
+  обновляется через `save_author` (UPSERT по `email`): ник и `source`
+  переписываются на более точные.
+- `subscription_requested` — запись создана на стороне владельца ресурса
+  при обработке `SubscriptionRequested` от подписчика.
+- `subscription_confirmed` — запись создана на стороне подписчика при
+  обработке `SubscriptionConfirmed` от владельца.
+- `test` — служебное значение для тестов крейта.
 
 ### `UserSettingsRecord`
 

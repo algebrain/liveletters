@@ -124,6 +124,130 @@ fn add_action_errors_on_missing_source() {
 }
 
 #[test]
+fn add_action_succeeds_when_subscription_targets_unknown_author() {
+    let home = common::TestHome::new();
+    let from = home.path().join("source.toml");
+    fs::write(
+        &from,
+        r#"
+display_name = "Austin"
+
+[mail]
+publish = "austinbreze@yandex.ru"
+receive = ["austinbreze@yandex.ru"]
+
+[meta]
+resources_owned = ["austinbreze@yandex.ru"]
+subscriptions = ["external-blog@example.org"]
+"#,
+    )
+    .unwrap();
+    let ctx = home.ctx("default");
+    run_user(
+        &ctx,
+        &tokens(&["add", "austin", "--from", from.to_str().unwrap()]),
+    )
+    .expect("add должен пройти, даже если в meta.subscriptions есть чужой e-mail");
+
+    let store =
+        liveletters_store::Store::open_for_home_dir(home.path().join("users/austin")).unwrap();
+    assert!(
+        store.get_user_settings_record("austin").unwrap().is_some(),
+        "user_settings должна быть записана"
+    );
+    assert!(
+        store.get_author("austinbreze@yandex.ru").unwrap().is_some(),
+        "автор austinbreze@yandex.ru должен быть в authors"
+    );
+    assert_eq!(
+        store.list_local_subscriptions("austin").unwrap(),
+        vec!["external-blog@example.org".to_owned()],
+        "local_subscriptions должны быть записаны целиком"
+    );
+}
+
+#[test]
+fn add_action_succeeds_when_resources_owned_references_other_email() {
+    let home = common::TestHome::new();
+    let from = home.path().join("source.toml");
+    fs::write(
+        &from,
+        r#"
+display_name = "Austin"
+
+[mail]
+publish = "austinbreze@yandex.ru"
+receive = ["austinbreze@yandex.ru"]
+
+[meta]
+resources_owned = ["austinbreze@yandex.ru", "other-blog@example.org"]
+"#,
+    )
+    .unwrap();
+    let ctx = home.ctx("default");
+    run_user(
+        &ctx,
+        &tokens(&["add", "austin", "--from", from.to_str().unwrap()]),
+    )
+    .expect("add должен пройти, даже если в meta.resources_owned есть чужой e-mail");
+
+    let store =
+        liveletters_store::Store::open_for_home_dir(home.path().join("users/austin")).unwrap();
+    let mut resources = store.list_resources_owned("austin").unwrap();
+    resources.sort();
+    assert_eq!(
+        resources,
+        vec![
+            "austinbreze@yandex.ru".to_owned(),
+            "other-blog@example.org".to_owned(),
+        ],
+        "resources_owned должны быть записаны целиком"
+    );
+    assert!(
+        store
+            .get_author("other-blog@example.org")
+            .unwrap()
+            .is_some(),
+        "автор other-blog@example.org должен быть предзаписан в authors"
+    );
+}
+
+#[test]
+fn add_action_warns_and_skips_self_subscription() {
+    let home = common::TestHome::new();
+    let from = home.path().join("source.toml");
+    fs::write(
+        &from,
+        r#"
+display_name = "Austin"
+
+[mail]
+publish = "austinbreze@yandex.ru"
+receive = ["austinbreze@yandex.ru"]
+
+[meta]
+subscriptions = ["austinbreze@yandex.ru", "external-blog@example.org"]
+"#,
+    )
+    .unwrap();
+    let ctx = home.ctx("default");
+    run_user(
+        &ctx,
+        &tokens(&["add", "austin", "--from", from.to_str().unwrap()]),
+    )
+    .expect("add не должен падать, когда в подписках есть собственный адрес");
+
+    let store =
+        liveletters_store::Store::open_for_home_dir(home.path().join("users/austin")).unwrap();
+    let subs = store.list_local_subscriptions("austin").unwrap();
+    assert_eq!(
+        subs,
+        vec!["external-blog@example.org".to_owned()],
+        "собственный адрес должен быть пропущен, внешний — записан"
+    );
+}
+
+#[test]
 fn rm_action_errors_without_yes() {
     let home = common::TestHome::new();
     home.add_identity("alice");

@@ -101,6 +101,35 @@ fn save_identity_to_db(store: &Store, name: &str, cfg: &IdentityConfig) -> Resul
     }
 
     store.save_receive_addresses(name, &cfg.mail.receive)?;
+
+    // Предзапись внешних адресов в `authors` до того, как таблицы
+    // `resources_owned` и `local_subscriptions` начнут на них ссылаться
+    // (FK → authors.email). Адрес самого пользователя (`mail.publish`)
+    // уже в `authors` (source = "self"), здесь он пропускается.
+    let own = cfg.mail.publish.as_str();
+    let mut pending: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    for r in &cfg.meta.resources_owned {
+        let s = r.as_str();
+        if s != own {
+            pending.insert(s);
+        }
+    }
+    for s in &cfg.meta.subscriptions {
+        let addr = s.as_str();
+        if addr != own {
+            pending.insert(addr);
+        } else {
+            eprintln!(
+                "предупреждение: адрес «{addr}» в meta.subscriptions — это ваш собственный; \
+                 нельзя быть подписанным на самого себя, запись пропущена"
+            );
+        }
+    }
+    for addr in &pending {
+        let nickname = addr.split('@').next().unwrap_or(addr);
+        store.save_author(addr, nickname, "origin")?;
+    }
+
     store.save_resources_owned(
         name,
         &cfg.meta
@@ -109,13 +138,14 @@ fn save_identity_to_db(store: &Store, name: &str, cfg: &IdentityConfig) -> Resul
             .map(|r| r.as_str().to_owned())
             .collect::<Vec<_>>(),
     )?;
-    store.save_local_subscriptions(
-        name,
-        &cfg.meta
-            .subscriptions
-            .iter()
-            .map(|r| r.as_str().to_owned())
-            .collect::<Vec<_>>(),
-    )?;
+    let subscriptions_filtered: Vec<String> = cfg
+        .meta
+        .subscriptions
+        .iter()
+        .map(|r| r.as_str())
+        .filter(|r| *r != own)
+        .map(str::to_owned)
+        .collect();
+    store.save_local_subscriptions(name, &subscriptions_filtered)?;
     Ok(())
 }

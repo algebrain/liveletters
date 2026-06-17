@@ -103,6 +103,23 @@ subscriptions = []
 полагаться на то, что `UserSettingsRecord.email_address` и
 `UserSettingsRecord.nickname` всегда непустые.
 
+## Согласованность `authors` с `meta`
+
+Все внешние e-mail из черновика — адреса из `meta.resources_owned`
+(кроме самого `mail.publish`) и адреса из `meta.subscriptions` (кроме
+самого `mail.publish`) — предзаписываются в `authors` со
+значением `source = "origin"` и ником из локальной части e-mail **до**
+того, как таблицы `resources_owned` и `local_subscriptions` начнут на
+них ссылаться. Это снимает требование `FOREIGN KEY → authors(email)`
+на стороне черновика: после успешного `lltt user add` все ссылки в
+`resources_owned` и `local_subscriptions` указывают на существующие
+записи в `authors`.
+
+Если в `meta.subscriptions` встречается `mail.publish` (собственный
+адрес), команда печатает предупреждение в `stderr` и пропускает такую
+запись. Сам факт наличия собственного адреса в подписках считается
+ошибкой пользователя: нельзя быть подписанным на самого себя.
+
 ## Пароли
 
 При `lltt user add` пароль скрывается только если выполнены все условия:
