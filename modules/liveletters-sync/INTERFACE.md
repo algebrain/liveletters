@@ -439,6 +439,32 @@
 - backend app;
 - sync-тестах и диагностическом контуре.
 
+## Идемпотентность протокольных событий
+
+Повторное применение события с **новым** `event_id`, но **тем же**
+логическим ключом обязано оставлять материальное состояние БД
+неизменным. Покрыто поведенческими тестами в `tests/idempotency.rs`:
+
+- `PostCreated` — `Replay("post_already_exists")`. Тест:
+  `replayed_post_created_is_reported_separately_from_duplicate_event_id`
+  в `tests/sync_ingest.rs`.
+- `CommentCreated` — `Replay("comment_already_exists")`. Тест:
+  `comment_created_replay_does_not_change_db`.
+- `PostHidden` — `Replay("post_already_hidden")`. Тест:
+  `post_hidden_replay_does_not_change_db`.
+- `CommentEdited` — `Replay("comment_edit_already_applied")` (если
+  `body` и `visibility` не изменились). Тест:
+  `comment_edited_replay_does_not_change_db`.
+- `SubscriptionRequested` — UPSERT в `subscriptions` идемпотентен;
+  в `outbox` допустимо две записи `SubscriptionConfirmed` (сознательно,
+  см. `.plans/260617-205718-sync-event-idempotency-tests.md`). Тест:
+  `subscription_requested_replay_keeps_subscriptions_table_stable`.
+- `SubscriptionConfirmed` (accepted) — повтор после `accept_pending`
+  без `pending` тихо игнорируется и возвращает `Applied` без эффекта.
+  Тест: `subscription_confirmed_accepted_replay_does_not_change_db`.
+- `SubscriptionRevoked` — `delete_subscription` идемпотентен. Тест:
+  `subscription_revoked_replay_does_not_change_db`.
+
 ## Связанные документы
 
 - [TECHNICAL_SPEC.md](./TECHNICAL_SPEC.md)
