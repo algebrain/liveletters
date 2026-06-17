@@ -1,4 +1,5 @@
 use crate::{DomainEventPayload, MessageEnvelope, ProtocolError, ProtocolIdentity};
+use liveletters_utils::text::require_non_blank;
 use serde::{Deserialize, Serialize};
 
 /// Полное техническое сообщение LiveLetters.
@@ -43,10 +44,9 @@ impl ProtocolMessage {
         human_readable_body: &str,
         payload: DomainEventPayload,
     ) -> Result<Self, ProtocolError> {
+        require_non_blank(human_readable_body, "human_readable_body")
+            .map_err(|_| ProtocolError::BlankHumanReadableBody)?;
         let trimmed = human_readable_body.trim();
-        if trimmed.is_empty() {
-            return Err(ProtocolError::BlankHumanReadableBody);
-        }
 
         let source = source.filter(|source| source != &origin);
         Ok(Self {

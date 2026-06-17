@@ -1,4 +1,5 @@
 use crate::DomainError;
+use liveletters_utils::text::require_non_blank;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PostBody(String);
@@ -10,12 +11,8 @@ pub struct CommentBody(String);
 pub struct Timestamp(u64);
 
 fn require_non_blank_body(value: &str, field: &'static str) -> Result<String, DomainError> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(DomainError::BlankBody(field));
-    }
-
-    Ok(trimmed.to_owned())
+    require_non_blank(value, field).map_err(|_| DomainError::BlankBody(field))?;
+    Ok(value.trim().to_owned())
 }
 
 impl PostBody {

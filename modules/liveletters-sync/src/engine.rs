@@ -9,6 +9,7 @@ use liveletters_store::{
     BounceRecord, CommentRecord, DeferredEventRecord, OutboxDelivery, OutboxRecord, PostRecord,
     RawEventRecord, RawMessageRecord, Store, StoreError, SubscriptionRecord,
 };
+use liveletters_utils::{email::looks_like_email, time::unix_now};
 
 use crate::{SyncError, SyncMessageOutcome, SyncReport};
 
@@ -487,10 +488,7 @@ impl<'a> SyncEngine<'a> {
                 final_recipient_email: Some(bounce.final_recipient.clone()),
                 status_code: Some(bounce.status.clone()),
                 diagnostic_code: Some(bounce.diagnostic_code.clone()),
-                received_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0),
+                received_at: unix_now(),
             })
             .map_err(SyncError::Store)?;
 
@@ -789,10 +787,15 @@ impl<'a> SyncEngine<'a> {
 
         let owner_nickname = author.nickname.clone();
         let owner_email = author.email.clone();
-        let domain = owner_email
-            .split_once('@')
-            .map(|(_, d)| d.to_owned())
-            .unwrap_or_else(|| "liveletters.invalid".to_owned());
+        let domain = if looks_like_email(&owner_email) {
+            owner_email
+                .trim()
+                .split_once('@')
+                .map(|(_, domain)| domain.to_owned())
+                .unwrap_or_else(|| "liveletters.invalid".to_owned())
+        } else {
+            "liveletters.invalid".to_owned()
+        };
 
         let event_id_str = format!(
             "subscription-confirmed:{}:{}:{}",
@@ -802,10 +805,7 @@ impl<'a> SyncEngine<'a> {
         );
         let event_id = liveletters_domain::EventId::new(&event_id_str)
             .map_err(|e| ApplyEventError::Invalid(format!("event_id: {e:?}")))?;
-        let created_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let created_at = unix_now();
 
         // Локализованный subject/body на языке A.
         let locale = parse_locale(&user.language).unwrap_or_else(|_| detect_system_locale());

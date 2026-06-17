@@ -3,6 +3,8 @@ use std::fmt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use thiserror::Error;
 
+use crate::{email::looks_like_email, text::require_non_blank};
+
 /// Человек и его почтовый адрес в строковом формате протокола:
 /// `Nickname <email@example.org>`.
 ///
@@ -113,27 +115,13 @@ fn normalize_part(value: String) -> String {
 }
 
 fn validate_nickname(value: &str) -> Result<(), ProtocolIdentityError> {
-    if value.is_empty() {
-        return Err(ProtocolIdentityError::BlankNickname);
-    }
+    require_non_blank(value, "nickname").map_err(|_| ProtocolIdentityError::BlankNickname)?;
     Ok(())
 }
 
 fn validate_email(value: &str) -> Result<(), ProtocolIdentityError> {
-    if value.is_empty() {
-        return Err(ProtocolIdentityError::BlankEmail);
-    }
-    if value.chars().any(char::is_whitespace) || value.contains('<') || value.contains('>') {
-        return Err(ProtocolIdentityError::InvalidEmail {
-            email: value.to_owned(),
-        });
-    }
-    let Some((local, domain)) = value.split_once('@') else {
-        return Err(ProtocolIdentityError::InvalidEmail {
-            email: value.to_owned(),
-        });
-    };
-    if local.is_empty() || domain.is_empty() || domain.contains('@') {
+    require_non_blank(value, "email").map_err(|_| ProtocolIdentityError::BlankEmail)?;
+    if value.contains('<') || value.contains('>') || !looks_like_email(value) {
         return Err(ProtocolIdentityError::InvalidEmail {
             email: value.to_owned(),
         });

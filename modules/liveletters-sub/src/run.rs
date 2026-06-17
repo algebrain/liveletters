@@ -1,4 +1,5 @@
 use liveletters_store::Store;
+use liveletters_utils::time::unix_now;
 
 use crate::{Args, SubError, args::SubAction};
 
@@ -9,10 +10,7 @@ pub fn subscribe(
 ) -> Result<(), SubError> {
     let delivery_address = delivery_address_for(store, &ctx.identity_name)?;
 
-    let created_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let created_at = unix_now();
 
     let core = liveletters_app_core::AppCore::new(store);
     core.subscribe(liveletters_app_core::SubscribeCommand {
@@ -35,10 +33,7 @@ pub fn unsubscribe(
     resource_address: &str,
 ) -> Result<(), SubError> {
     let delivery_address = delivery_address_for(store, &ctx.identity_name)?;
-    let created_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let created_at = unix_now();
 
     let core = liveletters_app_core::AppCore::new(store);
     let _ = core.unsubscribe(liveletters_app_core::UnsubscribeCommand {

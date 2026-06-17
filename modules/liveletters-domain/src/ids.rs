@@ -1,4 +1,5 @@
 use crate::DomainError;
+use liveletters_utils::text::require_non_blank;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PostId(String);
@@ -15,18 +16,14 @@ pub struct AccountId(String);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EventId(String);
 
-fn require_non_blank(value: &str, field: &'static str) -> Result<String, DomainError> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(DomainError::BlankIdentifier(field));
-    }
-
-    Ok(trimmed.to_owned())
+fn require_identifier(value: &str, field: &'static str) -> Result<String, DomainError> {
+    require_non_blank(value, field).map_err(|_| DomainError::BlankIdentifier(field))?;
+    Ok(value.trim().to_owned())
 }
 
 impl PostId {
     pub fn new(value: &str) -> Result<Self, DomainError> {
-        Ok(Self(require_non_blank(value, "post_id")?))
+        Ok(Self(require_identifier(value, "post_id")?))
     }
 
     pub fn as_str(&self) -> &str {
@@ -36,7 +33,7 @@ impl PostId {
 
 impl CommentId {
     pub fn new(value: &str) -> Result<Self, DomainError> {
-        Ok(Self(require_non_blank(value, "comment_id")?))
+        Ok(Self(require_identifier(value, "comment_id")?))
     }
 
     pub fn as_str(&self) -> &str {
@@ -46,7 +43,7 @@ impl CommentId {
 
 impl ResourceId {
     pub fn new(value: &str) -> Result<Self, DomainError> {
-        Ok(Self(require_non_blank(value, "resource_id")?))
+        Ok(Self(require_identifier(value, "resource_id")?))
     }
 
     pub fn as_str(&self) -> &str {
@@ -56,7 +53,7 @@ impl ResourceId {
 
 impl AccountId {
     pub fn new(value: &str) -> Result<Self, DomainError> {
-        Ok(Self(require_non_blank(value, "account_id")?))
+        Ok(Self(require_identifier(value, "account_id")?))
     }
 
     pub fn as_str(&self) -> &str {
@@ -66,7 +63,7 @@ impl AccountId {
 
 impl EventId {
     pub fn new(value: &str) -> Result<Self, DomainError> {
-        Ok(Self(require_non_blank(value, "event_id")?))
+        Ok(Self(require_identifier(value, "event_id")?))
     }
 
     pub fn as_str(&self) -> &str {

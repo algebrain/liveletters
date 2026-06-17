@@ -12,6 +12,10 @@ use liveletters_store::{
     UserSettingsRecord,
 };
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
+use liveletters_utils::{
+    email::{email_local_part, looks_like_email},
+    text::require_non_blank,
+};
 
 use crate::{
     AppCoreError, AppSettings, DeferredReprocessingSummary, new_comment_id, new_post_id,
@@ -736,8 +740,7 @@ fn display_author(
         })?;
     if author.nickname.is_empty() {
         // Фоллбэк: локальная часть e-mail до @.
-        let local = author.email.split('@').next().unwrap_or("").trim();
-        if !local.is_empty() {
+        if let Some(local) = email_local_part(&author.email) {
             return Ok(local.to_owned());
         }
         return Err(AppCoreError::ProfileIncomplete(format!(
@@ -799,12 +802,10 @@ fn default_profile_id() -> &'static str {
 }
 
 fn validate_non_blank(field: &str, value: &str) -> Result<(), AppCoreError> {
-    if value.trim().is_empty() {
-        return Err(AppCoreError::SettingsValidation {
-            field: field.to_owned(),
-            message: "must not be blank".to_owned(),
-        });
-    }
+    require_non_blank(value, "settings").map_err(|_| AppCoreError::SettingsValidation {
+        field: field.to_owned(),
+        message: "must not be blank".to_owned(),
+    })?;
 
     Ok(())
 }
@@ -819,7 +820,7 @@ fn validate_email(value: &str) -> Result<(), AppCoreError> {
         });
     }
 
-    if !trimmed.contains('@') {
+    if !looks_like_email(value) {
         return Err(AppCoreError::SettingsValidation {
             field: "email_address".to_owned(),
             message: "must contain @".to_owned(),

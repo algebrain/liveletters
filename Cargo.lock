@@ -557,6 +557,7 @@ dependencies = [
  "liveletters-protocol",
  "liveletters-store",
  "liveletters-sync",
+ "liveletters-utils",
  "serde_json",
  "tempfile",
  "uuid",
@@ -620,6 +621,7 @@ name = "liveletters-diagnostics"
 version = "0.1.0"
 dependencies = [
  "liveletters-store",
+ "liveletters-utils",
  "tempfile",
 ]
 
@@ -639,6 +641,7 @@ dependencies = [
 name = "liveletters-domain"
 version = "0.1.0"
 dependencies = [
+ "liveletters-utils",
  "serde",
 ]
 
@@ -720,6 +723,7 @@ dependencies = [
  "liveletters-log",
  "liveletters-mime",
  "liveletters-protocol",
+ "liveletters-utils",
  "native-tls",
 ]
 
@@ -830,6 +834,7 @@ name = "liveletters-store"
 version = "0.1.0"
 dependencies = [
  "liveletters-secret-box",
+ "liveletters-utils",
  "rusqlite",
  "tempfile",
  "thiserror",
@@ -846,6 +851,7 @@ dependencies = [
  "liveletters-i18n",
  "liveletters-output",
  "liveletters-store",
+ "liveletters-utils",
  "tempfile",
  "thiserror",
  "toml",
@@ -862,6 +868,7 @@ dependencies = [
  "liveletters-mail",
  "liveletters-protocol",
  "liveletters-store",
+ "liveletters-utils",
  "serde_json",
  "tempfile",
 ]

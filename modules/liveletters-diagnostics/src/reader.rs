@@ -1,4 +1,5 @@
 use liveletters_store::Store;
+use liveletters_utils::email::looks_like_email;
 
 use crate::{
     DeferredEventDiagnostic, DiagnosticsError, DiagnosticsSnapshot, HealthStatus, OutboxDiagnostic,
@@ -121,7 +122,8 @@ fn sanitize_preview(value: &str) -> String {
 
 fn mask_email_token(token: &str) -> String {
     let normalized = token.trim_matches(|c: char| matches!(c, '"' | '\'' | ',' | ';'));
-    if let Some((_, domain)) = normalized.split_once('@')
+    if looks_like_email(normalized)
+        && let Some((_, domain)) = normalized.split_once('@')
         && domain.contains('.')
     {
         let masked = format!("***@{domain}");

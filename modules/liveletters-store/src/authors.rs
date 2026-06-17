@@ -1,14 +1,12 @@
 use rusqlite::params;
 
 use crate::{AuthorRecord, Store, StoreError};
+use liveletters_utils::time::unix_now;
 
 impl Store {
     /// UPSERT в `authors`. Сохраняет `first_seen_at` при обновлении.
     pub fn save_author(&self, email: &str, nickname: &str, source: &str) -> Result<(), StoreError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = unix_now();
         self.connection().execute(
             r#"
             INSERT INTO authors (email, nickname, source, first_seen_at, updated_at)

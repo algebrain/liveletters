@@ -9,6 +9,7 @@ path = "src/lib.rs"
 
 [dependencies]
 liveletters-store = { path = "../liveletters-store" }
+liveletters-utils = { path = "../liveletters-utils" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

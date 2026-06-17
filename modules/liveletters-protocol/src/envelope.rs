@@ -1,4 +1,5 @@
 use crate::ProtocolError;
+use liveletters_utils::text::require_non_blank as require_text_non_blank;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -10,12 +11,8 @@ pub struct MessageEnvelope {
 }
 
 fn require_non_blank(value: &str, field: &'static str) -> Result<String, ProtocolError> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Err(ProtocolError::BlankEnvelopeField(field));
-    }
-
-    Ok(trimmed.to_owned())
+    require_text_non_blank(value, field).map_err(|_| ProtocolError::BlankEnvelopeField(field))?;
+    Ok(value.trim().to_owned())
 }
 
 impl MessageEnvelope {

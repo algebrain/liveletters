@@ -9,6 +9,7 @@ path = "src/lib.rs"
 
 [dependencies]
 liveletters-secret-box = { path = "../liveletters-secret-box" }
+liveletters-utils = { path = "../liveletters-utils" }
 rusqlite = { workspace = true }
 thiserror = { workspace = true }
 

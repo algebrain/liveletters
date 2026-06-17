@@ -15,6 +15,7 @@ liveletters-log = { path = "../liveletters-log" }
 liveletters-mail = { path = "../liveletters-mail" }
 liveletters-protocol = { path = "../liveletters-protocol" }
 liveletters-store = { path = "../liveletters-store" }
+liveletters-utils = { path = "../liveletters-utils" }
 serde_json = { workspace = true }
 
 [dev-dependencies]

@@ -3,6 +3,8 @@ use std::net::TcpStream;
 
 use native_tls::{TlsConnector, TlsStream};
 
+use liveletters_utils::time::unix_now;
+
 use crate::{
     FetchBatch, ImapMailboxConfig, MailAuth, MailSecurity, MailboxCursor, ReceivedEmail,
     TransportError,
@@ -165,11 +167,7 @@ fn since_date_for_today_minus(days: u32) -> String {
     // IMAP "DD-Mon-YYYY" (например, "09-Jun-2026") через стандартную
     // библиотеку. Поддерживаем максимум ~135 лет (i64 секунд), этого
     // хватит для любого разумного `days`.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
+    let now = unix_now() as i64;
     let secs_in_day: i64 = 86_400;
     let target = now - (days as i64) * secs_in_day;
     let days_since_epoch = target / secs_in_day;

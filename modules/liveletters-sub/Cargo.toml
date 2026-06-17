@@ -13,6 +13,7 @@ liveletters-config = { path = "../liveletters-config" }
 liveletters-domain = { path = "../liveletters-domain" }
 liveletters-output = { path = "../liveletters-output" }
 liveletters-store = { path = "../liveletters-store" }
+liveletters-utils = { path = "../liveletters-utils" }
 clap = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 toml = { workspace = true }
