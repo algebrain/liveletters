@@ -37,6 +37,7 @@ Content-Disposition: attachment; filename="liveletters.json"
     "event_id": "event-1"
   },
   "human_readable_body": "Test body",
+  "origin": "Alice <alice@example.test>",
   "payload": {
     "kind": "post_created",
     "post_id": "post-1",

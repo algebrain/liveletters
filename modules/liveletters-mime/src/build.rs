@@ -68,6 +68,7 @@ fn format_protocol_error(error: ProtocolError) -> String {
     match error {
         ProtocolError::BlankEnvelopeField(field) => format!("blank envelope field: {field}"),
         ProtocolError::BlankHumanReadableBody => "blank human readable body".to_owned(),
+        ProtocolError::InvalidIdentity(message) => format!("invalid identity: {message}"),
         ProtocolError::MalformedJson(message) => format!("malformed json: {message}"),
     }
 }

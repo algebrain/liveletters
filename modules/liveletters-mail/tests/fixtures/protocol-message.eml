@@ -20,6 +20,7 @@ Content-Disposition: attachment; filename="liveletters.json"
     "event_id": "event-2"
   },
   "human_readable_body": "Новый комментарий",
+  "origin": "Alice <alice@example.test>",
   "payload": {
     "kind": "comment_created",
     "comment_id": "comment-1",
@@ -28,6 +29,8 @@ Content-Disposition: attachment; filename="liveletters.json"
     "resource_id": "blog-1",
     "actor_id": "alice",
     "created_at": 1710000100,
+    "body": "Новый комментарий",
+    "body_format": "plain",
     "visibility": "public"
   }
 }

@@ -14,6 +14,7 @@ use std::thread;
 use std::time::Duration;
 
 use assert_cmd::prelude::*;
+use liveletters_protocol::ProtocolIdentity;
 use tempfile::TempDir;
 
 mod common;
@@ -51,6 +52,10 @@ fn save_subscription_fixture(store: &liveletters_store::Store, resource: &str, s
             subscriber_email: subscriber.into(),
         })
         .expect("save sub");
+}
+
+fn origin(nickname: &str, email: &str) -> ProtocolIdentity {
+    ProtocolIdentity::new(nickname.to_owned(), email.to_owned()).unwrap()
 }
 
 fn set_split_mail_settings(
@@ -297,6 +302,8 @@ fn sync_without_subcommand_runs_pull_then_push() {
 
     let incoming = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-pull-all").unwrap(),
+        origin("Alice", "alice@example.test"),
+        None,
         "Привет из полного sync",
         DomainEventPayload::PostCreated {
             post_id: "post-pull-all".into(),
@@ -332,6 +339,8 @@ fn sync_without_subcommand_runs_pull_then_push() {
 
     let outgoing = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-push-all").unwrap(),
+        origin("Alice", "alice@example.test"),
+        None,
         "Тело",
         DomainEventPayload::PostCreated {
             post_id: "post-push-all".into(),
@@ -400,6 +409,8 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
     };
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-push-1").unwrap(),
+        origin("Alice", "alice@example.test"),
+        None,
         "Тело",
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
@@ -464,6 +475,8 @@ fn sync_pull_advances_cursor_idempotently() {
 
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-pull-1").unwrap(),
+        origin("Alice", "alice@example.test"),
+        None,
         "Привет из IMAP",
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
@@ -549,11 +562,12 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
             "event-sub-direct",
         )
         .unwrap(),
+        origin("Алиса", "alice@example.test"),
+        None,
         "Запрос подписки",
         DomainEventPayload::SubscriptionRequested {
             resource_address: "algebrain@example.org".into(),
             subscriber_delivery_address: "alice@example.test".into(),
-            subscriber_nickname: "Алиса".into(),
             created_at: 1_710_000_000,
         },
     )
@@ -603,6 +617,8 @@ fn sync_pull_re_fetches_same_uid_when_imap_ignores_start_uid() {
 
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-pull-2").unwrap(),
+        origin("Alice", "alice@example.test"),
+        None,
         "Привет из IMAP",
         DomainEventPayload::PostCreated {
             post_id: "post-2".into(),

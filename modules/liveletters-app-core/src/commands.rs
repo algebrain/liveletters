@@ -3,7 +3,10 @@ use liveletters_domain::{
     CommentId, DomainError, EventId, Post, PostBody, PostCreated, PostHidden, PostId,
     ResourceAddress, ResourceId, Timestamp, Visibility,
 };
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolError, ProtocolIdentity, ProtocolMessage,
+    encode_message,
+};
 use liveletters_store::{
     CommentRecord, MailSettingsRecord, OutboxDelivery, OutboxRecord, PostRecord, Store,
     UserSettingsRecord,
@@ -220,6 +223,7 @@ pub fn create_post(
 
     let record = store.get_user_settings_record(command.profile_id)?;
     let author_name = display_author(store, record.as_ref())?;
+    let origin = protocol_origin(store, record.as_ref())?;
 
     let i18n = post_created(
         record.as_ref(),
@@ -242,6 +246,8 @@ pub fn create_post(
                 post.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
+            origin,
+            None,
             &i18n.body,
             DomainEventPayload::PostCreated {
                 post_id: post.id().as_str().to_owned(),
@@ -316,6 +322,7 @@ pub fn create_comment(
 
     let record = store.get_user_settings_record(command.profile_id)?;
     let author_name = display_author(store, record.as_ref())?;
+    let origin = protocol_origin(store, record.as_ref())?;
 
     let i18n = comment_created(
         record.as_ref(),
@@ -345,6 +352,8 @@ pub fn create_comment(
                 event.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
+            origin,
+            None,
             &i18n.body,
             DomainEventPayload::CommentCreated {
                 comment_id: comment.id().as_str().to_owned(),
@@ -450,6 +459,7 @@ pub fn hide_post(
 
     let record = store.get_user_settings_record(command.profile_id)?;
     let author_name = display_author(store, record.as_ref())?;
+    let origin = protocol_origin(store, record.as_ref())?;
 
     let i18n = post_hidden(record.as_ref(), &author_name, event.post_id().as_str());
 
@@ -468,6 +478,8 @@ pub fn hide_post(
                 event.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
+            origin,
+            None,
             &i18n.body,
             DomainEventPayload::PostHidden {
                 post_id: event.post_id().as_str().to_owned(),
@@ -539,6 +551,7 @@ pub fn edit_comment(
 
     let record = store.get_user_settings_record(command.profile_id)?;
     let author_name = display_author(store, record.as_ref())?;
+    let origin = protocol_origin(store, record.as_ref())?;
 
     let i18n = comment_edited(
         record.as_ref(),
@@ -562,6 +575,8 @@ pub fn edit_comment(
                 event.resource_id().as_str(),
                 event.event_id().as_str(),
             )?,
+            origin,
+            None,
             &i18n.body,
             DomainEventPayload::CommentEdited {
                 comment_id: event.comment_id().as_str().to_owned(),
@@ -731,6 +746,33 @@ fn display_author(
         )));
     }
     Ok(author.nickname)
+}
+
+fn protocol_origin(
+    store: &Store,
+    record: Option<&UserSettingsRecord>,
+) -> Result<ProtocolIdentity, AppCoreError> {
+    let user = record.ok_or_else(|| {
+        AppCoreError::ProfileIncomplete(
+            "user_settings отсутствует; задайте профиль: lltt set nickname \"Имя\"".into(),
+        )
+    })?;
+    let author = store
+        .get_author(&user.author_email)
+        .map_err(AppCoreError::Store)?
+        .ok_or_else(|| {
+            AppCoreError::ProfileIncomplete(format!(
+                "user_settings.author_email={} отсутствует в authors",
+                user.author_email
+            ))
+        })?;
+    let nickname = if author.nickname.trim().is_empty() {
+        author.email.clone()
+    } else {
+        author.nickname
+    };
+    ProtocolIdentity::new(nickname, author.email)
+        .map_err(|e| AppCoreError::Protocol(ProtocolError::InvalidIdentity(e.to_string())))
 }
 
 fn encode_visibility(visibility: Visibility) -> String {
@@ -939,8 +981,6 @@ pub fn subscribe(
     let user = store.get_user_settings_record(command.profile_id)?;
     let i18n = subscription_requested(user.as_ref(), delivery.as_str(), resource.as_str());
 
-    // Ник подписчика берём из authors (FK user_settings.author_email → authors.email).
-    // Этот ник попадёт в payload и будет записан в authors на стороне A.
     let author = store
         .get_author(
             user.as_ref()
@@ -952,7 +992,8 @@ pub fn subscribe(
         .ok_or_else(|| {
             AppCoreError::ProfileIncomplete("user_settings.author_email нет в authors".into())
         })?;
-    let subscriber_nickname = author.nickname.clone();
+    let origin = ProtocolIdentity::new(author.nickname.clone(), author.email.clone())
+        .map_err(|e| AppCoreError::Protocol(ProtocolError::InvalidIdentity(e.to_string())))?;
 
     let message = ProtocolMessage::new(
         MessageEnvelope::new(
@@ -961,11 +1002,12 @@ pub fn subscribe(
             resource.as_str(),
             event_id.as_str(),
         )?,
+        origin,
+        None,
         &i18n.body,
         DomainEventPayload::SubscriptionRequested {
             resource_address: resource.as_str().to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
-            subscriber_nickname,
             created_at: command.created_at,
         },
     )?;
@@ -1018,11 +1060,9 @@ pub fn unsubscribe(
     );
     let event_id = EventId::new(&event_id_str)?;
 
-    let i18n = subscription_revoked(
-        store.get_user_settings_record(command.profile_id)?.as_ref(),
-        delivery.as_str(),
-        resource.as_str(),
-    );
+    let user = store.get_user_settings_record(command.profile_id)?;
+    let origin = protocol_origin(store, user.as_ref())?;
+    let i18n = subscription_revoked(user.as_ref(), delivery.as_str(), resource.as_str());
 
     let message = ProtocolMessage::new(
         MessageEnvelope::new(
@@ -1031,6 +1071,8 @@ pub fn unsubscribe(
             resource.as_str(),
             event_id.as_str(),
         )?,
+        origin,
+        None,
         &i18n.body,
         DomainEventPayload::SubscriptionRevoked {
             resource_address: resource.as_str().to_owned(),

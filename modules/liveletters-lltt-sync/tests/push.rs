@@ -7,7 +7,9 @@ use std::time::Duration;
 use liveletters_mail::{
     ConfiguredSmtpTransport, MailAuth, MailSecurity, SmtpTransportConfig, build_protocol_email,
 };
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage, encode_message,
+};
 use liveletters_store::{OutboxDelivery, OutboxRecord, Store, SubscriptionRecord};
 use tempfile::TempDir;
 
@@ -22,6 +24,8 @@ fn open_store() -> (TempDir, Store) {
 fn sample_protocol_message(event_id: &str) -> ProtocolMessage {
     ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", event_id).unwrap(),
+        ProtocolIdentity::new("Alice", "alice@example.test").unwrap(),
+        None,
         "Тестовое письмо",
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),

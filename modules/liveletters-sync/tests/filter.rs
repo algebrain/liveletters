@@ -2,12 +2,18 @@ mod common;
 
 use common::open_temp_store;
 use liveletters_mail::{ReceivedEmail, build_protocol_email};
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage,
+};
 use liveletters_store::SubscriptionRecord;
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
 fn ensure_author(store: &liveletters_store::Store, email: &str, nickname: &str) {
     store.save_author(email, nickname, "test").unwrap();
+}
+
+fn identity(nickname: &str, email: &str) -> ProtocolIdentity {
+    ProtocolIdentity::new(nickname.to_owned(), email.to_owned()).unwrap()
 }
 
 fn subscription_requested_email(
@@ -17,11 +23,12 @@ fn subscription_requested_email(
 ) -> ReceivedEmail {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "subscription_requested", resource_address, event_id).unwrap(),
+        identity("Test User", subscriber_delivery_address),
+        None,
         "Запрос подписки",
         DomainEventPayload::SubscriptionRequested {
             resource_address: resource_address.into(),
             subscriber_delivery_address: subscriber_delivery_address.into(),
-            subscriber_nickname: "Test User".into(),
             created_at: 1_710_000_000,
         },
     )
@@ -49,6 +56,8 @@ fn subscription_revoked_email(
 ) -> ReceivedEmail {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "subscription_revoked", resource_address, event_id).unwrap(),
+        identity("Test User", subscriber_delivery_address),
+        None,
         "Отписка",
         DomainEventPayload::SubscriptionRevoked {
             resource_address: resource_address.into(),
@@ -76,6 +85,8 @@ fn subscription_revoked_email(
 fn post_created_email(event_id: &str, post_id: &str, resource_id: &str) -> ReceivedEmail {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", resource_id, event_id).unwrap(),
+        identity("Alice", resource_id),
+        None,
         "Новая запись",
         DomainEventPayload::PostCreated {
             post_id: post_id.into(),
@@ -113,6 +124,8 @@ fn comment_created_email(
 ) -> ReceivedEmail {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "comment_created", resource_id, event_id).unwrap(),
+        identity(author_email, author_email),
+        None,
         "Новый комментарий",
         DomainEventPayload::CommentCreated {
             comment_id: comment_id.into(),
@@ -199,12 +212,12 @@ fn apply_subscription_confirmed_does_not_persist_record_yet() {
             "sub-2",
         )
         .unwrap(),
+        identity("Алиса", "alice-publish@example.org"),
+        None,
         "Подтверждение",
         DomainEventPayload::SubscriptionConfirmed {
             resource_address: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
-            owner_nickname: "Алиса".into(),
-            owner_email: "alice-publish@example.org".into(),
             accepted: true,
             created_at: 1_710_000_000,
         },

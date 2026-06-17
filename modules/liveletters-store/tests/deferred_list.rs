@@ -15,6 +15,7 @@ fn list_deferred_events_returns_latest_first() {
                 event_type: "post_created".to_owned(),
                 reason: format!("reason-{i}"),
                 payload_json: "{}".to_owned(),
+                origin: "Alice <alice@example.test>".to_owned(),
             })
             .unwrap();
     }

@@ -1,12 +1,18 @@
 use liveletters_protocol::{
-    DomainEventPayload, MessageEnvelope, ProtocolError, ProtocolMessage, decode_message,
-    encode_message,
+    DomainEventPayload, MessageEnvelope, ProtocolError, ProtocolIdentity, ProtocolMessage,
+    decode_message, encode_message,
 };
+
+fn alice() -> ProtocolIdentity {
+    ProtocolIdentity::new("Alice", "alice@example.org").unwrap()
+}
 
 #[test]
 fn post_created_round_trip_keeps_envelope_and_payload() {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-1").unwrap(),
+        alice(),
+        None,
         "Новая запись в блоге",
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
@@ -27,6 +33,15 @@ fn post_created_round_trip_keeps_envelope_and_payload() {
     assert_eq!(decoded.envelope().event_type(), "post_created");
     assert_eq!(decoded.envelope().resource_id(), "blog-1");
     assert_eq!(decoded.envelope().event_id(), "event-1");
+    assert_eq!(
+        decoded.origin().to_wire_string(),
+        "Alice <alice@example.org>"
+    );
+    assert_eq!(
+        decoded.effective_source().to_wire_string(),
+        "Alice <alice@example.org>"
+    );
+    assert!(decoded.source().is_none());
     // human_readable_body намеренно не сериализуется в JSON
     // (см. message.rs: skip_serializing default), чтобы не дублировать
     // text/plain. После десериализации поле == None; тело хранится
@@ -39,6 +54,8 @@ fn post_created_round_trip_keeps_envelope_and_payload() {
 fn comment_created_round_trip_keeps_parent_comment_link() {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "comment_created", "blog-1", "event-2").unwrap(),
+        alice(),
+        Some(ProtocolIdentity::new("Bob", "bob@example.org").unwrap()),
         "Новый комментарий",
         DomainEventPayload::CommentCreated {
             comment_id: "comment-1".into(),
@@ -57,12 +74,53 @@ fn comment_created_round_trip_keeps_parent_comment_link() {
     let encoded = encode_message(&message).unwrap();
     let decoded = decode_message(&encoded).unwrap();
 
+    assert_eq!(decoded.origin().email(), "alice@example.org");
+    assert_eq!(decoded.effective_source().email(), "bob@example.org");
     match decoded.payload() {
         DomainEventPayload::CommentCreated {
             parent_comment_id, ..
         } => assert_eq!(parent_comment_id.as_deref(), Some("comment-root")),
         other => panic!("unexpected payload after decode: {other:?}"),
     }
+}
+
+#[test]
+fn source_is_omitted_when_equal_to_origin_and_encoded_when_different() {
+    let origin = ProtocolIdentity::new("Alice", "alice@example.org").unwrap();
+    let payload = DomainEventPayload::PostHidden {
+        post_id: "post-1".into(),
+        resource_id: "blog-1".into(),
+        actor_id: "alice@example.org".into(),
+        created_at: 1,
+    };
+    let without_source = ProtocolMessage::new(
+        MessageEnvelope::new("1", "post_hidden", "blog-1", "event-source-1").unwrap(),
+        origin.clone(),
+        Some(origin.clone()),
+        "Запись скрыта",
+        payload.clone(),
+    )
+    .unwrap();
+    let without_source_json = serde_json::to_string(&without_source).unwrap();
+    assert!(without_source_json.contains("\"origin\":\"Alice <alice@example.org>\""));
+    assert!(
+        !without_source_json.contains("\"source\""),
+        "{without_source_json}"
+    );
+
+    let with_source = ProtocolMessage::new(
+        MessageEnvelope::new("1", "post_hidden", "blog-1", "event-source-2").unwrap(),
+        origin,
+        Some(ProtocolIdentity::new("Bob", "bob@example.org").unwrap()),
+        "Запись скрыта",
+        payload,
+    )
+    .unwrap();
+    let with_source_json = serde_json::to_string(&with_source).unwrap();
+    assert!(with_source_json.contains("\"origin\":\"Alice <alice@example.org>\""));
+    assert!(with_source_json.contains("\"source\":\"Bob <bob@example.org>\""));
+    let decoded = decode_message(&with_source_json).unwrap();
+    assert_eq!(decoded.effective_source().email(), "bob@example.org");
 }
 
 #[test]
@@ -76,6 +134,8 @@ fn malformed_json_is_rejected() {
 fn blank_human_body_is_rejected() {
     let error = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-1").unwrap(),
+        alice(),
+        None,
         "   ",
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
@@ -96,6 +156,8 @@ fn blank_human_body_is_rejected() {
 fn post_hidden_round_trip_keeps_payload() {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_hidden", "blog-1", "event-3").unwrap(),
+        alice(),
+        None,
         "Запись скрыта",
         DomainEventPayload::PostHidden {
             post_id: "post-1".into(),
@@ -116,6 +178,8 @@ fn post_hidden_round_trip_keeps_payload() {
 fn comment_edited_round_trip_keeps_new_body() {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "comment_edited", "blog-1", "event-4").unwrap(),
+        alice(),
+        None,
         "Комментарий изменен",
         DomainEventPayload::CommentEdited {
             comment_id: "comment-1".into(),
@@ -150,11 +214,12 @@ fn subscription_requested_round_trip_keeps_payload() {
             "sub-1",
         )
         .unwrap(),
+        ProtocolIdentity::new("Борис", "bob-feed@example.org").unwrap(),
+        None,
         "Запрос подписки",
         DomainEventPayload::SubscriptionRequested {
             resource_address: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
-            subscriber_nickname: "Борис".into(),
             created_at: 1_710_000_400,
         },
     )
@@ -163,16 +228,16 @@ fn subscription_requested_round_trip_keeps_payload() {
     let encoded = encode_message(&message).unwrap();
     let decoded = decode_message(&encoded).unwrap();
 
+    assert_eq!(decoded.origin().nickname(), "Борис");
+    assert_eq!(decoded.origin().email(), "bob-feed@example.org");
     match decoded.payload() {
         DomainEventPayload::SubscriptionRequested {
             resource_address,
             subscriber_delivery_address,
-            subscriber_nickname,
             created_at,
         } => {
             assert_eq!(resource_address, "alice-publish@example.org");
             assert_eq!(subscriber_delivery_address, "bob-feed@example.org");
-            assert_eq!(subscriber_nickname, "Борис");
             assert_eq!(*created_at, 1_710_000_400);
         }
         other => panic!("unexpected payload after decode: {other:?}"),
@@ -189,12 +254,12 @@ fn subscription_confirmed_round_trip_keeps_payload() {
             "sub-2",
         )
         .unwrap(),
+        ProtocolIdentity::new("Алиса", "alice-publish@example.org").unwrap(),
+        None,
         "Подтверждение",
         DomainEventPayload::SubscriptionConfirmed {
             resource_address: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
-            owner_nickname: "Алиса".into(),
-            owner_email: "alice-publish@example.org".into(),
             accepted: true,
             created_at: 1_710_000_500,
         },
@@ -204,19 +269,17 @@ fn subscription_confirmed_round_trip_keeps_payload() {
     let encoded = encode_message(&message).unwrap();
     let decoded = decode_message(&encoded).unwrap();
 
+    assert_eq!(decoded.origin().nickname(), "Алиса");
+    assert_eq!(decoded.origin().email(), "alice-publish@example.org");
     match decoded.payload() {
         DomainEventPayload::SubscriptionConfirmed {
             resource_address,
             subscriber_delivery_address,
-            owner_nickname,
-            owner_email,
             accepted,
             created_at,
         } => {
             assert_eq!(resource_address, "alice-publish@example.org");
             assert_eq!(subscriber_delivery_address, "bob-feed@example.org");
-            assert_eq!(owner_nickname, "Алиса");
-            assert_eq!(owner_email, "alice-publish@example.org");
             assert!(*accepted);
             assert_eq!(*created_at, 1_710_000_500);
         }

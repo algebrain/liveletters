@@ -2,11 +2,15 @@
 //! внутренний служебный префикс `acct_`. В `actor_id` и `subscriber_*` поля
 //! передаётся почтовый адрес или пустая строка; никаких `acct_<имя>`.
 
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage, encode_message,
+};
 
 fn json_of(payload: DomainEventPayload) -> String {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-1").unwrap(),
+        ProtocolIdentity::new("Alice", "alice@example.org").unwrap(),
+        None,
         "Тело",
         payload,
     )
@@ -62,7 +66,6 @@ fn subscription_requested_does_not_leak_acct_prefix() {
     let payload = DomainEventPayload::SubscriptionRequested {
         resource_address: "blog-1".into(),
         subscriber_delivery_address: "carol@example.org".into(),
-        subscriber_nickname: "Кирилл".into(),
         created_at: 1_710_000_000,
     };
     let encoded = json_of(payload);
@@ -74,8 +77,6 @@ fn subscription_confirmed_does_not_leak_acct_prefix() {
     let payload = DomainEventPayload::SubscriptionConfirmed {
         resource_address: "blog-1".into(),
         subscriber_delivery_address: "carol@example.org".into(),
-        owner_nickname: "Каролина".into(),
-        owner_email: "carol@example.org".into(),
         accepted: true,
         created_at: 1_710_000_000,
     };

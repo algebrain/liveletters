@@ -2,7 +2,9 @@
 //! B применяет подтверждение (pending → subscriptions + local + authors).
 
 use liveletters_mail::{ReceivedEmail, build_protocol_email};
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage,
+};
 use liveletters_store::Store;
 use liveletters_sync::SyncEngine;
 
@@ -32,14 +34,19 @@ fn save_alice(store: &Store) {
         .unwrap();
 }
 
+fn identity(nickname: &str, email: &str) -> ProtocolIdentity {
+    ProtocolIdentity::new(nickname.to_owned(), email.to_owned()).unwrap()
+}
+
 fn build_subscription_requested_email(from: &str, to: &str, event_id: &str) -> ReceivedEmail {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "subscription_requested", to, event_id).unwrap(),
+        identity("Алиса", from),
+        None,
         "Запрос подписки",
         DomainEventPayload::SubscriptionRequested {
             resource_address: to.into(),
             subscriber_delivery_address: from.into(),
-            subscriber_nickname: "Алиса".into(),
             created_at: 1_710_000_000,
         },
     )
@@ -66,6 +73,8 @@ fn build_subscription_confirmed_email(
 ) -> ReceivedEmail {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "subscription_confirmed", from, event_id).unwrap(),
+        identity("Алиса", from),
+        None,
         if accepted {
             "Подтверждение"
         } else {
@@ -74,8 +83,6 @@ fn build_subscription_confirmed_email(
         DomainEventPayload::SubscriptionConfirmed {
             resource_address: from.into(),
             subscriber_delivery_address: to.into(),
-            owner_nickname: "Алиса".into(),
-            owner_email: from.into(),
             accepted,
             created_at: 1_710_000_500,
         },
@@ -121,15 +128,10 @@ fn a_responds_to_subscription_request_with_confirmed() {
         .expect("SubscriptionConfirmed в outbox");
     assert!(resp.message_id.is_some());
     let decoded = liveletters_protocol::decode_message(&resp.message_body).unwrap();
+    assert_eq!(decoded.origin().nickname(), "Алиса");
+    assert_eq!(decoded.origin().email(), "alice-publish@example.org");
     match decoded.payload() {
-        DomainEventPayload::SubscriptionConfirmed {
-            owner_nickname,
-            owner_email,
-            accepted,
-            ..
-        } => {
-            assert_eq!(owner_nickname, "Алиса");
-            assert_eq!(owner_email, "alice-publish@example.org");
+        DomainEventPayload::SubscriptionConfirmed { accepted, .. } => {
             assert!(accepted);
         }
         other => panic!("ожидался SubscriptionConfirmed, получили: {other:?}"),

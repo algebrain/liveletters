@@ -2,11 +2,19 @@ use liveletters_mail::{
     MailRetryPolicy, TransportError, build_protocol_email, decode_protocol_message,
     extract_liveletters_parts, parse_email,
 };
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage,
+};
+
+fn alice() -> ProtocolIdentity {
+    ProtocolIdentity::new("Alice", "alice@example.test").unwrap()
+}
 
 fn sample_post_created_message() -> ProtocolMessage {
     ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-1").unwrap(),
+        alice(),
+        None,
         "Новая запись в блоге",
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
@@ -153,6 +161,8 @@ fn multipart_email_round_trips_long_cyrillic_body() {
                         — LiveLetters";
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-1").unwrap(),
+        alice(),
+        None,
         long_ru_body,
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),

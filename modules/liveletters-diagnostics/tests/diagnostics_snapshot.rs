@@ -28,6 +28,7 @@ fn builds_sync_health_from_store_state() {
             event_type: "comment_created".into(),
             reason: "missing_post".into(),
             payload_json: "{\"kind\":\"comment_created\"}".into(),
+            origin: "Alice <alice@example.test>".into(),
         })
         .unwrap();
     store

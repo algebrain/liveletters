@@ -31,6 +31,7 @@
 
 - `MessageEnvelope`
 - `ProtocolMessage`
+- `ProtocolIdentity`
 - `DomainEventPayload`
 - `ProtocolError`
 - `encode_message(...)`
@@ -54,12 +55,15 @@
 
 ## Основная идея протокольного сообщения
 
-На уровне этого модуля сообщение LiveLetters состоит из двух wire-частей
-плюс одна runtime-часть, которая не сериализуется:
+На уровне этого модуля сообщение LiveLetters состоит из четырех частей,
+которые попадают в передаваемый JSON, плюс одна часть, которая существует
+только в памяти и не сериализуется:
 
 1. `envelope`
-2. `payload`
-3. `human_readable_body` — в памяти, но **не** в JSON; в outbox хранится
+2. `origin`
+3. `source`
+4. `payload`
+5. `human_readable_body` — в памяти, но **не** в JSON; в outbox хранится
    в отдельной колонке `OutboxRecord.human_readable_body` и попадает в
    `text/plain` под-часть при сборке письма (см.
    [`liveletters-mime::build_protocol_email`](../liveletters-mime/INTERFACE.md)).
@@ -76,6 +80,60 @@
 - какой у события идентификатор.
 
 То есть `envelope` это минимальный технический контекст сообщения.
+
+### `origin` и `source`
+
+Коротко:
+
+- `origin` — кто изначально создал событие;
+- `source` — от кого это конкретное письмо пришло получателю;
+- если `source` отсутствует, значит письмо пришло прямо от `origin`;
+- в `authors` получатель всегда записывает `origin`, а не `source`.
+
+`origin` — обязательная строка первичного источника сообщения в формате:
+
+```text
+Nickname <email@example.org>
+```
+
+`source` — такая же строка непосредственного источника сообщения. Поле
+необязательное: если в JSON его нет, получатель считает `source == origin`.
+
+В обычном сообщении `origin` и `source` совпадают, поэтому `source` не
+сериализуется. Сейчас они расходятся в сценарии пересылки комментария:
+если Боб рассылает подписчикам комментарий Алисы, Ева получает сообщение с
+`origin = "Alice <alice@example.org>"` и
+`source = "Bob <bob@example.org>"`.
+
+Получатель использует `origin` любого сообщения для заполнения таблицы
+`authors`. Поля `origin` и `source` заменяют отдельные поля payload, которые
+раньше переносили ник и почтовый адрес отправителя.
+
+В Rust эти строки представлены типом `ProtocolIdentity`. Он разбирает строку
+из передаваемого JSON и даёт доступ к `nickname()` и `email()`.
+
+#### Пример: комментарий Алисы к посту Боба
+
+1. Боб публикует пост.
+2. Алиса комментирует пост Боба.
+3. Боб принимает комментарий у себя и рассылает его подписчикам.
+4. Ева получает пересланный комментарий.
+
+В письме для Евы:
+
+```json
+{
+  "origin": "Alice <alice@example.org>",
+  "source": "Bob <bob@example.org>",
+  "payload": {
+    "kind": "comment_created"
+  }
+}
+```
+
+Ева сохраняет Алису в `authors`, потому что Алиса — первичный автор
+комментария. При этом Ева не становится подписанной на Алису: запись в
+`authors` означает «я знаю такого автора», а не «я подписана на него».
 
 ### `human_readable_body` (только в памяти, в JSON — `None`)
 
@@ -155,6 +213,8 @@
 В нем собраны вместе:
 
 - `MessageEnvelope`;
+- `ProtocolIdentity` для `origin`;
+- опциональный `ProtocolIdentity` для `source`;
 - человекочитаемое тело;
 - `DomainEventPayload`.
 
@@ -162,10 +222,11 @@
 
 `ProtocolMessage` создается через:
 
-- `ProtocolMessage::new(envelope, human_readable_body, payload) -> Result<ProtocolMessage, ProtocolError>`
+- `ProtocolMessage::new(envelope, origin, source, human_readable_body, payload) -> Result<ProtocolMessage, ProtocolError>`
 
 Смысл такого интерфейса:
 
+- нельзя забыть первичный источник сообщения;
 - нельзя забыть человекочитаемую часть;
 - нельзя случайно создать сообщение с пустым body;
 - полное сообщение строится централизованно.
@@ -175,6 +236,9 @@
 После создания доступны методы:
 
 - `envelope()`
+- `origin()`
+- `source()`
+- `effective_source()`
 - `human_readable_body()`
 - `payload()`
 
@@ -211,7 +275,7 @@
 - `PostHidden`
 - `CommentEdited`
 - `SubscriptionRequested` (B → A: запрос на подписку)
-- `SubscriptionConfirmed` (A → B: автоматический ответ с профилем A)
+- `SubscriptionConfirmed` (A → B: автоматический ответ)
 - `SubscriptionRevoked` (B → A: отзыв подписки, без подтверждения)
 
 ## Что означает каждый вариант payload
@@ -284,8 +348,9 @@ B отправляет A, чтобы заявить: «хочу получать
 - `resource_address` — адрес блога, на который B подписывается
 - `subscriber_delivery_address` — почтовый адрес B, на который A
   будет слать посты
-- `subscriber_nickname` — ник B, который A сохраняет в `authors`
 - `created_at`
+
+Ник и почтовый адрес B передаются через `origin`.
 
 При получении A автоматически отвечает `SubscriptionConfirmed` со
 своим профилем. Подписка B остаётся в `pending` до получения
@@ -293,15 +358,14 @@ B отправляет A, чтобы заявить: «хочу получать
 
 ### `SubscriptionConfirmed`
 
-A отвечает B после получения `SubscriptionRequested`. Передаёт
-свой профиль:
+A отвечает B после получения `SubscriptionRequested`.
 
 - `resource_address` — адрес блога A
 - `subscriber_delivery_address` — куда слать посты (равно B из запроса)
-- `owner_nickname` — ник A (для отображения у B)
-- `owner_email` — почтовый адрес A (для отображения у B)
 - `accepted` — `true` если A принимает подписку, `false` если отклоняет
 - `created_at`
+
+Ник и почтовый адрес A передаются через `origin`.
 
 B при получении `accepted=true` перемещает `pending` в подтверждённые
 подписки и сохраняет профиль A в `authors` (для печати в `feed`/`thread`
@@ -400,6 +464,7 @@ B отправляет A, чтобы отписаться. Подтвержде�
 
 - `BlankEnvelopeField(&'static str)`
 - `BlankHumanReadableBody`
+- `InvalidIdentity(String)`
 - `MalformedJson(String)`
 
 ### Как его понимать

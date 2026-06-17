@@ -180,15 +180,16 @@ impl Store {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO deferred_events
-                (event_id, event_type, reason, payload_json)
+                (event_id, event_type, reason, payload_json, origin)
             VALUES
-                (?1, ?2, ?3, ?4)
+                (?1, ?2, ?3, ?4, ?5)
             "#,
             params![
                 record.event_id,
                 record.event_type,
                 record.reason,
                 record.payload_json,
+                record.origin,
             ],
         )?;
 
@@ -198,7 +199,7 @@ impl Store {
     pub fn list_deferred_event_records(&self) -> Result<Vec<DeferredEventRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT event_id, event_type, reason, payload_json
+            SELECT event_id, event_type, reason, payload_json, origin
             FROM deferred_events
             ORDER BY rowid ASC
             "#,
@@ -210,6 +211,7 @@ impl Store {
                 event_type: row.get(1)?,
                 reason: row.get(2)?,
                 payload_json: row.get(3)?,
+                origin: row.get(4)?,
             })
         })?;
 
@@ -227,7 +229,7 @@ impl Store {
     ) -> Result<Vec<DeferredEventRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT event_id, event_type, reason, payload_json
+            SELECT event_id, event_type, reason, payload_json, origin
             FROM deferred_events
             ORDER BY rowid DESC
             LIMIT ?1
@@ -240,6 +242,7 @@ impl Store {
                 event_type: row.get(1)?,
                 reason: row.get(2)?,
                 payload_json: row.get(3)?,
+                origin: row.get(4)?,
             })
         })?;
 

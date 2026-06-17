@@ -174,7 +174,8 @@ impl Store {
                 event_id      TEXT PRIMARY KEY,
                 event_type    TEXT NOT NULL,
                 reason        TEXT NOT NULL,
-                payload_json  TEXT NOT NULL
+                payload_json  TEXT NOT NULL,
+                origin        TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS sync_cursors (

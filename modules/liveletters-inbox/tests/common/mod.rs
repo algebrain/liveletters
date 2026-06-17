@@ -43,6 +43,7 @@ fn build_post_eml(body: &str) -> String {
          \x20\x20\x20\x20\"event_id\": \"post-1\"\n\
          \x20\x20}},\n\
          \x20\x20\"human_readable_body\": \"{body}\",\n\
+         \x20\x20\"origin\": \"Alice <alice@example.test>\",\n\
          \x20\x20\"payload\": {{\n\
          \x20\x20\x20\x20\"kind\": \"post_created\",\n\
          \x20\x20\x20\x20\"post_id\": \"post-1\",\n\
@@ -50,6 +51,7 @@ fn build_post_eml(body: &str) -> String {
          \x20\x20\x20\x20\"actor_id\": \"alice\",\n\
          \x20\x20\x20\x20\"created_at\": 1710000000,\n\
          \x20\x20\x20\x20\"visibility\": \"public\",\n\
+         \x20\x20\x20\x20\"body_format\": \"plain\",\n\
          \x20\x20\x20\x20\"body\": \"{body}\"\n\
          \x20\x20}}\n\
          }}\n\

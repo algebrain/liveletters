@@ -29,6 +29,7 @@ members = [
     "modules/liveletters-log",
     "modules/liveletters-i18n",
     "modules/liveletters-bounce",
+    "modules/liveletters-utils",
     "apps/lltt",
 ]
 

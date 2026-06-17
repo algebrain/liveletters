@@ -24,6 +24,7 @@ fn verbose_shows_deferred_events() {
             event_type: "post_created".to_owned(),
             reason: "transient-network".to_owned(),
             payload_json: "{}".to_owned(),
+            origin: "Alice <alice@example.test>".to_owned(),
         })
         .unwrap();
 

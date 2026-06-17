@@ -28,6 +28,7 @@ fn doctor_reports_degraded_when_deferred_present() {
             event_type: "post_created".into(),
             reason: "transient".into(),
             payload_json: "{}".into(),
+            origin: "Alice <alice@example.test>".into(),
         })
         .unwrap();
     liveletters_doctor::run(&ctx_for(&tmp), &liveletters_doctor::Args::default()).unwrap();

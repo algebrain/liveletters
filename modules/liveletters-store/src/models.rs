@@ -68,6 +68,7 @@ pub struct DeferredEventRecord {
     pub event_type: String,
     pub reason: String,
     pub payload_json: String,
+    pub origin: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

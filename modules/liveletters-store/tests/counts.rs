@@ -43,6 +43,7 @@ fn save_deferred(store: &Store, event_id: &str) {
             event_type: "post_created".into(),
             reason: "transient".into(),
             payload_json: "{}".into(),
+            origin: "Alice <alice@example.test>".into(),
         })
         .unwrap();
 }

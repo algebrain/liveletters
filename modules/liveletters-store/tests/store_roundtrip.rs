@@ -321,6 +321,7 @@ fn deferred_events_can_be_saved_and_listed() {
             event_type: "comment_created".into(),
             reason: "missing_post".into(),
             payload_json: "{\"kind\":\"comment_created\"}".into(),
+            origin: "Alice <alice@example.test>".into(),
         })
         .unwrap();
 
@@ -328,6 +329,7 @@ fn deferred_events_can_be_saved_and_listed() {
 
     assert_eq!(deferred.len(), 1);
     assert_eq!(deferred[0].reason, "missing_post");
+    assert_eq!(deferred[0].origin, "Alice <alice@example.test>");
 }
 
 #[test]
@@ -340,6 +342,7 @@ fn deferred_event_can_be_deleted_after_reprocessing() {
             event_type: "comment_created".into(),
             reason: "missing_post".into(),
             payload_json: "{\"kind\":\"comment_created\"}".into(),
+            origin: "Alice <alice@example.test>".into(),
         })
         .unwrap();
 

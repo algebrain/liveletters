@@ -1,5 +1,5 @@
 [package]
-name = "liveletters-protocol"
+name = "liveletters-utils"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,6 +8,8 @@ license.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
-liveletters-utils = { path = "../liveletters-utils" }
 serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
 serde_json = { workspace = true }

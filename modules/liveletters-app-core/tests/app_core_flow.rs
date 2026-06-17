@@ -5,7 +5,7 @@ use liveletters_app_core::{
 };
 use liveletters_mail::{ReceivedEmail, build_protocol_email};
 use liveletters_protocol::{DomainEventPayload, decode_message};
-use liveletters_protocol::{MessageEnvelope, ProtocolMessage};
+use liveletters_protocol::{MessageEnvelope, ProtocolIdentity, ProtocolMessage};
 use liveletters_sync::SyncEngine;
 
 mod common;
@@ -275,6 +275,8 @@ fn reprocesses_deferred_events_through_app_core_orchestration() {
 
     let deferred_message = ProtocolMessage::new(
         MessageEnvelope::new("1", "comment_created", "blog-1", "event-comment-1").unwrap(),
+        ProtocolIdentity::new("alice".to_owned(), "alice@example.test".to_owned()).unwrap(),
+        None,
         "Комментарий раньше поста",
         DomainEventPayload::CommentCreated {
             comment_id: "comment-1".into(),

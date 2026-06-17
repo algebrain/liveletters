@@ -7,6 +7,7 @@ mod payload;
 pub use codec::{decode_message, encode_message};
 pub use envelope::MessageEnvelope;
 pub use error::ProtocolError;
+pub use liveletters_utils::protocol_identity::{ProtocolIdentity, ProtocolIdentityError};
 pub use message::ProtocolMessage;
 pub use payload::DomainEventPayload;
 

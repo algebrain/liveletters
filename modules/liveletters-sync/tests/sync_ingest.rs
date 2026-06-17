@@ -1,7 +1,9 @@
 mod common;
 
 use liveletters_mail::{ReceivedEmail, build_protocol_email};
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage,
+};
 use liveletters_store::{CommentRecord, PostRecord};
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
@@ -9,6 +11,10 @@ use common::open_temp_store;
 
 fn ensure_author(store: &liveletters_store::Store, email: &str, nickname: &str) {
     store.save_author(email, nickname, "test").unwrap();
+}
+
+fn identity(nickname: &str, email: &str) -> ProtocolIdentity {
+    ProtocolIdentity::new(nickname.to_owned(), email.to_owned()).unwrap()
 }
 
 fn protocol_email(event_id: &str, payload: DomainEventPayload, human_body: &str) -> ReceivedEmail {
@@ -36,6 +42,8 @@ fn protocol_email(event_id: &str, payload: DomainEventPayload, human_body: &str)
 
     let protocol_message = ProtocolMessage::new(
         MessageEnvelope::new("1", event_type, resource_id, event_id).unwrap(),
+        identity("Alice", "alice@example.test"),
+        None,
         human_body,
         payload,
     )
@@ -297,6 +305,8 @@ fn invalid_event_with_mismatched_resource_id_is_rejected() {
 
     let protocol_message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-envelope", "event-invalid-1").unwrap(),
+        identity("Alice", "alice@example.test"),
+        None,
         "Некорректное событие",
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),

@@ -196,10 +196,12 @@ pub enum MimeError {
 
 ```rust
 use liveletters_mime::{build_protocol_email, parse_email, extract_liveletters_parts, decode_protocol_message};
-use liveletters_protocol::{MessageEnvelope, ProtocolMessage, DomainEventPayload};
+use liveletters_protocol::{MessageEnvelope, ProtocolIdentity, ProtocolMessage, DomainEventPayload};
 
 let message = ProtocolMessage::new(
     MessageEnvelope::new("1", "post_created", "blog-1", "event-1")?,
+    ProtocolIdentity::new("Alice", "alice@example.test")?,
+    None,
     "alice написал:\n\nТекст поста",
     DomainEventPayload::PostCreated {
         post_id: "post-1".into(),
@@ -216,6 +218,7 @@ let outgoing = build_protocol_email(
     "alice@example.test",
     "bob@example.test",
     "Новая запись",
+    Some(message.human_readable_body().unwrap_or("")),
     &message,
 )?;
 
@@ -223,7 +226,8 @@ let parsed = parse_email(&outgoing.raw_message)?;
 let parts = extract_liveletters_parts(&parsed)?;
 let decoded = decode_protocol_message(parts.technical_body())?;
 
-assert_eq!(decoded.human_readable_body(), "alice написал:\n\nТекст поста");
+assert_eq!(parts.human_readable_body(), "alice написал:\n\nТекст поста");
+assert_eq!(decoded.origin().email(), "alice@example.test");
 ```
 
 ### Обработать письмо, пришедшее из IMAP

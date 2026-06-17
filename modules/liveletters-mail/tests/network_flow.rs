@@ -8,7 +8,13 @@ use liveletters_mail::{
     ConfiguredImapMailbox, ConfiguredSmtpTransport, FetchStatus, ImapMailboxConfig, MailAuth,
     MailSecurity, MailboxCursor, SendStatus, SmtpTransportConfig, build_protocol_email,
 };
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage,
+};
+
+fn alice() -> ProtocolIdentity {
+    ProtocolIdentity::new("Alice", "alice@example.test").unwrap()
+}
 
 #[test]
 fn configured_smtp_transport_sends_message_over_tcp() {
@@ -92,6 +98,8 @@ fn configured_smtp_transport_sends_message_over_tcp() {
 
     let protocol_message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-1").unwrap(),
+        alice(),
+        None,
         "Новая запись в блоге",
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
@@ -137,6 +145,8 @@ fn configured_smtp_transport_sends_message_over_tcp() {
 fn configured_imap_mailbox_fetches_messages_with_cursor() {
     let protocol_message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", "event-9").unwrap(),
+        alice(),
+        None,
         "Живое письмо",
         DomainEventPayload::PostCreated {
             post_id: "post-9".into(),

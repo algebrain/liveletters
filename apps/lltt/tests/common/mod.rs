@@ -7,7 +7,9 @@ use std::process::Command;
 
 use assert_cmd::prelude::*;
 use liveletters_mime::{build_protocol_email, extract_liveletters_parts, parse_email};
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage,
+};
 
 pub fn lltt() -> Command {
     Command::cargo_bin("lltt").expect("бинарь lltt")
@@ -66,6 +68,8 @@ subscriptions = []
 pub fn write_post_eml(dir: &std::path::Path, post_id: &str, body: &str) -> PathBuf {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", "blog-1", &format!("event-{post_id}")).unwrap(),
+        ProtocolIdentity::new("Alice".to_owned(), "alice@example.test".to_owned()).unwrap(),
+        None,
         body,
         DomainEventPayload::PostCreated {
             post_id: post_id.into(),

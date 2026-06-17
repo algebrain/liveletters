@@ -40,14 +40,11 @@ pub enum DomainEventPayload {
     SubscriptionRequested {
         resource_address: String,
         subscriber_delivery_address: String,
-        subscriber_nickname: String,
         created_at: u64,
     },
     SubscriptionConfirmed {
         resource_address: String,
         subscriber_delivery_address: String,
-        owner_nickname: String,
-        owner_email: String,
         accepted: bool,
         created_at: u64,
     },
@@ -103,14 +100,11 @@ enum WireDomainEventPayload {
     SubscriptionRequested {
         resource_address: String,
         subscriber_delivery_address: String,
-        subscriber_nickname: String,
         created_at: u64,
     },
     SubscriptionConfirmed {
         resource_address: String,
         subscriber_delivery_address: String,
-        owner_nickname: String,
-        owner_email: String,
         accepted: bool,
         created_at: u64,
     },
@@ -212,26 +206,20 @@ impl From<&DomainEventPayload> for WireDomainEventPayload {
             DomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
-                subscriber_nickname,
                 created_at,
             } => Self::SubscriptionRequested {
                 resource_address: resource_address.clone(),
                 subscriber_delivery_address: subscriber_delivery_address.clone(),
-                subscriber_nickname: subscriber_nickname.clone(),
                 created_at: *created_at,
             },
             DomainEventPayload::SubscriptionConfirmed {
                 resource_address,
                 subscriber_delivery_address,
-                owner_nickname,
-                owner_email,
                 accepted,
                 created_at,
             } => Self::SubscriptionConfirmed {
                 resource_address: resource_address.clone(),
                 subscriber_delivery_address: subscriber_delivery_address.clone(),
-                owner_nickname: owner_nickname.clone(),
-                owner_email: owner_email.clone(),
                 accepted: *accepted,
                 created_at: *created_at,
             },
@@ -322,26 +310,20 @@ impl TryFrom<WireDomainEventPayload> for DomainEventPayload {
             WireDomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
-                subscriber_nickname,
                 created_at,
             } => Ok(Self::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
-                subscriber_nickname,
                 created_at,
             }),
             WireDomainEventPayload::SubscriptionConfirmed {
                 resource_address,
                 subscriber_delivery_address,
-                owner_nickname,
-                owner_email,
                 accepted,
                 created_at,
             } => Ok(Self::SubscriptionConfirmed {
                 resource_address,
                 subscriber_delivery_address,
-                owner_nickname,
-                owner_email,
                 accepted,
                 created_at,
             }),

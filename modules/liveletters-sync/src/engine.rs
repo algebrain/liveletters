@@ -2,7 +2,9 @@ use liveletters_i18n::{Vars, detect_system_locale, parse_locale, translate};
 use liveletters_mail::{
     ReceivedEmail, decode_protocol_message, extract_liveletters_parts, parse_email,
 };
-use liveletters_protocol::{DomainEventPayload, MessageEnvelope, ProtocolMessage, encode_message};
+use liveletters_protocol::{
+    DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage, encode_message,
+};
 use liveletters_store::{
     BounceRecord, CommentRecord, DeferredEventRecord, OutboxDelivery, OutboxRecord, PostRecord,
     RawEventRecord, RawMessageRecord, Store, StoreError, SubscriptionRecord,
@@ -79,83 +81,86 @@ impl<'a> SyncEngine<'a> {
             )
             .map_err(|e| SyncError::Invalid(format!("envelope: {e:?}")))?;
 
-            let outcome = match self.apply_payload(&payload, infer_resource_id(&payload), &envelope)
-            {
-                Ok(()) => {
-                    self.store.delete_deferred_event_record(&record.event_id)?;
-                    self.store.save_raw_event_record(&RawEventRecord {
-                        event_id: record.event_id.clone(),
-                        event_type: record.event_type.clone(),
-                        resource_id: infer_resource_id(&payload).to_owned(),
-                        payload_json: record.payload_json,
-                        apply_status: "applied".into(),
-                        failure_reason: None,
-                    })?;
-                    SyncMessageOutcome::Applied {
-                        message_id: format!("deferred:{}", record.event_id),
-                        event_id: record.event_id,
+            let origin = ProtocolIdentity::parse(&record.origin)
+                .map_err(|e| SyncError::Invalid(format!("deferred origin: {e}")))?;
+            let outcome =
+                match self.apply_payload(&payload, infer_resource_id(&payload), &envelope, &origin)
+                {
+                    Ok(()) => {
+                        self.store.delete_deferred_event_record(&record.event_id)?;
+                        self.store.save_raw_event_record(&RawEventRecord {
+                            event_id: record.event_id.clone(),
+                            event_type: record.event_type.clone(),
+                            resource_id: infer_resource_id(&payload).to_owned(),
+                            payload_json: record.payload_json,
+                            apply_status: "applied".into(),
+                            failure_reason: None,
+                        })?;
+                        SyncMessageOutcome::Applied {
+                            message_id: format!("deferred:{}", record.event_id),
+                            event_id: record.event_id,
+                        }
                     }
-                }
-                Err(ApplyEventError::Deferred(reason)) => SyncMessageOutcome::Deferred {
-                    message_id: format!("deferred:{}", record.event_id),
-                    event_id: record.event_id,
-                    reason,
-                },
-                Err(ApplyEventError::Replay(reason)) => {
-                    self.store.delete_deferred_event_record(&record.event_id)?;
-                    self.store.save_raw_event_record(&RawEventRecord {
-                        event_id: record.event_id.clone(),
-                        event_type: record.event_type.clone(),
-                        resource_id: infer_resource_id(&payload).to_owned(),
-                        payload_json: record.payload_json,
-                        apply_status: "replay".into(),
-                        failure_reason: Some(reason.clone()),
-                    })?;
-                    SyncMessageOutcome::Replay {
+                    Err(ApplyEventError::Deferred(reason)) => SyncMessageOutcome::Deferred {
                         message_id: format!("deferred:{}", record.event_id),
                         event_id: record.event_id,
                         reason,
+                    },
+                    Err(ApplyEventError::Replay(reason)) => {
+                        self.store.delete_deferred_event_record(&record.event_id)?;
+                        self.store.save_raw_event_record(&RawEventRecord {
+                            event_id: record.event_id.clone(),
+                            event_type: record.event_type.clone(),
+                            resource_id: infer_resource_id(&payload).to_owned(),
+                            payload_json: record.payload_json,
+                            apply_status: "replay".into(),
+                            failure_reason: Some(reason.clone()),
+                        })?;
+                        SyncMessageOutcome::Replay {
+                            message_id: format!("deferred:{}", record.event_id),
+                            event_id: record.event_id,
+                            reason,
+                        }
                     }
-                }
-                Err(ApplyEventError::Unauthorized(reason)) => {
-                    self.store.delete_deferred_event_record(&record.event_id)?;
-                    self.store.save_raw_event_record(&RawEventRecord {
-                        event_id: record.event_id.clone(),
-                        event_type: record.event_type.clone(),
-                        resource_id: infer_resource_id(&payload).to_owned(),
-                        payload_json: record.payload_json,
-                        apply_status: "unauthorized".into(),
-                        failure_reason: Some(reason.clone()),
-                    })?;
-                    SyncMessageOutcome::Unauthorized {
+                    Err(ApplyEventError::Unauthorized(reason)) => {
+                        self.store.delete_deferred_event_record(&record.event_id)?;
+                        self.store.save_raw_event_record(&RawEventRecord {
+                            event_id: record.event_id.clone(),
+                            event_type: record.event_type.clone(),
+                            resource_id: infer_resource_id(&payload).to_owned(),
+                            payload_json: record.payload_json,
+                            apply_status: "unauthorized".into(),
+                            failure_reason: Some(reason.clone()),
+                        })?;
+                        SyncMessageOutcome::Unauthorized {
+                            message_id: format!("deferred:{}", record.event_id),
+                            event_id: record.event_id,
+                            reason,
+                        }
+                    }
+                    Err(ApplyEventError::Invalid(reason)) => {
+                        self.store.delete_deferred_event_record(&record.event_id)?;
+                        self.store.save_raw_event_record(&RawEventRecord {
+                            event_id: record.event_id.clone(),
+                            event_type: record.event_type.clone(),
+                            resource_id: infer_resource_id(&payload).to_owned(),
+                            payload_json: record.payload_json,
+                            apply_status: "invalid".into(),
+                            failure_reason: Some(reason.clone()),
+                        })?;
+                        SyncMessageOutcome::Invalid {
+                            message_id: format!("deferred:{}", record.event_id),
+                            event_id: record.event_id,
+                            reason,
+                        }
+                    }
+                    Err(ApplyEventError::Store(error)) => return Err(SyncError::Store(error)),
+                    Err(ApplyEventError::Filtered(reason)) => SyncMessageOutcome::Filtered {
                         message_id: format!("deferred:{}", record.event_id),
                         event_id: record.event_id,
                         reason,
-                    }
-                }
-                Err(ApplyEventError::Invalid(reason)) => {
-                    self.store.delete_deferred_event_record(&record.event_id)?;
-                    self.store.save_raw_event_record(&RawEventRecord {
-                        event_id: record.event_id.clone(),
-                        event_type: record.event_type.clone(),
-                        resource_id: infer_resource_id(&payload).to_owned(),
-                        payload_json: record.payload_json,
-                        apply_status: "invalid".into(),
-                        failure_reason: Some(reason.clone()),
-                    })?;
-                    SyncMessageOutcome::Invalid {
-                        message_id: format!("deferred:{}", record.event_id),
-                        event_id: record.event_id,
-                        reason,
-                    }
-                }
-                Err(ApplyEventError::Store(error)) => return Err(SyncError::Store(error)),
-                Err(ApplyEventError::Filtered(reason)) => SyncMessageOutcome::Filtered {
-                    message_id: format!("deferred:{}", record.event_id),
-                    event_id: record.event_id,
-                    reason,
-                },
-            };
+                    },
+                };
 
             outcomes.push(outcome);
         }
@@ -254,6 +259,13 @@ impl<'a> SyncEngine<'a> {
 
         let payload_json = serde_json::to_string(protocol_message.payload())
             .map_err(SyncError::SerializePayload)?;
+        // `origin` — первичный автор события. Даже если письмо пришло через
+        // пересылку (`source`), в `authors` должен попасть именно он.
+        self.store.save_author(
+            protocol_message.origin().email(),
+            protocol_message.origin().nickname(),
+            event_type_to_author_source(protocol_message.payload()),
+        )?;
         self.store.save_raw_event_record(&RawEventRecord {
             event_id: event_id.clone(),
             event_type: protocol_message.envelope().event_type().to_owned(),
@@ -267,6 +279,7 @@ impl<'a> SyncEngine<'a> {
             protocol_message.payload(),
             protocol_message.envelope().resource_id(),
             protocol_message.envelope(),
+            protocol_message.origin(),
         );
 
         match apply_result {
@@ -296,6 +309,7 @@ impl<'a> SyncEngine<'a> {
                         event_type: protocol_message.envelope().event_type().to_owned(),
                         reason: reason.clone(),
                         payload_json: payload_json.clone(),
+                        origin: protocol_message.origin().to_wire_string(),
                     })?;
                 self.store.save_raw_event_record(&RawEventRecord {
                     event_id: event_id.clone(),
@@ -504,6 +518,7 @@ impl<'a> SyncEngine<'a> {
         payload: &DomainEventPayload,
         resource_id: &str,
         envelope: &liveletters_protocol::MessageEnvelope,
+        origin: &ProtocolIdentity,
     ) -> Result<(), ApplyEventError> {
         if let Some(filter) = &self.identity_filter
             && matches!(
@@ -540,7 +555,7 @@ impl<'a> SyncEngine<'a> {
                     .save_post_record(&PostRecord {
                         post_id: post_id.clone(),
                         resource_email: resource_id.to_owned(),
-                        author_email: resource_id.to_owned(),
+                        author_email: origin.email().to_owned(),
                         created_at: *created_at,
                         body: body.clone(),
                         visibility: visibility.clone(),
@@ -552,7 +567,7 @@ impl<'a> SyncEngine<'a> {
                 comment_id,
                 post_id,
                 parent_comment_id,
-                actor_id,
+                actor_id: _,
                 created_at,
                 body,
                 body_format,
@@ -584,11 +599,7 @@ impl<'a> SyncEngine<'a> {
                         comment_id: comment_id.clone(),
                         post_id: post_id.clone(),
                         parent_comment_id: parent_comment_id.clone(),
-                        // Для CommentCreated email автора = resource_id блога
-                        // (комментарий публикуется от имени блог-владельца
-                        // в текущей модели). После введения поля `origin`
-                        // здесь будет лежать настоящий email комментатора.
-                        author_email: resource_id.to_owned(),
+                        author_email: origin.email().to_owned(),
                         created_at: *created_at,
                         body: body.clone(),
                         visibility: visibility.clone(),
@@ -596,14 +607,7 @@ impl<'a> SyncEngine<'a> {
                     })
                     .map_err(ApplyEventError::Store)?;
 
-                self.enqueue_redistribution(
-                    resource_id,
-                    envelope,
-                    payload,
-                    actor_id,
-                    post_id,
-                    body,
-                )?;
+                self.enqueue_redistribution(resource_id, envelope, payload, origin, post_id, body)?;
 
                 Ok(())
             }
@@ -688,20 +692,15 @@ impl<'a> SyncEngine<'a> {
             DomainEventPayload::SubscriptionRequested {
                 resource_address,
                 subscriber_delivery_address,
-                subscriber_nickname,
                 ..
             } => {
-                // 1. Записать подписчика в authors, чтобы при следующих
-                //    пересылках render-слой мог достать его ник.
-                self.store
-                    .save_author(
-                        subscriber_delivery_address,
-                        subscriber_nickname,
-                        "subscription_requested",
-                    )
-                    .map_err(ApplyEventError::Store)?;
+                if subscriber_delivery_address != origin.email() {
+                    return Err(ApplyEventError::Invalid(
+                        "subscriber_delivery_address_mismatch_origin".into(),
+                    ));
+                }
 
-                // 2. A — владелец ресурса — фиксирует подписку у себя,
+                // A — владелец ресурса — фиксирует подписку у себя,
                 //    чтобы знать подписчиков для последующих пересылок
                 //    (PostCreated/CommentCreated) и чтобы SubscriptionConfirmed
                 //    был идемпотентным.
@@ -724,17 +723,10 @@ impl<'a> SyncEngine<'a> {
             DomainEventPayload::SubscriptionConfirmed {
                 resource_address,
                 subscriber_delivery_address,
-                owner_nickname,
-                owner_email,
                 accepted,
                 ..
             } => {
                 if *accepted {
-                    // 1. Записать владельца ресурса в authors.
-                    self.store
-                        .save_author(owner_email, owner_nickname, "subscription_confirmed")
-                        .map_err(ApplyEventError::Store)?;
-                    // 2. pending → subscriptions + local_subscriptions
                     self.accept_pending_subscription(
                         resource_address,
                         subscriber_delivery_address,
@@ -838,12 +830,13 @@ impl<'a> SyncEngine<'a> {
                 event_id.as_str(),
             )
             .map_err(|e| ApplyEventError::Invalid(format!("envelope: {e:?}")))?,
+            ProtocolIdentity::new(owner_nickname.clone(), owner_email.clone())
+                .map_err(|e| ApplyEventError::Invalid(format!("origin: {e:?}")))?,
+            None,
             &body,
             DomainEventPayload::SubscriptionConfirmed {
                 resource_address: resource_address.to_owned(),
                 subscriber_delivery_address: subscriber_delivery_address.to_owned(),
-                owner_nickname,
-                owner_email: owner_email.clone(),
                 accepted: true,
                 created_at,
             },
@@ -953,7 +946,7 @@ impl<'a> SyncEngine<'a> {
         resource_email: &str,
         envelope: &liveletters_protocol::MessageEnvelope,
         payload: &DomainEventPayload,
-        author_id: &str,
+        origin: &ProtocolIdentity,
         post_id: &str,
         body: &str,
     ) -> Result<(), ApplyEventError> {
@@ -964,7 +957,7 @@ impl<'a> SyncEngine<'a> {
         let recipients: Vec<String> = subs
             .into_iter()
             .map(|s| s.subscriber_email)
-            .filter(|addr| addr != author_id)
+            .filter(|addr| addr != origin.email())
             .collect();
         if recipients.is_empty() {
             return Ok(());
@@ -989,7 +982,11 @@ impl<'a> SyncEngine<'a> {
         let human_body = translate(
             "comment_created_redistribute.body",
             locale,
-            Vars(&[("sender", author_id), ("post_id", post_id), ("body", body)]),
+            Vars(&[
+                ("sender", origin.email()),
+                ("post_id", post_id),
+                ("body", body),
+            ]),
         )
         .expect("шаблон comment_created_redistribute.body присутствует в таблице");
 
@@ -1001,12 +998,6 @@ impl<'a> SyncEngine<'a> {
             &new_event_id,
         )
         .map_err(|e| ApplyEventError::Invalid(format!("envelope: {e:?}")))?;
-        let message =
-            liveletters_protocol::ProtocolMessage::new(new_envelope, &human_body, payload.clone())
-                .map_err(|e| ApplyEventError::Invalid(format!("protocol: {e:?}")))?;
-        let message_body = liveletters_protocol::encode_message(&message)
-            .map_err(|e| ApplyEventError::Invalid(format!("encode: {e:?}")))?;
-
         // `author_email` — кто шлёт (владелец ресурса, profile_id движка).
         let user = self
             .store
@@ -1016,6 +1007,29 @@ impl<'a> SyncEngine<'a> {
         let author_email = user
             .map(|u| u.author_email)
             .unwrap_or_else(|| resource_email.to_owned());
+        let source = self
+            .store
+            .get_author(&author_email)
+            .map_err(ApplyEventError::Store)?
+            .map(|author| ProtocolIdentity::new(author.nickname, author.email))
+            .transpose()
+            .map_err(|e| ApplyEventError::Invalid(format!("source: {e:?}")))?
+            .unwrap_or_else(|| {
+                ProtocolIdentity::new(author_email.clone(), author_email.clone())
+                    .expect("fallback source identity")
+            });
+        let message = liveletters_protocol::ProtocolMessage::new(
+            new_envelope,
+            // При пересылке первичный автор события сохраняется в `origin`,
+            // а владелец ресурса, который рассылает письмо, становится `source`.
+            origin.clone(),
+            Some(source),
+            &human_body,
+            payload.clone(),
+        )
+        .map_err(|e| ApplyEventError::Invalid(format!("protocol: {e:?}")))?;
+        let message_body = liveletters_protocol::encode_message(&message)
+            .map_err(|e| ApplyEventError::Invalid(format!("encode: {e:?}")))?;
 
         let record = OutboxRecord {
             event_id: new_event_id,
@@ -1153,6 +1167,10 @@ fn infer_event_type(payload: &DomainEventPayload) -> &'static str {
         DomainEventPayload::SubscriptionConfirmed { .. } => "subscription_confirmed",
         DomainEventPayload::SubscriptionRevoked { .. } => "subscription_revoked",
     }
+}
+
+fn event_type_to_author_source(payload: &DomainEventPayload) -> &'static str {
+    infer_event_type(payload)
 }
 
 fn infer_resource_id(payload: &DomainEventPayload) -> &str {
