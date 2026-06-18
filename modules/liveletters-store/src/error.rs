@@ -7,6 +7,7 @@ pub enum StoreError {
     InvalidProtectedSecretFormat { message: String },
     InvalidColumn(String),
     InvalidTable(String),
+    AuthorNotFound { email: String },
 }
 
 impl std::fmt::Display for StoreError {
@@ -23,6 +24,7 @@ impl std::fmt::Display for StoreError {
             }
             Self::InvalidColumn(column) => write!(f, "неизвестная колонка: {column}"),
             Self::InvalidTable(table) => write!(f, "неизвестная таблица: {table}"),
+            Self::AuthorNotFound { email } => write!(f, "автор не найден: {email}"),
         }
     }
 }

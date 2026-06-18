@@ -342,6 +342,38 @@ fn cu_posts_prints_current_users_posts_newest_first() {
 }
 
 #[test]
+fn cu_posts_prints_fresh_author_identity_from_authors_table() {
+    let tmp = TempDir::new().unwrap();
+    common::init_user(tmp.path(), "alice");
+
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store
+        .save_author("alice@example.org", "Alice", "test")
+        .unwrap();
+    store
+        .save_post_record(&PostRecord {
+            post_id: "post-1".into(),
+            resource_email: "alice@example.org".into(),
+            author_email: "alice@example.org".into(),
+            created_at: 1_710_000_000,
+            body: "Мой пост".into(),
+            visibility: "public".into(),
+            hidden: false,
+        })
+        .unwrap();
+    store
+        .save_author("alice@example.org", "Robert", "test")
+        .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["cu", "posts"])
+        .assert()
+        .success()
+        .stdout(contains("Robert <alice@example.org>"));
+}
+
+#[test]
 fn cu_posts_works_with_db_only_identity_no_toml() {
     let tmp = TempDir::new().unwrap();
     common::init_user(tmp.path(), "alice");

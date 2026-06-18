@@ -156,6 +156,32 @@ fn feed_shows_subscribed_posts_and_hides_unsubscribed_posts() {
 }
 
 #[test]
+fn feed_prints_fresh_author_identity_from_authors_table() {
+    let tmp = TempDir::new().unwrap();
+    init_home(&tmp);
+    subscribe_alice_to(&tmp, "bob@example.org");
+    save_post(
+        &tmp,
+        "subscribed",
+        "bob@example.org",
+        "bob@example.org",
+        1_710_000_200,
+    );
+
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store
+        .save_author("bob@example.org", "Robert", "test")
+        .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("feed")
+        .assert()
+        .success()
+        .stdout(contains("Robert <bob@example.org>"));
+}
+
+#[test]
 fn feed_does_not_read_posts_from_shared_home_database() {
     let tmp = TempDir::new().unwrap();
     common::init_user(tmp.path(), "algebrain");

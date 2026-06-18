@@ -4,7 +4,22 @@ use liveletters_store::PostRecord;
 
 const BODY_MAX: usize = 80;
 
-pub fn print_feed(posts: &[PostRecord], identity_display: &str, limit: Option<usize>) {
+#[derive(Debug, Clone)]
+pub struct FeedPost {
+    record: PostRecord,
+    author_display: String,
+}
+
+impl FeedPost {
+    pub fn new(record: PostRecord, author_display: String) -> Self {
+        Self {
+            record,
+            author_display,
+        }
+    }
+}
+
+pub fn print_feed(posts: &[FeedPost], identity_display: &str, limit: Option<usize>) {
     let total = posts.len();
     let shown = match limit {
         Some(n) => n.min(total),
@@ -25,21 +40,22 @@ pub fn print_feed(posts: &[PostRecord], identity_display: &str, limit: Option<us
     }
 }
 
-fn print_post(post: &PostRecord) {
-    let visibility = if post.visibility.is_empty() {
+fn print_post(post: &FeedPost) {
+    let record = &post.record;
+    let visibility = if record.visibility.is_empty() {
         "—"
     } else {
-        post.visibility.as_str()
+        record.visibility.as_str()
     };
-    let hidden_marker = if post.hidden { " (скрыт)" } else { "" };
-    let created = format_unix_iso8601_utc(post.created_at);
+    let hidden_marker = if record.hidden { " (скрыт)" } else { "" };
+    let created = format_unix_iso8601_utc(record.created_at);
     println!(
         "┌─ пост #{} от {}{hidden_marker}",
-        post.post_id, post.author_email
+        record.post_id, post.author_display
     );
     println!("│  visibility: {visibility}");
     println!("│  {created}");
-    let body = truncate_body(&post.body, BODY_MAX);
+    let body = truncate_body(&record.body, BODY_MAX);
     for line in body.lines() {
         println!("│  {line}");
     }

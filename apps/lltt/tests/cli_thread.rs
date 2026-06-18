@@ -70,3 +70,37 @@ fn thread_with_comment_shows_comment_in_output() {
         .success()
         .stdout(contains("Текст комментария"));
 }
+
+#[test]
+fn thread_prints_fresh_author_identities_from_authors_table() {
+    let tmp = TempDir::new().unwrap();
+    common::init_user(tmp.path(), "alice");
+    let post_id = create_post(&tmp);
+
+    let body_path = tmp.path().join("c.txt");
+    fs::write(&body_path, "Текст комментария").unwrap();
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args([
+            "comment",
+            "new",
+            &post_id,
+            "--body-file",
+            body_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let store =
+        liveletters_store::Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    store
+        .save_author("alice@example.org", "Robert", "test")
+        .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["thread", &post_id])
+        .assert()
+        .success()
+        .stdout(contains("Robert <alice@example.org>"));
+}

@@ -69,3 +69,36 @@ fn list_authors_returns_all_sorted_by_email() {
     let emails: Vec<&str> = list.iter().map(|r| r.email.as_str()).collect();
     assert_eq!(emails, vec!["a@x.org", "b@x.org", "c@x.org"]);
 }
+
+#[test]
+fn format_author_identity_uses_current_author_record() {
+    let (store, _tmp) = common::open_temp_store();
+    store.save_author("bob@example.org", "Bob", "test").unwrap();
+
+    assert_eq!(
+        store.format_author_identity("bob@example.org").unwrap(),
+        "Bob <bob@example.org>"
+    );
+
+    store
+        .save_author("bob@example.org", "Robert", "test")
+        .unwrap();
+    assert_eq!(
+        store.format_author_identity("bob@example.org").unwrap(),
+        "Robert <bob@example.org>"
+    );
+}
+
+#[test]
+fn format_author_identity_rejects_unknown_author() {
+    let (store, _tmp) = common::open_temp_store();
+
+    let err = store
+        .format_author_identity("missing@example.org")
+        .unwrap_err();
+
+    assert!(matches!(
+        err,
+        liveletters_store::StoreError::AuthorNotFound { email } if email == "missing@example.org"
+    ));
+}

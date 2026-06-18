@@ -35,7 +35,7 @@ pub fn print_thread(thread: &PostThread) {
 
     println!(
         "┌─ пост #{} от {}{hidden_marker}",
-        post.post_id, post.author_id
+        post.post_id, post.author_display
     );
     println!("│  visibility: {visibility}");
     for line in post.body.lines() {
@@ -120,7 +120,7 @@ fn render_tree(nodes: &[Node], parent: Option<usize>) -> Vec<String> {
         };
         out.push(format!(
             "{prefix} {} ({}){}",
-            c.comment.author_id, c.comment.comment_id, hidden_marker
+            c.comment.author_display, c.comment.comment_id, hidden_marker
         ));
         for line in c.comment.body.lines() {
             out.push(format!("        {line}"));
@@ -140,6 +140,7 @@ mod tests {
             post_id: "post-1".to_owned(),
             parent_comment_id: parent.map(str::to_owned),
             author_id: "user".to_owned(),
+            author_display: "User <user@example.org>".to_owned(),
             created_at: 0,
             body: "Тело".to_owned(),
             visibility: "public".to_owned(),

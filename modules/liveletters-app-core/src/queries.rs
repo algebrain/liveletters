@@ -30,8 +30,8 @@ pub fn get_current_user_posts(
         .list_posts()?
         .into_iter()
         .filter(|post| post.author_email == query.author_id)
-        .map(post_summary_from_record)
-        .collect();
+        .map(|post| post_summary_from_record(store, post))
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(CurrentUserPosts::new(posts))
 }
@@ -51,10 +51,13 @@ pub fn get_post_thread(
     let comments = store
         .list_comments_for_post(query.post_id)?
         .into_iter()
-        .map(comment_summary_from_record)
-        .collect();
+        .map(|comment| comment_summary_from_record(store, comment))
+        .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(PostThread::new(post_summary_from_record(post), comments))
+    Ok(PostThread::new(
+        post_summary_from_record(store, post)?,
+        comments,
+    ))
 }
 
 pub fn get_pending_outbox(
@@ -119,29 +122,39 @@ pub fn get_settings(store: &Store, _query: GetSettingsQuery) -> Result<AppSettin
     Ok(settings)
 }
 
-fn post_summary_from_record(record: PostRecord) -> PostSummary {
-    PostSummary {
+fn post_summary_from_record(
+    store: &Store,
+    record: PostRecord,
+) -> Result<PostSummary, AppCoreError> {
+    let author_display = store.format_author_identity(&record.author_email)?;
+    Ok(PostSummary {
         post_id: record.post_id,
         resource_id: record.resource_email,
         author_id: record.author_email,
+        author_display,
         created_at: record.created_at,
         body: record.body,
         visibility: decode_visibility_name(&record.visibility),
         hidden: record.hidden,
-    }
+    })
 }
 
-fn comment_summary_from_record(record: CommentRecord) -> CommentSummary {
-    CommentSummary {
+fn comment_summary_from_record(
+    store: &Store,
+    record: CommentRecord,
+) -> Result<CommentSummary, AppCoreError> {
+    let author_display = store.format_author_identity(&record.author_email)?;
+    Ok(CommentSummary {
         comment_id: record.comment_id,
         post_id: record.post_id,
         parent_comment_id: record.parent_comment_id,
         author_id: record.author_email,
+        author_display,
         created_at: record.created_at,
         body: record.body,
         visibility: decode_visibility_name(&record.visibility),
         hidden: record.hidden,
-    }
+    })
 }
 
 fn outbox_entry_from_record(record: OutboxRecord) -> OutboxEntry {

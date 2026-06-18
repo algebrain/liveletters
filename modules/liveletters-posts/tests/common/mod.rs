@@ -7,6 +7,7 @@ pub fn sample_post(id: &str, body: &str, hidden: bool) -> PostSummary {
         post_id: id.to_owned(),
         resource_id: "blog-1".to_owned(),
         author_id: "alice".to_owned(),
+        author_display: "Alice <alice@example.org>".to_owned(),
         created_at: 0,
         body: body.to_owned(),
         visibility: "public".to_owned(),

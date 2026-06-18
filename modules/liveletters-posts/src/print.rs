@@ -22,11 +22,11 @@ pub fn print_posts(posts_list: &CurrentUserPosts, identity_display: &str, limit:
     }
 
     for post in posts.iter().take(shown) {
-        print_post(post, identity_display);
+        print_post(post);
     }
 }
 
-fn print_post(post: &PostSummary, author: &str) {
+fn print_post(post: &PostSummary) {
     let visibility = if post.visibility.is_empty() {
         "—"
     } else {
@@ -34,7 +34,10 @@ fn print_post(post: &PostSummary, author: &str) {
     };
     let hidden_marker = if post.hidden { " (скрыт)" } else { "" };
     let created = format_unix_iso8601_utc(post.created_at);
-    println!("┌─ пост #{} от {}{hidden_marker}", post.post_id, author);
+    println!(
+        "┌─ пост #{} от {}{hidden_marker}",
+        post.post_id, post.author_display
+    );
     println!("│  visibility: {visibility}");
     println!("│  {created}");
     let body = truncate_body(&post.body, BODY_MAX);

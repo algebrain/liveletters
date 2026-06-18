@@ -39,6 +39,15 @@ impl Store {
         }))
     }
 
+    pub fn format_author_identity(&self, email: &str) -> Result<String, StoreError> {
+        let author = self
+            .get_author(email)?
+            .ok_or_else(|| StoreError::AuthorNotFound {
+                email: email.to_owned(),
+            })?;
+        Ok(format!("{} <{}>", author.nickname, author.email))
+    }
+
     pub fn list_authors(&self) -> Result<Vec<AuthorRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             "SELECT email, nickname, source, first_seen_at, updated_at

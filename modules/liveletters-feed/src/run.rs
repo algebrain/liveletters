@@ -4,7 +4,7 @@ use std::error::Error;
 use liveletters_output::CommandContext;
 use liveletters_store::{PostRecord, Store};
 
-use crate::print::print_feed;
+use crate::print::{FeedPost, print_feed};
 use crate::{Args, FeedError};
 
 pub fn run(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -32,7 +32,11 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), FeedError> {
         .list_posts()?
         .into_iter()
         .filter(|post| is_subscription_post(post, &subscribed, &owned))
-        .collect::<Vec<_>>();
+        .map(|post| {
+            let author_display = store.format_author_identity(&post.author_email)?;
+            Ok(FeedPost::new(post, author_display))
+        })
+        .collect::<Result<Vec<_>, liveletters_store::StoreError>>()?;
 
     print_feed(&posts, &display_name, args.limit);
     Ok(())
