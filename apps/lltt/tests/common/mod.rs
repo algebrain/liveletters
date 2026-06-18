@@ -74,7 +74,6 @@ pub fn write_post_eml(dir: &std::path::Path, post_id: &str, body: &str) -> PathB
         DomainEventPayload::PostCreated {
             post_id: post_id.into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_000,
             body: body.into(),
             body_format: "plain".into(),

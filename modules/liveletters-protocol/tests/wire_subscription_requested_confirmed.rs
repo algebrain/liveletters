@@ -29,7 +29,7 @@ fn json_of(payload: DomainEventPayload, origin: ProtocolIdentity) -> String {
 #[test]
 fn subscription_requested_round_trip() {
     let payload = DomainEventPayload::SubscriptionRequested {
-        resource_address: "alice@example.org".into(),
+        resource_id: "alice@example.org".into(),
         subscriber_delivery_address: "bob@example.org".into(),
         created_at: 1_710_000_000,
     };
@@ -52,7 +52,7 @@ fn subscription_requested_round_trip() {
 #[test]
 fn subscription_confirmed_uses_origin_for_owner_profile_and_accepted_flag() {
     let payload = DomainEventPayload::SubscriptionConfirmed {
-        resource_address: "alice@example.org".into(),
+        resource_id: "alice@example.org".into(),
         subscriber_delivery_address: "bob@example.org".into(),
         accepted: true,
         created_at: 1_710_000_000,
@@ -73,7 +73,7 @@ fn subscription_confirmed_uses_origin_for_owner_profile_and_accepted_flag() {
 #[test]
 fn subscription_confirmed_with_declined_keeps_profile() {
     let payload = DomainEventPayload::SubscriptionConfirmed {
-        resource_address: "alice@example.org".into(),
+        resource_id: "alice@example.org".into(),
         subscriber_delivery_address: "bob@example.org".into(),
         accepted: false,
         created_at: 1_710_000_000,
@@ -86,7 +86,7 @@ fn subscription_confirmed_with_declined_keeps_profile() {
 #[test]
 fn subscription_revoked_round_trip() {
     let payload = DomainEventPayload::SubscriptionRevoked {
-        resource_address: "alice@example.org".into(),
+        resource_id: "alice@example.org".into(),
         subscriber_delivery_address: "bob@example.org".into(),
         created_at: 1_710_000_000,
     };

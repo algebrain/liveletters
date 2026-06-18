@@ -534,7 +534,6 @@ impl<'a> SyncEngine<'a> {
         match payload {
             DomainEventPayload::PostCreated {
                 post_id,
-                actor_id: _,
                 created_at,
                 body,
                 visibility,
@@ -565,7 +564,6 @@ impl<'a> SyncEngine<'a> {
                 comment_id,
                 post_id,
                 parent_comment_id,
-                actor_id: _,
                 created_at,
                 body,
                 body_format,
@@ -622,9 +620,7 @@ impl<'a> SyncEngine<'a> {
                     return Err(ApplyEventError::Replay("post_already_hidden".into()));
                 }
 
-                if let DomainEventPayload::PostHidden { actor_id, .. } = payload
-                    && existing.author_email != *actor_id
-                {
+                if existing.author_email != origin.email() {
                     return Err(ApplyEventError::Unauthorized(
                         "actor_cannot_hide_post".into(),
                     ));
@@ -651,32 +647,24 @@ impl<'a> SyncEngine<'a> {
                     return Err(ApplyEventError::Deferred("missing_comment".into()));
                 };
 
-                if let DomainEventPayload::CommentEdited {
-                    actor_id,
-                    body,
-                    visibility,
-                    ..
-                } = payload
-                {
-                    if existing.author_email != *actor_id {
-                        return Err(ApplyEventError::Unauthorized(
-                            "actor_cannot_edit_comment".into(),
-                        ));
-                    }
+                if existing.author_email != origin.email() {
+                    return Err(ApplyEventError::Unauthorized(
+                        "actor_cannot_edit_comment".into(),
+                    ));
+                }
 
-                    if body.trim().is_empty() {
-                        return Err(ApplyEventError::Invalid("blank_comment_body".into()));
-                    }
+                if body.trim().is_empty() {
+                    return Err(ApplyEventError::Invalid("blank_comment_body".into()));
+                }
 
-                    if visibility.trim().is_empty() {
-                        return Err(ApplyEventError::Invalid("blank_visibility".into()));
-                    }
+                if visibility.trim().is_empty() {
+                    return Err(ApplyEventError::Invalid("blank_visibility".into()));
+                }
 
-                    if existing.body == *body && existing.visibility == *visibility {
-                        return Err(ApplyEventError::Replay(
-                            "comment_edit_already_applied".into(),
-                        ));
-                    }
+                if existing.body == *body && existing.visibility == *visibility {
+                    return Err(ApplyEventError::Replay(
+                        "comment_edit_already_applied".into(),
+                    ));
                 }
 
                 self.store
@@ -688,7 +676,7 @@ impl<'a> SyncEngine<'a> {
                     .map_err(ApplyEventError::Store)
             }
             DomainEventPayload::SubscriptionRequested {
-                resource_address,
+                resource_id: resource_address,
                 subscriber_delivery_address,
                 ..
             } => {
@@ -719,7 +707,7 @@ impl<'a> SyncEngine<'a> {
                 Ok(())
             }
             DomainEventPayload::SubscriptionConfirmed {
-                resource_address,
+                resource_id: resource_address,
                 subscriber_delivery_address,
                 accepted,
                 ..
@@ -739,7 +727,7 @@ impl<'a> SyncEngine<'a> {
                 Ok(())
             }
             DomainEventPayload::SubscriptionRevoked {
-                resource_address,
+                resource_id: resource_address,
                 subscriber_delivery_address,
                 ..
             } => {
@@ -835,7 +823,7 @@ impl<'a> SyncEngine<'a> {
             None,
             &body,
             DomainEventPayload::SubscriptionConfirmed {
-                resource_address: resource_address.to_owned(),
+                resource_id: resource_address.to_owned(),
                 subscriber_delivery_address: subscriber_delivery_address.to_owned(),
                 accepted: true,
                 created_at,
@@ -1075,18 +1063,6 @@ fn validate_protocol_message(
         return Err("event_type_mismatch".into());
     }
 
-    let actor_id = infer_actor_id(payload);
-    if matches!(
-        payload,
-        DomainEventPayload::PostCreated { .. }
-            | DomainEventPayload::CommentCreated { .. }
-            | DomainEventPayload::PostHidden { .. }
-            | DomainEventPayload::CommentEdited { .. }
-    ) && actor_id.trim().is_empty()
-    {
-        return Err("blank_actor_id".into());
-    }
-
     match payload {
         DomainEventPayload::PostCreated { visibility, .. }
         | DomainEventPayload::CommentCreated { visibility, .. }
@@ -1097,29 +1073,29 @@ fn validate_protocol_message(
         }
         DomainEventPayload::PostHidden { .. } => {}
         DomainEventPayload::SubscriptionRequested {
-            resource_address,
+            resource_id,
             subscriber_delivery_address,
             ..
         } => {
-            if resource_address.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
+            if resource_id.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
                 return Err("blank_subscription_field".into());
             }
         }
         DomainEventPayload::SubscriptionConfirmed {
-            resource_address,
+            resource_id,
             subscriber_delivery_address,
             ..
         } => {
-            if resource_address.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
+            if resource_id.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
                 return Err("blank_subscription_field".into());
             }
         }
         DomainEventPayload::SubscriptionRevoked {
-            resource_address,
+            resource_id,
             subscriber_delivery_address,
             ..
         } => {
-            if resource_address.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
+            if resource_id.trim().is_empty() || subscriber_delivery_address.trim().is_empty() {
                 return Err("blank_subscription_field".into());
             }
         }
@@ -1179,27 +1155,9 @@ fn infer_resource_id(payload: &DomainEventPayload) -> &str {
         | DomainEventPayload::CommentCreated { resource_id, .. }
         | DomainEventPayload::PostHidden { resource_id, .. }
         | DomainEventPayload::CommentEdited { resource_id, .. } => resource_id,
-        DomainEventPayload::SubscriptionRequested {
-            resource_address, ..
-        }
-        | DomainEventPayload::SubscriptionConfirmed {
-            resource_address, ..
-        }
-        | DomainEventPayload::SubscriptionRevoked {
-            resource_address, ..
-        } => resource_address,
-    }
-}
-
-fn infer_actor_id(payload: &DomainEventPayload) -> &str {
-    match payload {
-        DomainEventPayload::PostCreated { actor_id, .. }
-        | DomainEventPayload::CommentCreated { actor_id, .. }
-        | DomainEventPayload::PostHidden { actor_id, .. }
-        | DomainEventPayload::CommentEdited { actor_id, .. } => actor_id,
-        DomainEventPayload::SubscriptionRequested { .. }
-        | DomainEventPayload::SubscriptionConfirmed { .. }
-        | DomainEventPayload::SubscriptionRevoked { .. } => "",
+        DomainEventPayload::SubscriptionRequested { resource_id, .. }
+        | DomainEventPayload::SubscriptionConfirmed { resource_id, .. }
+        | DomainEventPayload::SubscriptionRevoked { resource_id, .. } => resource_id,
     }
 }
 

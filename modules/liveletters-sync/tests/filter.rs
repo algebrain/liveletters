@@ -18,16 +18,16 @@ fn identity(nickname: &str, email: &str) -> ProtocolIdentity {
 
 fn subscription_requested_email(
     event_id: &str,
-    resource_address: &str,
+    resource_id: &str,
     subscriber_delivery_address: &str,
 ) -> ReceivedEmail {
     let message = ProtocolMessage::new(
-        MessageEnvelope::new("1", "subscription_requested", resource_address, event_id).unwrap(),
+        MessageEnvelope::new("1", "subscription_requested", resource_id, event_id).unwrap(),
         identity("Test User", subscriber_delivery_address),
         None,
         "Запрос подписки",
         DomainEventPayload::SubscriptionRequested {
-            resource_address: resource_address.into(),
+            resource_id: resource_id.into(),
             subscriber_delivery_address: subscriber_delivery_address.into(),
             created_at: 1_710_000_000,
         },
@@ -36,7 +36,7 @@ fn subscription_requested_email(
 
     let outgoing = build_protocol_email(
         "bob@example.test",
-        resource_address,
+        resource_id,
         "Sync fixture",
         Some(message.human_readable_body().unwrap_or("")),
         &message,
@@ -51,16 +51,16 @@ fn subscription_requested_email(
 
 fn subscription_revoked_email(
     event_id: &str,
-    resource_address: &str,
+    resource_id: &str,
     subscriber_delivery_address: &str,
 ) -> ReceivedEmail {
     let message = ProtocolMessage::new(
-        MessageEnvelope::new("1", "subscription_revoked", resource_address, event_id).unwrap(),
+        MessageEnvelope::new("1", "subscription_revoked", resource_id, event_id).unwrap(),
         identity("Test User", subscriber_delivery_address),
         None,
         "Отписка",
         DomainEventPayload::SubscriptionRevoked {
-            resource_address: resource_address.into(),
+            resource_id: resource_id.into(),
             subscriber_delivery_address: subscriber_delivery_address.into(),
             created_at: 1_710_000_000,
         },
@@ -69,7 +69,7 @@ fn subscription_revoked_email(
 
     let outgoing = build_protocol_email(
         "bob@example.test",
-        resource_address,
+        resource_id,
         "Sync fixture",
         Some(message.human_readable_body().unwrap_or("")),
         &message,
@@ -91,7 +91,6 @@ fn post_created_email(event_id: &str, post_id: &str, resource_id: &str) -> Recei
         DomainEventPayload::PostCreated {
             post_id: post_id.into(),
             resource_id: resource_id.into(),
-            actor_id: "alice".into(),
             created_at: 1,
             body: "Текст поста".into(),
             body_format: "plain".into(),
@@ -132,7 +131,6 @@ fn comment_created_email(
             post_id: post_id.into(),
             parent_comment_id: None,
             resource_id: resource_id.into(),
-            actor_id: author_email.into(),
             created_at: 1,
             body: "Текст комментария".into(),
             body_format: "plain".into(),
@@ -216,7 +214,7 @@ fn apply_subscription_confirmed_does_not_persist_record_yet() {
         None,
         "Подтверждение",
         DomainEventPayload::SubscriptionConfirmed {
-            resource_address: "alice-publish@example.org".into(),
+            resource_id: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
             accepted: true,
             created_at: 1_710_000_000,
@@ -384,7 +382,7 @@ fn applied_comment_created_creates_outbox_redistribution_to_other_subscribers() 
         })
         .unwrap();
 
-    // bob комментирует (actor_id = его email — это важно для фильтра)
+    // bob комментирует (origin.email = его email — это важно для фильтра)
     let report = engine
         .ingest_batch(vec![comment_created_email(
             "comment-1",

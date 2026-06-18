@@ -69,7 +69,6 @@ fn comment_created_email(
             post_id: post_id.into(),
             parent_comment_id: None,
             resource_id: resource_id.into(),
-            actor_id: author_email.into(),
             created_at: 1,
             body: "Текст комментария".into(),
             body_format: "plain".into(),
@@ -101,7 +100,6 @@ fn post_created_email(
         DomainEventPayload::PostCreated {
             post_id: post_id.into(),
             resource_id: resource_id.into(),
-            actor_id: author_email.into(),
             created_at: 1,
             body: "Текст поста".into(),
             body_format: "plain".into(),

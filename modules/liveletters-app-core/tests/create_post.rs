@@ -117,8 +117,9 @@ fn create_post_uses_email_when_nickname_is_empty() {
     .unwrap();
     let outbox = store.list_outbox_records().unwrap();
     let envelope: Value = serde_json::from_str(&outbox[0].message_body).unwrap();
+    assert!(envelope["payload"].get("actor_id").is_none());
     assert_eq!(
-        envelope["payload"]["actor_id"], "alice@example.test",
-        "RED: actor_id should fall back to email when nickname is empty"
+        envelope["origin"], "alice@example.test <alice@example.test>",
+        "origin должен содержать профиль автора, когда actor_id больше нет"
     );
 }

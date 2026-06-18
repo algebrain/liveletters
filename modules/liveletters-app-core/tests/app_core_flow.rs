@@ -286,7 +286,6 @@ fn reprocesses_deferred_events_through_app_core_orchestration() {
             post_id: "post-1".into(),
             parent_comment_id: None,
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 2,
             body: "Комментарий раньше поста".into(),
             body_format: "plain".into(),

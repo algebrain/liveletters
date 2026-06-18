@@ -40,7 +40,7 @@ fn build_subscription_confirmed_eml(from: &str, to: &str, accepted: bool) -> Str
             "Отказ"
         },
         liveletters_protocol::DomainEventPayload::SubscriptionConfirmed {
-            resource_address: from.into(),
+            resource_id: from.into(),
             subscriber_delivery_address: to.into(),
             accepted,
             created_at: 1_710_000_500,

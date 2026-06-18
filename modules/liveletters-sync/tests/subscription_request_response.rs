@@ -45,7 +45,7 @@ fn build_subscription_requested_email(from: &str, to: &str, event_id: &str) -> R
         None,
         "Запрос подписки",
         DomainEventPayload::SubscriptionRequested {
-            resource_address: to.into(),
+            resource_id: to.into(),
             subscriber_delivery_address: from.into(),
             created_at: 1_710_000_000,
         },
@@ -81,7 +81,7 @@ fn build_subscription_confirmed_email(
             "Отказ"
         },
         DomainEventPayload::SubscriptionConfirmed {
-            resource_address: from.into(),
+            resource_id: from.into(),
             subscriber_delivery_address: to.into(),
             accepted,
             created_at: 1_710_000_500,

@@ -109,6 +109,10 @@ Nickname <email@example.org>
 `authors`. Поля `origin` и `source` заменяют отдельные поля payload, которые
 раньше переносили ник и почтовый адрес отправителя.
 
+Отдельного `actor_id` в payload нет: автор поста, комментария или
+изменения определяется по `origin`. `source` не является автором события;
+это только непосредственный источник доставки.
+
 В Rust эти строки представлены типом `ProtocolIdentity`. Он разбирает строку
 из передаваемого JSON и даёт доступ к `nickname()` и `email()`.
 
@@ -288,7 +292,6 @@ Nickname <email@example.org>
 
 - `post_id`
 - `resource_id`
-- `actor_id`
 - `created_at`
 - `body`
 - `body_format`
@@ -316,7 +319,6 @@ Nickname <email@example.org>
 - `post_id`
 - `parent_comment_id`
 - `resource_id`
-- `actor_id`
 - `created_at`
 - `visibility`
 
@@ -345,7 +347,7 @@ B отправляет A, чтобы заявить: «хочу получать
 
 Поля:
 
-- `resource_address` — адрес блога, на который B подписывается
+- `resource_id` — идентификатор ресурса, на который B подписывается
 - `subscriber_delivery_address` — почтовый адрес B, на который A
   будет слать посты
 - `created_at`
@@ -360,7 +362,7 @@ B отправляет A, чтобы заявить: «хочу получать
 
 A отвечает B после получения `SubscriptionRequested`.
 
-- `resource_address` — адрес блога A
+- `resource_id` — идентификатор ресурса A
 - `subscriber_delivery_address` — куда слать посты (равно B из запроса)
 - `accepted` — `true` если A принимает подписку, `false` если отклоняет
 - `created_at`
@@ -378,7 +380,7 @@ B отправляет A, чтобы отписаться. Подтвержде�
 
 Поля:
 
-- `resource_address`
+- `resource_id`
 - `subscriber_delivery_address`
 - `created_at`
 

@@ -1,6 +1,6 @@
 //! Гарантия того, что сериализованный JSON полезной нагрузки не содержит
-//! внутренний служебный префикс `acct_`. В `actor_id` и `subscriber_*` поля
-//! передаётся почтовый адрес или пустая строка; никаких `acct_<имя>`.
+//! внутренний служебный префикс `acct_`. В протоколе передаются почтовые
+//! адреса, а не локальные служебные `acct_<имя>`.
 
 use liveletters_protocol::{
     DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage, encode_message,
@@ -30,11 +30,10 @@ fn json_of(payload: DomainEventPayload) -> String {
 }
 
 #[test]
-fn post_created_actor_id_email_does_not_leak_acct_prefix() {
+fn post_created_origin_email_does_not_leak_acct_prefix() {
     let payload = DomainEventPayload::PostCreated {
         post_id: "post-1".into(),
         resource_id: "blog-1".into(),
-        actor_id: "alice@example.org".into(),
         created_at: 1_710_000_000,
         body: "Текст".into(),
         body_format: "plain".into(),
@@ -45,13 +44,12 @@ fn post_created_actor_id_email_does_not_leak_acct_prefix() {
 }
 
 #[test]
-fn comment_created_actor_id_email_does_not_leak_acct_prefix() {
+fn comment_created_origin_email_does_not_leak_acct_prefix() {
     let payload = DomainEventPayload::CommentCreated {
         comment_id: "c-1".into(),
         post_id: "post-1".into(),
         parent_comment_id: None,
         resource_id: "blog-1".into(),
-        actor_id: "bob@example.org".into(),
         created_at: 1_710_000_000,
         body: "Текст".into(),
         body_format: "plain".into(),
@@ -64,7 +62,7 @@ fn comment_created_actor_id_email_does_not_leak_acct_prefix() {
 #[test]
 fn subscription_requested_does_not_leak_acct_prefix() {
     let payload = DomainEventPayload::SubscriptionRequested {
-        resource_address: "blog-1".into(),
+        resource_id: "blog-1".into(),
         subscriber_delivery_address: "carol@example.org".into(),
         created_at: 1_710_000_000,
     };
@@ -75,7 +73,7 @@ fn subscription_requested_does_not_leak_acct_prefix() {
 #[test]
 fn subscription_confirmed_does_not_leak_acct_prefix() {
     let payload = DomainEventPayload::SubscriptionConfirmed {
-        resource_address: "blog-1".into(),
+        resource_id: "blog-1".into(),
         subscriber_delivery_address: "carol@example.org".into(),
         accepted: true,
         created_at: 1_710_000_000,

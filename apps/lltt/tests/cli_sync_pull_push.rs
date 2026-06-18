@@ -308,7 +308,6 @@ fn sync_without_subcommand_runs_pull_then_push() {
         DomainEventPayload::PostCreated {
             post_id: "post-pull-all".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_000,
             body: "Привет из полного sync".into(),
             body_format: "plain".into(),
@@ -345,7 +344,6 @@ fn sync_without_subcommand_runs_pull_then_push() {
         DomainEventPayload::PostCreated {
             post_id: "post-push-all".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_100,
             body: "Тело".into(),
             body_format: "plain".into(),
@@ -415,7 +413,6 @@ fn sync_push_sends_one_email_per_subscriber_and_clears_outbox() {
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_000,
             body: "Тело".into(),
             body_format: "plain".into(),
@@ -481,7 +478,6 @@ fn sync_pull_advances_cursor_idempotently() {
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_000,
             body: "Привет из IMAP".into(),
             body_format: "plain".into(),
@@ -566,7 +562,7 @@ fn sync_push_with_direct_delivery_ignores_subscriptions_table() {
         None,
         "Запрос подписки",
         DomainEventPayload::SubscriptionRequested {
-            resource_address: "algebrain@example.org".into(),
+            resource_id: "algebrain@example.org".into(),
             subscriber_delivery_address: "alice@example.test".into(),
             created_at: 1_710_000_000,
         },
@@ -623,7 +619,6 @@ fn sync_pull_re_fetches_same_uid_when_imap_ignores_start_uid() {
         DomainEventPayload::PostCreated {
             post_id: "post-2".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_000,
             body: "Привет из IMAP".into(),
             body_format: "plain".into(),

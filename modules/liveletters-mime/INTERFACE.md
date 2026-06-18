@@ -206,7 +206,6 @@ let message = ProtocolMessage::new(
     DomainEventPayload::PostCreated {
         post_id: "post-1".into(),
         resource_id: "blog-1".into(),
-        actor_id: "alice".into(),
         created_at: 1_710_000_000,
         body: "Текст поста".into(),
         body_format: "plain".into(),

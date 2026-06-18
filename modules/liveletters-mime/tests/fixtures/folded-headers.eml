@@ -42,7 +42,6 @@ Content-Disposition: attachment; filename="liveletters.json"
     "kind": "post_created",
     "post_id": "post-1",
     "resource_id": "test-blog",
-    "actor_id": "alice",
     "created_at": 1710000000,
     "body": "Test body text",
     "body_format": "plain",

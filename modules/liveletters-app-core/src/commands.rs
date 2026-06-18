@@ -226,7 +226,6 @@ pub fn create_post(
     );
 
     let record = store.get_user_settings_record(command.profile_id)?;
-    let author_name = display_author(store, record.as_ref())?;
     let origin = protocol_origin(store, record.as_ref())?;
 
     let i18n = post_created(
@@ -256,10 +255,6 @@ pub fn create_post(
             DomainEventPayload::PostCreated {
                 post_id: post.id().as_str().to_owned(),
                 resource_id: post.resource_id().as_str().to_owned(),
-                actor_id: record
-                    .as_ref()
-                    .map(|r| r.author_email.clone())
-                    .unwrap_or_else(|| author_name.clone()),
                 created_at: post.created_at().as_unix_seconds(),
                 body: post.body().as_str().to_owned(),
                 body_format: "plain".to_owned(),
@@ -366,10 +361,6 @@ pub fn create_comment(
                     .parent_comment_id()
                     .map(|parent_id| parent_id.as_str().to_owned()),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: record
-                    .as_ref()
-                    .map(|r| r.author_email.clone())
-                    .unwrap_or_else(|| author_name.clone()),
                 created_at: comment.created_at().as_unix_seconds(),
                 body: comment.body().as_str().to_owned(),
                 body_format: "plain".to_owned(),
@@ -488,10 +479,6 @@ pub fn hide_post(
             DomainEventPayload::PostHidden {
                 post_id: event.post_id().as_str().to_owned(),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: record
-                    .as_ref()
-                    .map(|r| r.author_email.clone())
-                    .unwrap_or_else(|| author_name.clone()),
                 created_at: event.created_at().as_unix_seconds(),
             },
         )?,
@@ -586,10 +573,6 @@ pub fn edit_comment(
                 comment_id: event.comment_id().as_str().to_owned(),
                 post_id: event.post_id().as_str().to_owned(),
                 resource_id: event.resource_id().as_str().to_owned(),
-                actor_id: record
-                    .as_ref()
-                    .map(|r| r.author_email.clone())
-                    .unwrap_or_else(|| author_name.clone()),
                 created_at: event.created_at().as_unix_seconds(),
                 body: comment.body().as_str().to_owned(),
                 visibility: encode_visibility(comment.visibility()),
@@ -1007,7 +990,7 @@ pub fn subscribe(
         None,
         &i18n.body,
         DomainEventPayload::SubscriptionRequested {
-            resource_address: resource.as_str().to_owned(),
+            resource_id: resource.as_str().to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
             created_at: command.created_at,
         },
@@ -1076,7 +1059,7 @@ pub fn unsubscribe(
         None,
         &i18n.body,
         DomainEventPayload::SubscriptionRevoked {
-            resource_address: resource.as_str().to_owned(),
+            resource_id: resource.as_str().to_owned(),
             subscriber_delivery_address: delivery.as_str().to_owned(),
             created_at: command.created_at,
         },

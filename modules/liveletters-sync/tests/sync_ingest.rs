@@ -29,15 +29,15 @@ fn protocol_email(event_id: &str, payload: DomainEventPayload, human_body: &str)
         DomainEventPayload::CommentEdited { resource_id, .. } => {
             ("comment_edited", resource_id.as_str())
         }
-        DomainEventPayload::SubscriptionRequested {
-            resource_address, ..
-        } => ("subscription_requested", resource_address.as_str()),
-        DomainEventPayload::SubscriptionConfirmed {
-            resource_address, ..
-        } => ("subscription_confirmed", resource_address.as_str()),
-        DomainEventPayload::SubscriptionRevoked {
-            resource_address, ..
-        } => ("subscription_revoked", resource_address.as_str()),
+        DomainEventPayload::SubscriptionRequested { resource_id, .. } => {
+            ("subscription_requested", resource_id.as_str())
+        }
+        DomainEventPayload::SubscriptionConfirmed { resource_id, .. } => {
+            ("subscription_confirmed", resource_id.as_str())
+        }
+        DomainEventPayload::SubscriptionRevoked { resource_id, .. } => {
+            ("subscription_revoked", resource_id.as_str())
+        }
     };
 
     let protocol_message = ProtocolMessage::new(
@@ -76,7 +76,6 @@ fn valid_post_created_message_is_applied() {
             DomainEventPayload::PostCreated {
                 post_id: "post-1".into(),
                 resource_id: "blog-1".into(),
-                actor_id: "alice".into(),
                 created_at: 1,
                 body: "Текст поста".into(),
                 body_format: "plain".into(),
@@ -107,7 +106,6 @@ fn duplicate_event_is_detected_without_reapplying() {
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1,
             body: "Текст поста".into(),
             body_format: "plain".into(),
@@ -164,7 +162,6 @@ fn comment_without_post_is_deferred() {
                 post_id: "missing-post".into(),
                 parent_comment_id: None,
                 resource_id: "blog-1".into(),
-                actor_id: "alice".into(),
                 created_at: 2,
                 body: "Новый комментарий".into(),
                 body_format: "plain".into(),
@@ -216,7 +213,6 @@ fn replayed_post_created_is_reported_separately_from_duplicate_event_id() {
             DomainEventPayload::PostCreated {
                 post_id: "post-1".into(),
                 resource_id: "blog-1".into(),
-                actor_id: "alice".into(),
                 created_at: 1,
                 body: "Старая запись".into(),
                 body_format: "plain".into(),
@@ -277,7 +273,6 @@ fn unauthorized_comment_edit_is_rejected() {
                 comment_id: "comment-1".into(),
                 post_id: "post-1".into(),
                 resource_id: "blog-1".into(),
-                actor_id: "mallory".into(),
                 created_at: 3,
                 body: "Hacked".into(),
                 visibility: "public".into(),
@@ -311,7 +306,6 @@ fn invalid_event_with_mismatched_resource_id_is_rejected() {
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
             resource_id: "blog-payload".into(),
-            actor_id: "alice".into(),
             created_at: 1,
             body: "Некорректное событие".into(),
             body_format: "plain".into(),
@@ -356,7 +350,6 @@ fn invalid_post_created_with_blank_body_is_rejected() {
             DomainEventPayload::PostCreated {
                 post_id: "post-blank".into(),
                 resource_id: "blog-1".into(),
-                actor_id: "alice".into(),
                 created_at: 1,
                 body: "   ".into(),
                 body_format: "plain".into(),
@@ -384,7 +377,6 @@ fn invalid_post_created_with_unknown_body_format_is_rejected() {
             DomainEventPayload::PostCreated {
                 post_id: "post-format".into(),
                 resource_id: "blog-1".into(),
-                actor_id: "alice".into(),
                 created_at: 1,
                 body: "Текст".into(),
                 body_format: "rst".into(),
@@ -415,7 +407,6 @@ fn deferred_events_can_be_reprocessed_after_dependencies_appear() {
                 post_id: "post-1".into(),
                 parent_comment_id: None,
                 resource_id: "blog-1".into(),
-                actor_id: "alice".into(),
                 created_at: 2,
                 body: "Комментарий раньше поста".into(),
                 body_format: "plain".into(),
@@ -431,7 +422,6 @@ fn deferred_events_can_be_reprocessed_after_dependencies_appear() {
             DomainEventPayload::PostCreated {
                 post_id: "post-1".into(),
                 resource_id: "blog-1".into(),
-                actor_id: "alice".into(),
                 created_at: 1,
                 body: "Пост появился позже".into(),
                 body_format: "plain".into(),

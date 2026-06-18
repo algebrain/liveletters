@@ -82,12 +82,14 @@ fn save_bob(store: &Store) {
 fn comment_created_replay_does_not_change_db() {
     let (store, _tmp) = common::open_temp_store();
     store.save_author("blog-1", "blog", "self").unwrap();
-    store.save_author("alice", "alice", "self").unwrap();
+    store
+        .save_author("alice@example.test", "alice", "self")
+        .unwrap();
     store
         .save_post_record(&liveletters_store::PostRecord {
             post_id: "post-1".into(),
             resource_email: "blog-1".into(),
-            author_email: "alice".into(),
+            author_email: "alice@example.test".into(),
             created_at: 1,
             body: "Пост".into(),
             visibility: "public".into(),
@@ -101,7 +103,6 @@ fn comment_created_replay_does_not_change_db() {
         post_id: "post-1".into(),
         parent_comment_id: None,
         resource_id: "blog-1".into(),
-        actor_id: "alice".into(),
         created_at: 2,
         body: "Первый комментарий".into(),
         body_format: "plain".into(),
@@ -125,10 +126,11 @@ fn comment_created_replay_does_not_change_db() {
     );
 
     let report1 = engine.ingest_batch(vec![first]).expect("first ingest");
-    assert!(matches!(
-        report1.outcomes()[0],
-        SyncMessageOutcome::Applied { .. }
-    ));
+    let outcome1 = &report1.outcomes()[0];
+    assert!(
+        matches!(outcome1, SyncMessageOutcome::Applied { .. }),
+        "первое скрытие должно примениться: {outcome1:?}"
+    );
     let snapshot_before = store.list_comments_for_post("post-1").unwrap();
     assert_eq!(snapshot_before.len(), 1);
     assert_eq!(snapshot_before[0].body, "Первый комментарий");
@@ -155,12 +157,14 @@ fn comment_created_replay_does_not_change_db() {
 fn post_hidden_replay_does_not_change_db() {
     let (store, _tmp) = common::open_temp_store();
     store.save_author("blog-1", "blog", "self").unwrap();
-    store.save_author("alice", "alice", "self").unwrap();
+    store
+        .save_author("alice@example.test", "alice", "self")
+        .unwrap();
     store
         .save_post_record(&liveletters_store::PostRecord {
             post_id: "post-1".into(),
             resource_email: "blog-1".into(),
-            author_email: "alice".into(),
+            author_email: "alice@example.test".into(),
             created_at: 1,
             body: "Пост".into(),
             visibility: "public".into(),
@@ -172,7 +176,6 @@ fn post_hidden_replay_does_not_change_db() {
     let payload = || DomainEventPayload::PostHidden {
         post_id: "post-1".into(),
         resource_id: "blog-1".into(),
-        actor_id: "alice".into(),
         created_at: 2,
     };
     let first = build_email(
@@ -193,10 +196,11 @@ fn post_hidden_replay_does_not_change_db() {
     );
 
     let report1 = engine.ingest_batch(vec![first]).expect("first ingest");
-    assert!(matches!(
-        report1.outcomes()[0],
-        SyncMessageOutcome::Applied { .. }
-    ));
+    let outcome1 = &report1.outcomes()[0];
+    assert!(
+        matches!(outcome1, SyncMessageOutcome::Applied { .. }),
+        "первое скрытие должно примениться: {outcome1:?}"
+    );
     let snapshot_before = store.list_posts().unwrap();
     assert_eq!(snapshot_before.len(), 1);
     assert!(snapshot_before[0].hidden);
@@ -220,12 +224,14 @@ fn post_hidden_replay_does_not_change_db() {
 fn comment_edited_replay_does_not_change_db() {
     let (store, _tmp) = common::open_temp_store();
     store.save_author("blog-1", "blog", "self").unwrap();
-    store.save_author("alice", "alice", "self").unwrap();
+    store
+        .save_author("alice@example.test", "alice", "self")
+        .unwrap();
     store
         .save_post_record(&liveletters_store::PostRecord {
             post_id: "post-1".into(),
             resource_email: "blog-1".into(),
-            author_email: "alice".into(),
+            author_email: "alice@example.test".into(),
             created_at: 1,
             body: "Пост".into(),
             visibility: "public".into(),
@@ -237,7 +243,7 @@ fn comment_edited_replay_does_not_change_db() {
             comment_id: "comment-1".into(),
             post_id: "post-1".into(),
             parent_comment_id: None,
-            author_email: "alice".into(),
+            author_email: "alice@example.test".into(),
             created_at: 2,
             body: "Оригинал".into(),
             visibility: "public".into(),
@@ -250,7 +256,6 @@ fn comment_edited_replay_does_not_change_db() {
         comment_id: "comment-1".into(),
         post_id: "post-1".into(),
         resource_id: "blog-1".into(),
-        actor_id: "alice".into(),
         created_at: 3,
         body: "Отредактировано".into(),
         visibility: "public".into(),
@@ -308,7 +313,7 @@ fn subscription_requested_replay_keeps_subscriptions_table_stable() {
     let engine = SyncEngine::new(&store).with_profile_id("alice");
 
     let payload = || DomainEventPayload::SubscriptionRequested {
-        resource_address: "alice-publish@example.org".into(),
+        resource_id: "alice-publish@example.org".into(),
         subscriber_delivery_address: "bob-feed@example.org".into(),
         created_at: 1_710_000_000,
     };
@@ -377,7 +382,7 @@ fn repeated_subscription_requested_keeps_response_semantically_same() {
     let engine = SyncEngine::new(&store).with_profile_id("alice");
 
     let payload = || DomainEventPayload::SubscriptionRequested {
-        resource_address: "alice-publish@example.org".into(),
+        resource_id: "alice-publish@example.org".into(),
         subscriber_delivery_address: "bob-feed@example.org".into(),
         created_at: 1_710_000_000,
     };
@@ -423,7 +428,7 @@ fn subscription_confirmed_accepted_replay_does_not_change_db() {
     let engine = SyncEngine::new(&store).with_profile_id("bob");
 
     let payload = || DomainEventPayload::SubscriptionConfirmed {
-        resource_address: "alice-publish@example.org".into(),
+        resource_id: "alice-publish@example.org".into(),
         subscriber_delivery_address: "bob-publish@example.org".into(),
         accepted: true,
         created_at: 1_710_000_500,
@@ -488,7 +493,7 @@ struct SubscriptionConfirmedSemantics {
     event_type: String,
     origin_nickname: String,
     origin_email: String,
-    resource_address: String,
+    resource_id: String,
     subscriber_delivery_address: String,
     accepted: bool,
     delivery: OutboxDelivery,
@@ -509,7 +514,7 @@ fn latest_subscription_confirmed(store: &Store) -> OutboxRecord {
 fn subscription_confirmed_semantics(record: &OutboxRecord) -> SubscriptionConfirmedSemantics {
     let message = liveletters_protocol::decode_message(&record.message_body).unwrap();
     let DomainEventPayload::SubscriptionConfirmed {
-        resource_address,
+        resource_id,
         subscriber_delivery_address,
         accepted,
         ..
@@ -521,7 +526,7 @@ fn subscription_confirmed_semantics(record: &OutboxRecord) -> SubscriptionConfir
         event_type: record.event_type.clone(),
         origin_nickname: message.origin().nickname().to_owned(),
         origin_email: message.origin().email().to_owned(),
-        resource_address: resource_address.clone(),
+        resource_id: resource_id.clone(),
         subscriber_delivery_address: subscriber_delivery_address.clone(),
         accepted: *accepted,
         delivery: record.delivery.clone(),
@@ -544,7 +549,7 @@ fn subscription_revoked_replay_does_not_change_db() {
     let engine = SyncEngine::new(&store).with_profile_id("bob");
 
     let payload = || DomainEventPayload::SubscriptionRevoked {
-        resource_address: "alice-publish@example.org".into(),
+        resource_id: "alice-publish@example.org".into(),
         subscriber_delivery_address: "bob-publish@example.org".into(),
         created_at: 1_710_001_000,
     };

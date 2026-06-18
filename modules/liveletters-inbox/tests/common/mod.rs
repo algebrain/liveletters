@@ -48,7 +48,6 @@ fn build_post_eml(body: &str) -> String {
          \x20\x20\x20\x20\"kind\": \"post_created\",\n\
          \x20\x20\x20\x20\"post_id\": \"post-1\",\n\
          \x20\x20\x20\x20\"resource_id\": \"blog-1\",\n\
-         \x20\x20\x20\x20\"actor_id\": \"alice\",\n\
          \x20\x20\x20\x20\"created_at\": 1710000000,\n\
          \x20\x20\x20\x20\"visibility\": \"public\",\n\
          \x20\x20\x20\x20\"body_format\": \"plain\",\n\

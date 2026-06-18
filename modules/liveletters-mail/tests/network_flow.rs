@@ -104,7 +104,6 @@ fn configured_smtp_transport_sends_message_over_tcp() {
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_000,
             body: "Текст поста".into(),
             body_format: "plain".into(),
@@ -151,7 +150,6 @@ fn configured_imap_mailbox_fetches_messages_with_cursor() {
         DomainEventPayload::PostCreated {
             post_id: "post-9".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_123,
             body: "Живое письмо".into(),
             body_format: "plain".into(),

@@ -17,7 +17,6 @@ fn post_created_round_trip_keeps_envelope_and_payload() {
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_000,
             body: "Текст поста".into(),
             body_format: "plain".into(),
@@ -27,6 +26,11 @@ fn post_created_round_trip_keeps_envelope_and_payload() {
     .unwrap();
 
     let encoded = encode_message(&message).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+    assert!(
+        json["payload"].get("actor_id").is_none(),
+        "actor_id должен передаваться через origin, а не payload: {encoded}"
+    );
     let decoded = decode_message(&encoded).unwrap();
 
     assert_eq!(decoded.envelope().schema_version(), "1");
@@ -62,7 +66,6 @@ fn comment_created_round_trip_keeps_parent_comment_link() {
             post_id: "post-1".into(),
             parent_comment_id: Some("comment-root".into()),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_100,
             body: "Текст комментария".into(),
             body_format: "plain".into(),
@@ -72,6 +75,11 @@ fn comment_created_round_trip_keeps_parent_comment_link() {
     .unwrap();
 
     let encoded = encode_message(&message).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+    assert!(
+        json["payload"].get("actor_id").is_none(),
+        "actor_id должен передаваться через origin, а не payload: {encoded}"
+    );
     let decoded = decode_message(&encoded).unwrap();
 
     assert_eq!(decoded.origin().email(), "alice@example.org");
@@ -90,7 +98,6 @@ fn source_is_omitted_when_equal_to_origin_and_encoded_when_different() {
     let payload = DomainEventPayload::PostHidden {
         post_id: "post-1".into(),
         resource_id: "blog-1".into(),
-        actor_id: "alice@example.org".into(),
         created_at: 1,
     };
     let without_source = ProtocolMessage::new(
@@ -140,7 +147,6 @@ fn blank_human_body_is_rejected() {
         DomainEventPayload::PostCreated {
             post_id: "post-1".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_000,
             body: "Текст поста".into(),
             body_format: "plain".into(),
@@ -162,7 +168,6 @@ fn post_hidden_round_trip_keeps_payload() {
         DomainEventPayload::PostHidden {
             post_id: "post-1".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_200,
         },
     )
@@ -185,7 +190,6 @@ fn comment_edited_round_trip_keeps_new_body() {
             comment_id: "comment-1".into(),
             post_id: "post-1".into(),
             resource_id: "blog-1".into(),
-            actor_id: "alice".into(),
             created_at: 1_710_000_300,
             body: "Исправленный комментарий".into(),
             visibility: "public".into(),
@@ -218,7 +222,7 @@ fn subscription_requested_round_trip_keeps_payload() {
         None,
         "Запрос подписки",
         DomainEventPayload::SubscriptionRequested {
-            resource_address: "alice-publish@example.org".into(),
+            resource_id: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
             created_at: 1_710_000_400,
         },
@@ -232,11 +236,11 @@ fn subscription_requested_round_trip_keeps_payload() {
     assert_eq!(decoded.origin().email(), "bob-feed@example.org");
     match decoded.payload() {
         DomainEventPayload::SubscriptionRequested {
-            resource_address,
+            resource_id,
             subscriber_delivery_address,
             created_at,
         } => {
-            assert_eq!(resource_address, "alice-publish@example.org");
+            assert_eq!(resource_id, "alice-publish@example.org");
             assert_eq!(subscriber_delivery_address, "bob-feed@example.org");
             assert_eq!(*created_at, 1_710_000_400);
         }
@@ -258,7 +262,7 @@ fn subscription_confirmed_round_trip_keeps_payload() {
         None,
         "Подтверждение",
         DomainEventPayload::SubscriptionConfirmed {
-            resource_address: "alice-publish@example.org".into(),
+            resource_id: "alice-publish@example.org".into(),
             subscriber_delivery_address: "bob-feed@example.org".into(),
             accepted: true,
             created_at: 1_710_000_500,
@@ -273,12 +277,12 @@ fn subscription_confirmed_round_trip_keeps_payload() {
     assert_eq!(decoded.origin().email(), "alice-publish@example.org");
     match decoded.payload() {
         DomainEventPayload::SubscriptionConfirmed {
-            resource_address,
+            resource_id,
             subscriber_delivery_address,
             accepted,
             created_at,
         } => {
-            assert_eq!(resource_address, "alice-publish@example.org");
+            assert_eq!(resource_id, "alice-publish@example.org");
             assert_eq!(subscriber_delivery_address, "bob-feed@example.org");
             assert!(*accepted);
             assert_eq!(*created_at, 1_710_000_500);
@@ -290,7 +294,7 @@ fn subscription_confirmed_round_trip_keeps_payload() {
 #[test]
 fn subscription_revoked_serializes_with_snake_case_tag() {
     let payload = DomainEventPayload::SubscriptionRevoked {
-        resource_address: "alice-publish@example.org".into(),
+        resource_id: "alice-publish@example.org".into(),
         subscriber_delivery_address: "bob-feed@example.org".into(),
         created_at: 1_710_000_500,
     };
@@ -298,4 +302,9 @@ fn subscription_revoked_serializes_with_snake_case_tag() {
     let json = serde_json::to_value(&payload).unwrap();
 
     assert_eq!(json["kind"], "subscription_revoked");
+    assert_eq!(json["resource_id"], "alice-publish@example.org");
+    assert!(
+        json.get("resource_address").is_none(),
+        "subscription payload должен использовать resource_id: {json}"
+    );
 }
