@@ -191,7 +191,7 @@ pwd_obfuscate = false
 
     lltt()
         .env("LIVELETTERS_HOME", tmp.path())
-        .args(["user", "add", "alice"])
+        .args(["user", "add", "alice", "--yes"])
         .assert()
         .success();
 
@@ -204,6 +204,114 @@ pwd_obfuscate = false
         .success()
         .stdout(contains("********"))
         .stdout(contains(password).not());
+}
+
+#[test]
+fn cu_user_add_yes_obfuscates_passwords_without_prompting_again() {
+    let tmp = TempDir::new().unwrap();
+    let smtp_password = "smtp-secret-42";
+    let imap_password = "imap-secret-43";
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["init", "--force"])
+        .assert()
+        .success();
+    fs::create_dir_all(tmp.path().join("drafts")).unwrap();
+    let draft = tmp.path().join("drafts/alice.toml");
+    fs::write(
+        &draft,
+        format!(
+            r#"
+display_name = "Alice"
+
+[mail]
+publish = "alice@example.org"
+receive = ["alice@example.org"]
+
+[mail.smtp]
+host = "smtp.example.org"
+port = 587
+security = "starttls"
+username = "alice@example.org"
+password = "{smtp_password}"
+hello_domain = "example.org"
+pwd_obfuscate = true
+
+[mail.imap]
+host = "imap.example.org"
+port = 993
+security = "tls"
+username = "alice@example.org"
+password = "{imap_password}"
+mailbox = "INBOX"
+pwd_obfuscate = true
+"#
+        ),
+    )
+    .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["user", "add", "alice", "--yes"])
+        .assert()
+        .success();
+
+    let store = Store::open_for_home_dir(tmp.path().join("users/alice")).unwrap();
+    let settings = store.get_mail_settings_record("alice").unwrap().unwrap();
+    assert_eq!(settings.smtp_password, smtp_password);
+    assert_eq!(settings.imap_password, imap_password);
+
+    let rewritten = fs::read_to_string(draft).unwrap();
+    assert!(rewritten.contains("pwd_obfuscate = true"));
+    assert!(
+        !rewritten.contains(smtp_password) && !rewritten.contains(imap_password),
+        "черновик должен хранить скрытые, а не открытые пароли: {rewritten}"
+    );
+}
+
+#[test]
+fn cu_user_add_short_yes_obfuscates_passwords_without_prompting_again() {
+    let tmp = TempDir::new().unwrap();
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args(["init", "--force"])
+        .assert()
+        .success();
+    let from = tmp.path().join("alice.toml");
+    fs::write(
+        &from,
+        r#"
+display_name = "Alice"
+
+[mail]
+publish = "alice@example.org"
+receive = ["alice@example.org"]
+
+[mail.smtp]
+host = "smtp.example.org"
+port = 587
+security = "starttls"
+username = "alice@example.org"
+password = "smtp-secret"
+hello_domain = "example.org"
+pwd_obfuscate = true
+"#,
+    )
+    .unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .arg("user")
+        .arg("add")
+        .arg("alice")
+        .arg("--from")
+        .arg(&from)
+        .arg("-y")
+        .assert()
+        .success();
+
+    let rewritten = fs::read_to_string(from).unwrap();
+    assert!(!rewritten.contains("smtp-secret"));
 }
 
 #[test]

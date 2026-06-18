@@ -605,6 +605,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "console",
+ "liveletters-app-core",
  "liveletters-config",
  "liveletters-i18n",
  "liveletters-output",

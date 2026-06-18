@@ -159,11 +159,27 @@ subscriptions = ["external-blog@example.org"]
         store.get_author("austinbreze@yandex.ru").unwrap().is_some(),
         "автор austinbreze@yandex.ru должен быть в authors"
     );
-    assert_eq!(
-        store.list_local_subscriptions("austin").unwrap(),
-        vec!["external-blog@example.org".to_owned()],
-        "local_subscriptions должны быть записаны целиком"
+    assert!(
+        store
+            .get_author("external-blog@example.org")
+            .unwrap()
+            .is_some(),
+        "автор external-blog@example.org должен быть предзаписан в authors"
     );
+    assert!(
+        store.list_local_subscriptions("austin").unwrap().is_empty(),
+        "subscriptions из черновика не должны сразу становиться подтверждёнными"
+    );
+    let pending = store.list_pending_subscriptions("austin").unwrap();
+    assert_eq!(
+        pending.len(),
+        1,
+        "subscriptions из черновика должны попадать в pending"
+    );
+    assert_eq!(pending[0].resource_email, "external-blog@example.org");
+    let outbox = store.list_outbox_records().unwrap();
+    assert_eq!(outbox.len(), 1, "должен быть создан запрос подписки");
+    assert_eq!(outbox[0].event_type, "subscription_requested");
 }
 
 #[test]
@@ -239,12 +255,17 @@ subscriptions = ["austinbreze@yandex.ru", "external-blog@example.org"]
 
     let store =
         liveletters_store::Store::open_for_home_dir(home.path().join("users/austin")).unwrap();
-    let subs = store.list_local_subscriptions("austin").unwrap();
-    assert_eq!(
-        subs,
-        vec!["external-blog@example.org".to_owned()],
-        "собственный адрес должен быть пропущен, внешний — записан"
+    assert!(
+        store.list_local_subscriptions("austin").unwrap().is_empty(),
+        "subscriptions из черновика не должны сразу становиться подтверждёнными"
     );
+    let pending = store.list_pending_subscriptions("austin").unwrap();
+    assert_eq!(
+        pending.len(),
+        1,
+        "собственный адрес должен быть пропущен, внешний — записан в pending"
+    );
+    assert_eq!(pending[0].resource_email, "external-blog@example.org");
 }
 
 #[test]

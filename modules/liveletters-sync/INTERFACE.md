@@ -456,9 +456,11 @@
   `body` и `visibility` не изменились). Тест:
   `comment_edited_replay_does_not_change_db`.
 - `SubscriptionRequested` — UPSERT в `subscriptions` идемпотентен;
-  в `outbox` допустимо две записи `SubscriptionConfirmed` (сознательно,
-  см. `.plans/260617-205718-sync-event-idempotency-tests.md`). Тест:
-  `subscription_requested_replay_keeps_subscriptions_table_stable`.
+  повторный запрос от того же подписчика к тому же ресурсу даёт такой
+  же по смыслу `SubscriptionConfirmed`: тот же ресурс, подписчик,
+  владелец, результат и доставка. Тесты:
+  `subscription_requested_replay_keeps_subscriptions_table_stable`,
+  `repeated_subscription_requested_keeps_response_semantically_same`.
 - `SubscriptionConfirmed` (accepted) — повтор после `accept_pending`
   без `pending` тихо игнорируется и возвращает `Applied` без эффекта.
   Тест: `subscription_confirmed_accepted_replay_does_not_change_db`.

@@ -34,6 +34,7 @@ pub enum CuAction {
     Add {
         name: String,
         from: Option<std::path::PathBuf>,
+        yes: bool,
     },
     Rm {
         name: String,

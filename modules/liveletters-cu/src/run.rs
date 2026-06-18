@@ -40,9 +40,9 @@ pub fn run_user(ctx: &CommandContext, args: &Args) -> Result<(), Box<dyn Error +
             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?,
         CuAction::Show { name, reveal } => super::show::run(ctx, &name, reveal)
             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?,
-        CuAction::Add { name, from } => {
+        CuAction::Add { name, from, yes } => {
             let from = from.unwrap_or_else(|| default_draft_path(ctx, &name));
-            super::add::run(ctx, &name, &from)
+            super::add::run(ctx, &name, &from, yes)
                 .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?
         }
         CuAction::Rm { name, yes } => super::rm::run(ctx, &name, yes)
@@ -178,6 +178,7 @@ fn parse_show(rest: &[String]) -> Result<CuAction, CuError> {
 fn parse_add(rest: &[String]) -> Result<CuAction, CuError> {
     let mut name: Option<String> = None;
     let mut from: Option<std::path::PathBuf> = None;
+    let mut yes = false;
     let mut iter = rest.iter();
     while let Some(token) = iter.next() {
         if let Some(value) = token.strip_prefix("--from=") {
@@ -187,8 +188,12 @@ fn parse_add(rest: &[String]) -> Result<CuAction, CuError> {
                 .next()
                 .ok_or_else(|| CuError::InvalidArgs("`--from` требует значение".to_owned()))?;
             from = Some(std::path::PathBuf::from(next));
+        } else if token == "--yes" || token == "-y" {
+            yes = true;
         } else if let Some(value) = token.strip_prefix("--") {
             return Err(CuError::InvalidArgs(format!("неизвестный флаг: --{value}")));
+        } else if let Some(value) = token.strip_prefix('-') {
+            return Err(CuError::InvalidArgs(format!("неизвестный флаг: -{value}")));
         } else if name.is_some() {
             return Err(CuError::InvalidArgs(format!(
                 "лишний позиционный аргумент: {token}"
@@ -199,7 +204,7 @@ fn parse_add(rest: &[String]) -> Result<CuAction, CuError> {
     }
     let name =
         name.ok_or_else(|| CuError::InvalidArgs("`add` требует имя идентичности".to_owned()))?;
-    Ok(CuAction::Add { name, from })
+    Ok(CuAction::Add { name, from, yes })
 }
 
 fn default_draft_path(ctx: &CommandContext, name: &str) -> std::path::PathBuf {

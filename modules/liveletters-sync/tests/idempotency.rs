@@ -20,7 +20,7 @@ use liveletters_mail::{ReceivedEmail, build_protocol_email};
 use liveletters_protocol::{
     DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage,
 };
-use liveletters_store::Store;
+use liveletters_store::{OutboxDelivery, OutboxRecord, Store};
 use liveletters_sync::{SyncEngine, SyncMessageOutcome};
 
 mod common;
@@ -368,6 +368,51 @@ fn subscription_requested_replay_keeps_subscriptions_table_stable() {
 }
 
 #[test]
+fn repeated_subscription_requested_keeps_response_semantically_same() {
+    let (store, _tmp) = common::open_temp_store();
+    save_alice(&store);
+    store
+        .save_author("bob-feed@example.org", "Борис", "test")
+        .unwrap();
+    let engine = SyncEngine::new(&store).with_profile_id("alice");
+
+    let payload = || DomainEventPayload::SubscriptionRequested {
+        resource_address: "alice-publish@example.org".into(),
+        subscriber_delivery_address: "bob-feed@example.org".into(),
+        created_at: 1_710_000_000,
+    };
+    let first = build_email(
+        "event-1",
+        "subscription_requested",
+        "alice-publish@example.org",
+        "bob-feed@example.org",
+        payload(),
+        "Запрос подписки",
+    );
+    let second = build_email(
+        "event-2",
+        "subscription_requested",
+        "alice-publish@example.org",
+        "bob-feed@example.org",
+        payload(),
+        "Запрос подписки",
+    );
+
+    engine.ingest_batch(vec![first]).expect("first ingest");
+    let first_response = latest_subscription_confirmed(&store);
+    let first_semantics = subscription_confirmed_semantics(&first_response);
+
+    engine.ingest_batch(vec![second]).expect("second ingest");
+    let second_response = latest_subscription_confirmed(&store);
+    let second_semantics = subscription_confirmed_semantics(&second_response);
+
+    assert_eq!(
+        second_semantics, first_semantics,
+        "повторный запрос должен давать такой же по смыслу ответ"
+    );
+}
+
+#[test]
 fn subscription_confirmed_accepted_replay_does_not_change_db() {
     let (store, _tmp) = common::open_temp_store();
     save_alice(&store);
@@ -436,6 +481,53 @@ fn subscription_confirmed_accepted_replay_does_not_change_db() {
         0,
         "pending_subscriptions остаются пустыми"
     );
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SubscriptionConfirmedSemantics {
+    event_type: String,
+    origin_nickname: String,
+    origin_email: String,
+    resource_address: String,
+    subscriber_delivery_address: String,
+    accepted: bool,
+    delivery: OutboxDelivery,
+    subject: Option<String>,
+    human_readable_body: Option<String>,
+}
+
+fn latest_subscription_confirmed(store: &Store) -> OutboxRecord {
+    store
+        .list_outbox_records()
+        .unwrap()
+        .into_iter()
+        .rev()
+        .find(|record| record.event_type == "subscription_confirmed")
+        .expect("subscription_confirmed должен быть в outbox")
+}
+
+fn subscription_confirmed_semantics(record: &OutboxRecord) -> SubscriptionConfirmedSemantics {
+    let message = liveletters_protocol::decode_message(&record.message_body).unwrap();
+    let DomainEventPayload::SubscriptionConfirmed {
+        resource_address,
+        subscriber_delivery_address,
+        accepted,
+        ..
+    } = message.payload()
+    else {
+        panic!("ожидался SubscriptionConfirmed");
+    };
+    SubscriptionConfirmedSemantics {
+        event_type: record.event_type.clone(),
+        origin_nickname: message.origin().nickname().to_owned(),
+        origin_email: message.origin().email().to_owned(),
+        resource_address: resource_address.clone(),
+        subscriber_delivery_address: subscriber_delivery_address.clone(),
+        accepted: *accepted,
+        delivery: record.delivery.clone(),
+        subject: record.subject.clone(),
+        human_readable_body: record.human_readable_body.clone(),
+    }
 }
 
 #[test]

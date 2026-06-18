@@ -7,13 +7,16 @@ use liveletters_store::{MailSettingsRecord, Store};
 use crate::{
     error::CuError,
     name::validate_user_name,
-    password_obfuscation::{DialoguerPasswordConfirmer, obfuscate_identity_passwords},
+    password_obfuscation::{
+        DialoguerPasswordConfirmer, confirm_identity_passwords, obfuscate_identity_passwords,
+    },
 };
 
 pub fn run(
     ctx: &liveletters_output::CommandContext,
     name: &str,
     from: &Path,
+    yes: bool,
 ) -> Result<(), CuError> {
     validate_user_name(name)?;
     if !from.exists() {
@@ -46,9 +49,12 @@ pub fn run(
         }
     }
 
-    let mut confirmer = DialoguerPasswordConfirmer;
     let user_state_home = ctx.home.join("users").join(name);
-    let changed = obfuscate_identity_passwords(&user_state_home, &mut cfg, &mut confirmer)?;
+    if !yes {
+        let mut confirmer = DialoguerPasswordConfirmer;
+        confirm_identity_passwords(&cfg, &mut confirmer)?;
+    }
+    let changed = obfuscate_identity_passwords(&user_state_home, &mut cfg)?;
     if changed {
         let obfuscated = toml::to_string_pretty(&cfg)
             .map_err(|e| CuError::Config(liveletters_config::ConfigError::Toml(e.to_string())))?;
@@ -103,9 +109,9 @@ fn save_identity_to_db(store: &Store, name: &str, cfg: &IdentityConfig) -> Resul
     store.save_receive_addresses(name, &cfg.mail.receive)?;
 
     // Предзапись внешних адресов в `authors` до того, как таблицы
-    // `resources_owned` и `local_subscriptions` начнут на них ссылаться
-    // (FK → authors.email). Адрес самого пользователя (`mail.publish`)
-    // уже в `authors` (source = "self"), здесь он пропускается.
+    // `resources_owned` и `pending_subscriptions` начнут на них ссылаться.
+    // Адрес самого пользователя (`mail.publish`) уже в `authors`
+    // (source = "self"), здесь он пропускается.
     let own = cfg.mail.publish.as_str();
     let mut pending: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
     for r in &cfg.meta.resources_owned {
@@ -138,14 +144,23 @@ fn save_identity_to_db(store: &Store, name: &str, cfg: &IdentityConfig) -> Resul
             .map(|r| r.as_str().to_owned())
             .collect::<Vec<_>>(),
     )?;
-    let subscriptions_filtered: Vec<String> = cfg
+    for resource in cfg
         .meta
         .subscriptions
         .iter()
         .map(|r| r.as_str())
         .filter(|r| *r != own)
-        .map(str::to_owned)
-        .collect();
-    store.save_local_subscriptions(name, &subscriptions_filtered)?;
+    {
+        liveletters_app_core::subscribe(
+            store,
+            liveletters_app_core::SubscribeCommand {
+                profile_id: name,
+                resource_address: resource,
+                subscriber_delivery_address: own,
+                created_at: liveletters_app_core::unix_millis_now(),
+            },
+        )
+        .map_err(|e| CuError::InvalidArgs(e.to_string()))?;
+    }
     Ok(())
 }

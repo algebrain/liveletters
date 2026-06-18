@@ -55,8 +55,10 @@ modules/liveletters-cu/src/
 | `["init", "alice", "--force"]` | `CuAction::Init { name: "alice", force: true }` |
 | `["show", "alice"]` | `CuAction::Show { name: "alice", reveal: false }` |
 | `["show", "alice", "--reveal"]` | `CuAction::Show { name: "alice", reveal: true }` |
-| `["add", "alice"]` | `CuAction::Add { name: "alice", from: None }` |
-| `["add", "alice", "--from", "drafts/alice.toml"]` | `CuAction::Add { name: "alice", from: Some(...) }` |
+| `["add", "alice"]` | `CuAction::Add { name: "alice", from: None, yes: false }` |
+| `["add", "alice", "--from", "drafts/alice.toml"]` | `CuAction::Add { name: "alice", from: Some(...), yes: false }` |
+| `["add", "alice", "--yes"]` | `CuAction::Add { name: "alice", from: None, yes: true }` |
+| `["add", "alice", "-y"]` | `CuAction::Add { name: "alice", from: None, yes: true }` |
 | `["rm", "alice", "--yes"]` | `CuAction::Rm { name: "alice", yes: true }` |
 
 Отсутствующая подкоманда, неизвестный флаг или лишний позиционный аргумент возвращают `CuError::InvalidArgs`.
@@ -77,7 +79,7 @@ modules/liveletters-cu/src/
 2. `List` вызывает `list::run`;
 3. `Init` вызывает `user_init::run`;
 4. `Show` вызывает `show::run`;
-5. `Add` вызывает `add::run`; если `--from` не указан, передаёт `<home>/drafts/<name>.toml`;
+5. `Add` вызывает `add::run`; если `--from` не указан, передаёт `<home>/drafts/<name>.toml`, а `--yes`/`-y` передаёт как признак уже подтверждённых паролей;
 6. `Rm` вызывает `rm::run`.
 
 ## `user init`
@@ -94,17 +96,20 @@ modules/liveletters-cu/src/
 
 ## `user add`
 
-`add::run(ctx, name, from)`:
+`add::run(ctx, name, from, yes)`:
 
 1. проверяет имя;
 2. проверяет наличие файла `from`;
 3. читает и разбирает TOML в `IdentityConfig`;
-4. вызывает `obfuscate_identity_passwords`;
-5. если пароли были скрыты, переписывает исходный TOML уже с `obf:v1:...`;
-6. сохраняет идентичность через `save_identity`;
-7. открывает `Store::open_for_home_dir(<home>/users/<name>)`;
-8. копирует SMTP/IMAP-настройки из идентичности в `MailSettingsRecord` этого пользователя;
-9. сохраняет `mail_settings`.
+4. если `yes == false`, вызывает `confirm_identity_passwords`;
+5. вызывает `obfuscate_identity_passwords`;
+6. если пароли были скрыты, переписывает исходный TOML уже с `obf:v1:...`;
+7. сохраняет идентичность через `save_identity`;
+8. открывает `Store::open_for_home_dir(<home>/users/<name>)`;
+9. копирует SMTP/IMAP-настройки из идентичности в `MailSettingsRecord` этого пользователя;
+10. сохраняет `mail_settings`;
+11. сохраняет ресурсы из `meta.resources_owned`;
+12. для внешних адресов из `meta.subscriptions` создаёт ожидающие подписки через `liveletters_app_core::subscribe`.
 
 Команда намеренно не пишет `current-user`: выбор текущего пользователя остаётся отдельным явным шагом `lltt cu <имя>`.
 
@@ -114,9 +119,18 @@ modules/liveletters-cu/src/
 
 - `PasswordConfirmer` — интерфейс подтверждения;
 - реализацию для терминала со скрытым вводом и звёздочками;
-- `obfuscate_identity_passwords(home, cfg, confirmer)`.
+- `confirm_identity_passwords(cfg, confirmer)`;
+- `obfuscate_identity_passwords(home, cfg)`.
 
-Алгоритм обрабатывает SMTP и IMAP отдельно. Для каждой секции пароль скрывается только при `pwd_obfuscate = true`, непустом пароле и отсутствии префикса `obf:v1:`. Для `user add` ключ скрытия берётся из пользовательского состояния `<home>/users/<name>/`. Перед скрытием пользователь должен повторить пароль. Несовпадение даёт `CuError::PasswordConfirmationMismatch`.
+Подтверждение и скрытие — разные шаги. Без `--yes` / `-y`
+подтверждается каждый непустой SMTP/IMAP-пароль, независимо от
+`pwd_obfuscate`. Несовпадение даёт
+`CuError::PasswordConfirmationMismatch`.
+
+Скрытие обрабатывает SMTP и IMAP отдельно. Для каждой секции пароль
+скрывается только при `pwd_obfuscate = true`, непустом пароле и
+отсутствии префикса `obf:v1:`. Для `user add` ключ скрытия берётся из
+пользовательского состояния `<home>/users/<name>/`.
 
 ## Удаление
 
