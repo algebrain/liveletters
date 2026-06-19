@@ -10,6 +10,7 @@
 - нормализация CRLF → LF;
 - парсинг RFC 5322-заголовков (включая folded continuation lines) через `mailparse`;
 - извлечение `human_readable_body` и `technical_body` из multipart-письма;
+- централизованные лимиты размера письма, частей, числа MIME-частей и глубины MIME-дерева;
 - сборка `OutgoingEmail` из `ProtocolMessage`;
 - разбор `ProtocolMessage` из JSON-строки через `liveletters_protocol::decode_message` с человекочитаемой формулировкой ошибок;
 - типизированные структуры `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`.
@@ -19,7 +20,8 @@
 - реализовывать SMTP/IMAP/TCP/TLS — это `liveletters-mail`;
 - хранить письма или эвенты в SQLite — это `liveletters-store`;
 - делать retry/throttling/dedup — это `liveletters-sync`;
-- разбирать quoted-printable, base64, MIME-вложения; эту работу делает `mailparse`;
+- разбирать quoted-printable и base64 вручную; эту работу делает `mailparse`;
+- принимать произвольные MIME-вложения без манифеста в `liveletters.json`;
 - валидировать email-адреса в `From`/`To`.
 
 ## Почему выделен в отдельный крейт
@@ -41,6 +43,13 @@ parse_email(raw_email)            → ParsedEmail
 extract_liveletters_parts(parsed) → ExtractedMailParts
 decode_protocol_message(parts.technical_body())
                                    → ProtocolMessage
+```
+
+Для тестов и будущей настройки доступны варианты с явными лимитами:
+
+```
+parse_email_with_limits(raw_email, limits)
+extract_liveletters_parts_with_limits(parsed, limits)
 ```
 
 Каждый шаг — отдельная функция с собственным `Result`-типом, и каждый шаг можно использовать по отдельности. Это разделение сделано сознательно:
@@ -82,6 +91,23 @@ Content-Disposition: attachment; filename="liveletters.json"
 
 `Content-Type` письма — `multipart/mixed` с фиксированной границей `liveletters-boundary`. Человекочитаемая часть лежит в `text/plain; charset="utf-8"` под-части (её содержимое передаётся в `build_protocol_email` отдельным параметром `body: Option<&str>`, который отправитель берёт из колонки `OutboxRecord.human_readable_body`). Сериализованный JSON — в `application/json` под-части с `Content-Disposition: attachment; filename="liveletters.json"`; поля `human_readable_body` в нём нет (помечено `skip_serializing` в `ProtocolMessage`), чтобы избежать дублирования в wire-формате. Никакого base64url-кодирования: JSON передаётся как есть в именованной MIME-части. Это снимает проблему с антиспам-фильтрами, которые ранее флагали длинный base64url-блок внутри `text/plain` как обфускацию.
 
+Входящий MIME разбирается строго:
+
+- корневое письмо должно быть `multipart/*`;
+- непосредственная `text/plain` часть должна быть ровно одна;
+- непосредственная `application/json` часть должна быть ровно одна;
+- JSON-часть должна быть названа `liveletters.json` через параметр `name`
+  в `Content-Type` или `filename` в `Content-Disposition`;
+- дополнительные части запрещены, пока в `liveletters.json` нет манифеста
+  вложений;
+- дубликаты `text/plain`, дубликаты `liveletters.json`,
+  `application/json` с другим именем и неизвестные части дают
+  `MimeError::InvalidEmailFormat`.
+
+Это правило намеренно не запрещает будущие вложения навсегда. Когда в
+протоколе появится манифест вложений, дополнительные части можно будет
+принимать только после сверки с этим манифестом.
+
 Заголовок `Subject` кодируется через `encode_rfc2047`: если строка содержит не-ASCII символы (например, кириллицу), она оборачивается в `=?utf-8?B?<base64>?=`. Чистый ASCII передаётся без изменений. Это нужно, потому что RFC 5322 требует ASCII в заголовках — несоблюдение приводит к тому, что SMTP-серверы (например, Яндекса) удаляют не-ASCII заголовки из письма. `mailparse` на стороне получателя автоматически декодирует RFC 2047-строку обратно в исходный текст через `MailHeader::get_value()`, поэтому round-trip прозрачен.
 
 ## Парсинг MIME через `mailparse`
@@ -96,6 +122,11 @@ Content-Disposition: attachment; filename="liveletters.json"
 `parse_email` в `src/parser.rs` вызывает `mailparse::parse_mail` для разбора заголовков и сохраняет нормализованный сырой email в `ParsedEmail.raw`. Это позволяет `extract_liveletters_parts` в `src/mime.rs` повторно вызывать `mailparse::parse_mail` для навигации по MIME-дереву без хранения дополнительных структур.
 
 Для `text/plain`-части используется `get_body()` (учёт charset), для `application/json` — `get_body_raw()` + `String::from_utf8` (JSON всегда UTF-8, без charset-преобразования).
+
+Перед извлечением частей код считает MIME-части и глубину дерева. Значения
+по умолчанию задаёт `MimeLimits`: до 10 МиБ на сырое письмо, до 1 МиБ на
+человекочитаемую часть, до 1 МиБ на `liveletters.json`, до 8 MIME-частей и
+глубину до 2.
 
 ## Нормализация CRLF → LF
 
@@ -119,10 +150,11 @@ Content-Disposition: attachment; filename="liveletters.json"
 Модуль включает:
 
 - `parse_email`, `extract_liveletters_parts`, `build_protocol_email`, `decode_protocol_message`;
+- `parse_email_with_limits`, `extract_liveletters_parts_with_limits`, `MimeLimits`;
 - `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`;
 - `MimeError` с четырьмя вариантами;
 - `crate_name() -> &'static str` для диагностики;
-- integration-тесты в `tests/parse.rs` (7 тестов): разбор заголовков и тела, наличие `X-LiveLetters-Protocol`, извлечение human+technical, round-trip build→parse→extract→decode, отсутствие JSON-вложения, отказ на письме без `\n\n`, отказ на письме без multipart, письма с folded-заголовками;
+- integration-тесты в `tests/parse.rs`: разбор заголовков и тела, наличие `X-LiveLetters-Protocol`, извлечение human+technical, round-trip build→parse→extract→decode, отсутствие JSON-вложения, отказ на письме без `\n\n`, отказ на письме без multipart, письма с folded-заголовками, отказ на дубликатах частей, неверном имени JSON, лишнем вложении и превышении лимитов;
 - 1 lib-test `exposes_crate_name`.
 
 ## Требования к структуре каталога
@@ -130,6 +162,7 @@ Content-Disposition: attachment; filename="liveletters.json"
 - `src/lib.rs`;
 - `src/build.rs`;
 - `src/error.rs`;
+- `src/limits.rs`;
 - `src/message.rs`;
 - `src/mime.rs`;
 - `src/parser.rs`;
@@ -150,6 +183,11 @@ Content-Disposition: attachment; filename="liveletters.json"
 - `extract_liveletters_parts_rejects_non_multipart_email` — на `text/plain`-письме возвращается `MimeError::InvalidEmailFormat`;
 - `parse_email_handles_folded_headers_without_crashing` — `parse_email` не падает на письме с folded-заголовками (Received, DKIM-Signature с continuation lines);
 - `extract_parts_from_email_with_folded_headers` — `extract_liveletters_parts` извлекает human+technical из письма с folded-заголовками, `decode_protocol_message` корректно парсит payload.
+- `extract_rejects_duplicate_liveletters_json_parts` — письмо с двумя `liveletters.json` частями отклоняется;
+- `extract_rejects_json_part_without_liveletters_filename` и `extract_rejects_json_part_without_filename` — JSON без имени `liveletters.json` не принимается как техническая часть;
+- `extract_rejects_extra_attachment_without_manifest` — лишнее вложение без манифеста отклоняется;
+- `extract_rejects_duplicate_text_plain_parts` — неоднозначная человекочитаемая часть отклоняется;
+- `parse_email_rejects_raw_message_over_limit`, `extract_rejects_json_over_limit`, `extract_rejects_human_body_over_limit`, `extract_rejects_too_many_mime_parts`, `extract_rejects_mime_tree_deeper_than_limit` — лимиты работают на реальных письмах.
 
 Тесты намеренно идут через настоящие строки, а не через in-memory fakes. `sample_protocol_mime()` собирает «сырое» письмо через `build_protocol_email`, а потом прогоняет его через парсер. `folded-headers.eml` в `tests/fixtures/` — синтетическое письмо с folded-заголовками (Received из 3 цепочек, многострочная DKIM-Signature, Authentication-Results) и тестовыми адресами (@example.test).
 
@@ -160,6 +198,7 @@ Content-Disposition: attachment; filename="liveletters.json"
 - описание конвейера `parse_email → extract_liveletters_parts → decode_protocol_message`;
 - описание формата LiveLetters-письма;
 - описание роли `build_protocol_email`;
+- описание строгих MIME-правил и `MimeLimits`;
 - описание вариантов `MimeError`;
 - явная фиксация того, что модуль не делает (произвольные вложения, quoted-printable, несколько альтернативных `multipart`-веток).
 
@@ -167,15 +206,17 @@ Content-Disposition: attachment; filename="liveletters.json"
 
 - `parse_email` разбирает любой RFC 5322-текст с `\n\n` между заголовками и телом, включая письма с folded-заголовками (Received, DKIM-Signature с continuation lines);
 - `extract_liveletters_parts` достаёт человекочитаемый текст и JSON-часть из multipart-письма;
+- `extract_liveletters_parts` отклоняет дубликаты частей, JSON без имени `liveletters.json`, лишние вложения без манифеста и превышение лимитов;
 - `build_protocol_email` собирает multipart-письмо с `text/plain` и `application/json` частями;
 - round-trip `build → parse → extract → decode` сохраняет `ProtocolMessage` побитово;
-- 7 integration-тестов и 1 lib-test зелёные.
+- integration-тесты и 1 lib-test зелёные.
 
 Свойства реализации:
 
 - выделение MIME-логики в отдельный крейт без зависимостей от SMTP/IMAP;
 - типизированные структуры `OutgoingEmail`/`ReceivedEmail`/`ParsedEmail`/`ExtractedMailParts`;
-- покрытие тестами round-trip и всех четырёх классов ошибок `MimeError`.
+- централизованный `MimeLimits`;
+- покрытие тестами round-trip, всех четырёх классов ошибок `MimeError` и строгих MIME-ограничений.
 
 Ограничения:
 

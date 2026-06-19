@@ -1,5 +1,7 @@
 use liveletters_mime::{
-    build_protocol_email, decode_protocol_message, extract_liveletters_parts, parse_email,
+    MimeError, MimeLimits, build_protocol_email, decode_protocol_message,
+    extract_liveletters_parts, extract_liveletters_parts_with_limits, parse_email,
+    parse_email_with_limits,
 };
 use liveletters_protocol::{
     DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage,
@@ -262,4 +264,219 @@ fn encoded_subject_round_trips_through_parse() {
     .expect("raw email should be built");
     let parsed = parse_email(&outgoing.raw_message).expect("should parse");
     assert_eq!(parsed.subject().as_deref(), Some("Новая запись"));
+}
+
+fn multipart_with_parts(parts: &[&str]) -> String {
+    format!(
+        "From: alice@example.test\n\
+         To: bob@example.test\n\
+         Subject: MIME security\n\
+         X-LiveLetters-Protocol: v1\n\
+         MIME-Version: 1.0\n\
+         Content-Type: multipart/mixed; boundary=\"liveletters-boundary\"\n\
+         \n\
+         {}\n\
+         --liveletters-boundary--\n",
+        parts.join("")
+    )
+}
+
+fn text_part(body: &str) -> String {
+    format!(
+        "--liveletters-boundary\n\
+         Content-Type: text/plain; charset=\"utf-8\"\n\
+         \n\
+         {body}\n"
+    )
+}
+
+fn json_part(filename: Option<&str>, body: &str) -> String {
+    match filename {
+        Some(filename) => format!(
+            "--liveletters-boundary\n\
+             Content-Type: application/json; name=\"{filename}\"\n\
+             Content-Disposition: attachment; filename=\"{filename}\"\n\
+             \n\
+             {body}\n"
+        ),
+        None => format!(
+            "--liveletters-boundary\n\
+             Content-Type: application/json\n\
+             \n\
+             {body}\n"
+        ),
+    }
+}
+
+fn binary_part() -> String {
+    "--liveletters-boundary\n\
+     Content-Type: application/octet-stream\n\
+     Content-Disposition: attachment; filename=\"extra.bin\"\n\
+     \n\
+     bytes\n"
+        .to_owned()
+}
+
+fn encoded_sample_message(event_id: &str) -> String {
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "post_created", "blog-1", event_id).unwrap(),
+        alice(),
+        None,
+        "Новая запись в блоге",
+        DomainEventPayload::PostCreated {
+            post_id: format!("post-{event_id}"),
+            resource_id: "blog-1".into(),
+            created_at: 1_710_000_000,
+            body: "Текст поста".into(),
+            body_format: "plain".into(),
+            visibility: "public".into(),
+        },
+    )
+    .unwrap();
+    liveletters_protocol::encode_message(&message).unwrap()
+}
+
+#[test]
+fn extract_rejects_duplicate_liveletters_json_parts() {
+    let first = encoded_sample_message("first-json");
+    let second = encoded_sample_message("second-json");
+    let raw = multipart_with_parts(&[
+        &text_part("Новая запись"),
+        &json_part(Some("liveletters.json"), &first),
+        &json_part(Some("liveletters.json"), &second),
+    ]);
+
+    let parsed = parse_email(&raw).expect("email should parse");
+    let err = extract_liveletters_parts(&parsed).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn extract_rejects_json_part_without_liveletters_filename() {
+    let raw = multipart_with_parts(&[
+        &text_part("Новая запись"),
+        &json_part(Some("payload.json"), &encoded_sample_message("wrong-name")),
+    ]);
+
+    let parsed = parse_email(&raw).expect("email should parse");
+    let err = extract_liveletters_parts(&parsed).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn extract_rejects_json_part_without_filename() {
+    let raw = multipart_with_parts(&[
+        &text_part("Новая запись"),
+        &json_part(None, &encoded_sample_message("missing-name")),
+    ]);
+
+    let parsed = parse_email(&raw).expect("email should parse");
+    let err = extract_liveletters_parts(&parsed).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn extract_rejects_extra_attachment_without_manifest() {
+    let raw = multipart_with_parts(&[
+        &text_part("Новая запись"),
+        &json_part(
+            Some("liveletters.json"),
+            &encoded_sample_message("extra-attachment"),
+        ),
+        &binary_part(),
+    ]);
+
+    let parsed = parse_email(&raw).expect("email should parse");
+    let err = extract_liveletters_parts(&parsed).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn extract_rejects_duplicate_text_plain_parts() {
+    let raw = multipart_with_parts(&[
+        &text_part("Первая часть"),
+        &text_part("Вторая часть"),
+        &json_part(
+            Some("liveletters.json"),
+            &encoded_sample_message("duplicate-text"),
+        ),
+    ]);
+
+    let parsed = parse_email(&raw).expect("email should parse");
+    let err = extract_liveletters_parts(&parsed).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn parse_email_rejects_raw_message_over_limit() {
+    let raw = sample_multipart_mime();
+    let limits = MimeLimits {
+        max_raw_email_bytes: raw.len() - 1,
+        ..MimeLimits::default()
+    };
+
+    let err = parse_email_with_limits(&raw, limits).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn extract_rejects_json_over_limit() {
+    let raw = sample_multipart_mime();
+    let parsed = parse_email(&raw).expect("email should parse");
+    let limits = MimeLimits {
+        max_json_bytes: 32,
+        ..MimeLimits::default()
+    };
+
+    let err = extract_liveletters_parts_with_limits(&parsed, limits).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn extract_rejects_human_body_over_limit() {
+    let raw = sample_multipart_mime();
+    let parsed = parse_email(&raw).expect("email should parse");
+    let limits = MimeLimits {
+        max_human_bytes: 8,
+        ..MimeLimits::default()
+    };
+
+    let err = extract_liveletters_parts_with_limits(&parsed, limits).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn extract_rejects_too_many_mime_parts() {
+    let raw = sample_multipart_mime();
+    let parsed = parse_email(&raw).expect("email should parse");
+    let limits = MimeLimits {
+        max_parts: 2,
+        ..MimeLimits::default()
+    };
+
+    let err = extract_liveletters_parts_with_limits(&parsed, limits).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
+}
+
+#[test]
+fn extract_rejects_mime_tree_deeper_than_limit() {
+    let raw = sample_multipart_mime();
+    let parsed = parse_email(&raw).expect("email should parse");
+    let limits = MimeLimits {
+        max_depth: 0,
+        ..MimeLimits::default()
+    };
+
+    let err = extract_liveletters_parts_with_limits(&parsed, limits).unwrap_err();
+
+    assert!(matches!(err, MimeError::InvalidEmailFormat(_)));
 }

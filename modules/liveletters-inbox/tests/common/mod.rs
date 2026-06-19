@@ -33,7 +33,8 @@ fn build_post_eml(body: &str) -> String {
          \n\
          {body}\n\
          --liveletters-boundary\n\
-         Content-Type: application/json\n\
+         Content-Type: application/json; name=\"liveletters.json\"\n\
+         Content-Disposition: attachment; filename=\"liveletters.json\"\n\
          \n\
          {{\n\
          \x20\x20\"envelope\": {{\n\

@@ -13,7 +13,7 @@
 
 - отправку или приём писем (это `liveletters-mail`);
 - хранение писем в БД (это `liveletters-store`);
-- разбор нестандартных MIME-деревьев, вложений и кодировок quoted-printable в теле. Исходящие письма строятся как `multipart/mixed` с `text/plain; charset="utf-8"` под-частью и `application/json; name="liveletters.json"` вложением. Никакого base64url-блока в теле больше нет: JSON кладётся как отдельная MIME-часть с `Content-Disposition: attachment; filename="liveletters.json"`.
+- разбор нестандартных MIME-деревьев и произвольных вложений. Исходящие письма строятся как `multipart/mixed` с ровно одной `text/plain; charset="utf-8"` под-частью и ровно одним `application/json; name="liveletters.json"` вложением. Никакого base64url-блока в теле больше нет: JSON кладётся как отдельная MIME-часть с `Content-Disposition: attachment; filename="liveletters.json"`.
 
 ## Где находится интерфейс
 
@@ -23,22 +23,26 @@
 Наружу экспортируются:
 
 - `parse_email(&str) -> Result<ParsedEmail, MimeError>`;
+- `parse_email_with_limits(&str, MimeLimits) -> Result<ParsedEmail, MimeError>`;
 - `extract_liveletters_parts(&ParsedEmail) -> Result<ExtractedMailParts, MimeError>`;
+- `extract_liveletters_parts_with_limits(&ParsedEmail, MimeLimits) -> Result<ExtractedMailParts, MimeError>`;
 - `build_protocol_email(from, to, subject, body: Option<&str>, &ProtocolMessage) -> Result<OutgoingEmail, MimeError>`;
 - `decode_protocol_message(&str) -> Result<ProtocolMessage, MimeError>`;
 - типы `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`;
+- тип настроек `MimeLimits`;
 - тип ошибки `MimeError`;
 - функция-хелпер `crate_name() -> &'static str` для диагностики.
 
-Внутренние модули `build`, `error`, `message`, `mime`, `parser` не публикуются.
+Внутренние модули `build`, `error`, `limits`, `message`, `mime`, `parser` не публикуются.
 
 ## Что считается внешним интерфейсом этого модуля
 
 С практической точки зрения внешний интерфейс `liveletters-mime` это:
 
-1. четыре функции: `parse_email`, `extract_liveletters_parts`, `build_protocol_email`, `decode_protocol_message`;
+1. функции конвейера: `parse_email`, `parse_email_with_limits`, `extract_liveletters_parts`, `extract_liveletters_parts_with_limits`, `build_protocol_email`, `decode_protocol_message`;
 2. четыре структуры данных: `OutgoingEmail`, `ReceivedEmail`, `ParsedEmail`, `ExtractedMailParts`;
-3. `MimeError` как единый тип ошибок MIME-слоя.
+3. `MimeLimits` для централизованных ограничений;
+4. `MimeError` как единый тип ошибок MIME-слоя.
 
 Именно этим API пользуются:
 
@@ -68,12 +72,19 @@ pub fn parse_email(raw_email: &str) -> Result<ParsedEmail, MimeError>
 
 Разделяет «сырое письмо» на блок заголовков и тело:
 
+- применяет лимит на размер сырого письма;
 - нормализует CRLF → LF, чтобы не зависеть от того, в какой форме пришло письмо;
 - требует, чтобы между последним заголовком и телом была пустая строка (`\n\n`) — это канонический разделитель заголовков и тела в RFC 5322;
 - разбирает каждую строку заголовка как `name: value` (с триммингом пробелов вокруг `:`);
 - возвращает `MimeError::InvalidEmailFormat` на любом структурном отклонении.
 
 `ParsedEmail` инкапсулирует `headers: Vec<(String, String)>` и `body: String`. Заголовки хранятся в исходном порядке, но поиск по имени — case-insensitive (`eq_ignore_ascii_case`), как и требует RFC 5322.
+
+Если вызывающему коду нужны нестандартные ограничения, используется:
+
+```rust
+pub fn parse_email_with_limits(raw_email: &str, limits: MimeLimits) -> Result<ParsedEmail, MimeError>
+```
 
 Полезные методы `ParsedEmail`:
 
@@ -107,6 +118,23 @@ Content-Disposition: attachment; filename="liveletters.json"
 ```
 
 `text/plain` под-часть заполняется из аргумента `body` функции `build_protocol_email` (берётся из колонки `OutboxRecord.human_readable_body` на стороне отправителя). `application/json` под-часть — это JSON-сериализованный `ProtocolMessage`, в котором поля `human_readable_body` нет (оно `skip_serializing`). JSON передаётся как есть, без base64url-кодирования.
+
+Правила входящего письма строгие:
+
+- корневое письмо должно быть `multipart/*`;
+- `text/plain` часть должна быть ровно одна;
+- `application/json` часть должна быть ровно одна и называться `liveletters.json` через `Content-Type: ...; name="liveletters.json"` или `Content-Disposition: ...; filename="liveletters.json"`;
+- лишние вложения без манифеста отклоняются;
+- превышение лимитов размера частей, числа частей или глубины MIME-дерева отклоняется до разбора JSON.
+
+Вариант с явными лимитами:
+
+```rust
+pub fn extract_liveletters_parts_with_limits(
+    parsed: &ParsedEmail,
+    limits: MimeLimits,
+) -> Result<ExtractedMailParts, MimeError>
+```
 
 `ExtractedMailParts` предоставляет:
 
@@ -155,6 +183,25 @@ pub fn build_protocol_email(
 - `from`, `to`, `subject` — для SMTP envelope;
 - `raw_message` — готовое к отправке тело письма.
 
+## Тип `MimeLimits`
+
+```rust
+pub struct MimeLimits {
+    pub max_raw_email_bytes: usize,
+    pub max_human_bytes: usize,
+    pub max_json_bytes: usize,
+    pub max_parts: usize,
+    pub max_depth: usize,
+}
+```
+
+`MimeLimits` задаёт защитные ограничения MIME-слоя. Обычные функции
+`parse_email` и `extract_liveletters_parts` используют значения по
+умолчанию: до 10 МиБ на сырое письмо, до 1 МиБ на человекочитаемую часть,
+до 1 МиБ на `liveletters.json`, до 8 MIME-частей и глубину дерева до 2.
+Функции с суффиксом `_with_limits` нужны для тестов и будущей настройки
+этих значений из конфигурации.
+
 ## Тип `ReceivedEmail`
 
 ```rust
@@ -182,7 +229,7 @@ pub enum MimeError {
 Смысл вариантов:
 
 - `Protocol(String)` — сбой на стыке с `liveletters_protocol`: пустое поле envelope, пустое `human_readable_body`, битый JSON.
-- `InvalidEmailFormat(&'static str)` — структурная проблема письма: нет `\n\n` между заголовками и телом, заголовок без `:`, отсутствует `Content-Type`, повреждён служебный блок или старый multipart не содержит `boundary`.
+- `InvalidEmailFormat(&'static str)` — структурная проблема письма: нет `\n\n` между заголовками и телом, заголовок без `:`, отсутствует `Content-Type`, повреждён служебный блок, multipart не содержит `boundary`, MIME-часть продублирована, названа неверно или превышает лимит.
 - `MissingHumanReadablePart` — в multipart-теле не нашлось `text/plain` под-части.
 - `MissingTechnicalPart` — в multipart-теле не нашлось `application/json` под-части.
 
@@ -251,7 +298,7 @@ match extract_liveletters_parts(&parsed) {
 
 ## Что модуль не делает
 
-- не разбирает произвольные вложения (`multipart/alternative`/`multipart/related`/`multipart/encrypted`); крейт работает только с `multipart/mixed` фиксированной структуры (две под-части: `text/plain` и `application/json` с `filename="liveletters.json"`);
+- не разбирает произвольные вложения (`multipart/alternative`/`multipart/related`/`multipart/encrypted`); крейт принимает только фиксированную структуру v1: одна `text/plain` часть и одна `application/json` часть с `filename="liveletters.json"` или `name="liveletters.json"`;
 - не валидирует email-адреса в полях `From`/`To` — это работа SMTP-слоя;
 - не делает retry, throttling, deduplication писем — это ответственность `liveletters-sync`;
 - не сохраняет ничего в БД — это ответственность `liveletters-store`.

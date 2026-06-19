@@ -1,6 +1,19 @@
-use crate::{MimeError, ParsedEmail};
+use crate::{MimeError, MimeLimits, ParsedEmail};
 
 pub fn parse_email(raw_email: &str) -> Result<ParsedEmail, MimeError> {
+    parse_email_with_limits(raw_email, MimeLimits::default())
+}
+
+pub fn parse_email_with_limits(
+    raw_email: &str,
+    limits: MimeLimits,
+) -> Result<ParsedEmail, MimeError> {
+    if raw_email.len() > limits.max_raw_email_bytes {
+        return Err(MimeError::InvalidEmailFormat(
+            "raw email exceeds size limit",
+        ));
+    }
+
     let normalized = raw_email.replace("\r\n", "\n");
     if !normalized.contains("\n\n") {
         return Err(MimeError::InvalidEmailFormat(
