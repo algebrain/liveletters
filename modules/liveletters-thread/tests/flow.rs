@@ -70,7 +70,6 @@ fn thread_for_post_with_root_and_reply_prints_tree() {
             post_id: post.post().id().as_str(),
             parent_comment_id: None,
             body: "Корневой",
-            visibility: Visibility::Public,
         })
         .unwrap();
 
@@ -80,7 +79,6 @@ fn thread_for_post_with_root_and_reply_prints_tree() {
         post_id: post.post().id().as_str(),
         parent_comment_id: Some(root.comment().id().as_str()),
         body: "Ответ",
-        visibility: Visibility::Public,
     })
     .unwrap();
 

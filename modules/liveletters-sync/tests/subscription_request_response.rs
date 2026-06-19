@@ -102,6 +102,33 @@ fn build_subscription_confirmed_email(
     }
 }
 
+fn build_friend_added_email(from: &str, to: &str, event_id: &str) -> ReceivedEmail {
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new("1", "friend_added", from, event_id).unwrap(),
+        identity("Алиса", from),
+        None,
+        "Алиса добавила вас в друзья",
+        DomainEventPayload::FriendAdded {
+            resource_id: from.into(),
+            friend_address: to.into(),
+            created_at: 1_710_000_700,
+        },
+    )
+    .unwrap();
+    let outgoing = build_protocol_email(
+        from,
+        to,
+        "Sync fixture",
+        Some(message.human_readable_body().unwrap_or("")),
+        &message,
+    )
+    .unwrap();
+    ReceivedEmail {
+        message_id: format!("message-{event_id}"),
+        raw_message: outgoing.raw_message,
+    }
+}
+
 #[test]
 fn a_responds_to_subscription_request_with_confirmed() {
     let (store, _tmp) = open();
@@ -238,6 +265,75 @@ fn b_accepts_confirmed_and_moves_pending_to_subscriptions() {
         .expect("authors должен содержать профиль A");
     assert_eq!(author.nickname, "Алиса");
     assert_eq!(author.source, "subscription_confirmed");
+}
+
+#[test]
+fn confirmed_subscription_completes_pending_friend_and_enqueues_friend_added() {
+    let (store, _tmp) = open();
+    let engine = SyncEngine::new(&store).with_profile_id("alice");
+
+    store
+        .save_identity("alice", "alice@example.org", "Алиса", None, "ru", true)
+        .unwrap();
+    store.save_author("bob@example.org", "Боб", "test").unwrap();
+    store
+        .save_pending_subscription("alice", "bob@example.org", 1_710_000_000)
+        .unwrap();
+    store
+        .save_pending_friend(
+            "alice",
+            "alice@example.org",
+            "bob@example.org",
+            "bob@example.org",
+            1_710_000_000,
+        )
+        .unwrap();
+
+    let raw = build_subscription_confirmed_email(
+        "bob@example.org",
+        "alice@example.org",
+        "sub-friend",
+        true,
+    );
+
+    engine.ingest_batch(vec![raw]).expect("ingest ok");
+
+    assert!(
+        store
+            .is_friend("alice@example.org", "bob@example.org")
+            .unwrap()
+    );
+    assert!(store.list_pending_friends("alice").unwrap().is_empty());
+    let outbox = store.list_outbox_records().unwrap();
+    let friend_added = outbox
+        .iter()
+        .find(|r| r.event_type == "friend_added")
+        .expect("friend_added should be queued after confirmed subscription");
+    let decoded = liveletters_protocol::decode_message(&friend_added.message_body).unwrap();
+    assert!(matches!(
+        decoded.payload(),
+        DomainEventPayload::FriendAdded {
+            resource_id,
+            friend_address,
+            ..
+        } if resource_id == "alice@example.org" && friend_address == "bob@example.org"
+    ));
+}
+
+#[test]
+fn friend_added_marks_recipient_as_friend_of_origin_resource() {
+    let (store, _tmp) = open();
+    let engine =
+        SyncEngine::new_with_identity(&store, "bob@example.org", &[]).with_profile_id("bob");
+
+    let raw = build_friend_added_email("alice@example.org", "bob@example.org", "friend-added-1");
+
+    engine.ingest_batch(vec![raw]).expect("ingest ok");
+
+    assert_eq!(
+        store.list_friend_of("bob").unwrap()[0].resource_email,
+        "alice@example.org"
+    );
 }
 
 #[test]

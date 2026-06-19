@@ -49,6 +49,11 @@ pub enum DomainEventPayload {
         subscriber_delivery_address: String,
         created_at: u64,
     },
+    FriendAdded {
+        resource_id: String,
+        friend_address: String,
+        created_at: u64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +108,11 @@ enum WireDomainEventPayload {
     SubscriptionRevoked {
         resource_id: String,
         subscriber_delivery_address: String,
+        created_at: u64,
+    },
+    FriendAdded {
+        resource_id: String,
+        friend_address: String,
         created_at: u64,
     },
 }
@@ -216,6 +226,15 @@ impl From<&DomainEventPayload> for WireDomainEventPayload {
                 subscriber_delivery_address: subscriber_delivery_address.clone(),
                 created_at: *created_at,
             },
+            DomainEventPayload::FriendAdded {
+                resource_id,
+                friend_address,
+                created_at,
+            } => Self::FriendAdded {
+                resource_id: resource_id.clone(),
+                friend_address: friend_address.clone(),
+                created_at: *created_at,
+            },
         }
     }
 }
@@ -310,6 +329,15 @@ impl TryFrom<WireDomainEventPayload> for DomainEventPayload {
             } => Ok(Self::SubscriptionRevoked {
                 resource_id,
                 subscriber_delivery_address,
+                created_at,
+            }),
+            WireDomainEventPayload::FriendAdded {
+                resource_id,
+                friend_address,
+                created_at,
+            } => Ok(Self::FriendAdded {
+                resource_id,
+                friend_address,
                 created_at,
             }),
         }

@@ -9,16 +9,16 @@ mod service;
 pub use commands::{
     CreateCommentCommand, CreateCommentFromIdentityCommand, CreateCommentResult, CreatePostCommand,
     CreatePostFromIdentityCommand, CreatePostResult, EditCommentCommand, EditCommentResult,
-    HidePostCommand, HidePostResult, Identity, ReprocessDeferredEventsCommand,
-    ReprocessDeferredEventsResult, SaveSettingsCommand, SaveSettingsResult, SubscribeCommand,
-    SubscribeResult, UnsubscribeCommand, UnsubscribeResult, create_comment_from_identity,
-    create_post_from_identity, subscribe, unsubscribe,
+    FriendCommand, FriendResult, HidePostCommand, HidePostResult, Identity,
+    ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult, SaveSettingsCommand,
+    SaveSettingsResult, SubscribeCommand, SubscribeResult, UnsubscribeCommand, UnsubscribeResult,
+    create_comment_from_identity, create_post_from_identity, subscribe, unsubscribe,
 };
 pub use errors::AppCoreError;
 pub use i18n_strings::{
-    SubjectAndBody, comment_created, comment_created_redistribute, comment_edited, locale_for,
-    post_created, post_hidden, subscription_confirmed_accepted, subscription_confirmed_declined,
-    subscription_requested, subscription_revoked,
+    SubjectAndBody, comment_created, comment_created_redistribute, comment_edited, friend_added,
+    locale_for, post_created, post_hidden, subscription_confirmed_accepted,
+    subscription_confirmed_declined, subscription_requested, subscription_revoked,
 };
 pub use ids::{new_comment_id, new_post_id, unix_millis_now};
 pub use liveletters_domain::Visibility;

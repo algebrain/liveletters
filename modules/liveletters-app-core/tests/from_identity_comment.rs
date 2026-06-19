@@ -39,7 +39,7 @@ fn create_comment_from_identity_derives_fields_and_persists_comment() {
             profile_id: "alice",
             identity: &ident,
             body: "Запись",
-            visibility: Visibility::Public,
+            visibility: Visibility::FriendsOnly,
         })
         .unwrap();
 
@@ -50,7 +50,6 @@ fn create_comment_from_identity_derives_fields_and_persists_comment() {
             post_id: post.post().id().as_str(),
             parent_comment_id: None,
             body: "Комментарий",
-            visibility: Visibility::FriendsOnly,
         })
         .unwrap();
 
@@ -91,7 +90,6 @@ fn create_comment_from_identity_uses_parent_when_provided() {
             post_id: post.post().id().as_str(),
             parent_comment_id: None,
             body: "Корневой",
-            visibility: Visibility::Public,
         })
         .unwrap();
 
@@ -102,7 +100,6 @@ fn create_comment_from_identity_uses_parent_when_provided() {
             post_id: post.post().id().as_str(),
             parent_comment_id: Some(parent.comment().id().as_str()),
             body: "Ответ",
-            visibility: Visibility::Public,
         })
         .unwrap();
 

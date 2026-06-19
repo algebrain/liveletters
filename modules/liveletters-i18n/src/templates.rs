@@ -61,6 +61,14 @@ pub(super) fn template(key: &str, locale: Locale) -> Option<&'static str> {
             "%subscriber% отписался(ась) от вас в LiveLetters (блог %resource%).\n\n— LiveLetters",
             "%subscriber% has unsubscribed from you in LiveLetters (blog %resource%).\n\n— LiveLetters",
         ),
+        "friend_added.subject" => (
+            "Вас добавили в друзья: %resource%",
+            "You were added as a friend: %resource%",
+        ),
+        "friend_added.body" => (
+            "%owner% добавил(а) Вас в друзья. Теперь вы можете видеть приватные записи %resource%, если у вас есть доступ к просмотру этого журнала.\n\n— LiveLetters",
+            "%owner% added you as a friend. You can now see private posts in %resource% when you have access to view that journal.\n\n— LiveLetters",
+        ),
         _ => return None,
     };
     Some(if matches!(locale, Locale::Ru) { ru } else { en })

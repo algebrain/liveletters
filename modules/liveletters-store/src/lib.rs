@@ -2,6 +2,7 @@ mod authors;
 mod comments;
 mod error;
 mod extras;
+mod friends;
 mod introspection;
 mod metrics;
 mod models;
@@ -18,9 +19,10 @@ mod sync_state;
 pub use error::StoreError;
 pub use introspection::{ColumnInfo, ForeignKeyInfo};
 pub use models::{
-    AuthorRecord, BounceRecord, CommentRecord, DeferredEventRecord, MailSettingsRecord,
-    OutboxDelivery, OutboxRecord, PendingSubscriptionRecord, PostRecord, RawEventRecord,
-    RawMessageRecord, SubscriptionRecord, UserSettingsRecord,
+    AuthorRecord, BounceRecord, CommentRecord, DeferredEventRecord, FriendOfRecord, FriendRecord,
+    MailSettingsRecord, OutboxDelivery, OutboxRecord, PendingFriendRecord,
+    PendingSubscriptionRecord, PostRecord, RawEventRecord, RawMessageRecord, SubscriptionRecord,
+    UserSettingsRecord,
 };
 pub use outbox::{decode_delivery, encode_delivery};
 pub use paths::{EnvOverrides, StorePaths, resolve_data_dir, resolve_data_dir_from_env};

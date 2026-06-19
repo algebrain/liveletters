@@ -13,7 +13,7 @@ fn lltt() -> Command {
 }
 
 #[test]
-fn help_lists_all_fourteen_subcommands() {
+fn help_lists_all_top_level_subcommands() {
     let output = lltt().arg("--help").output().expect("запуск lltt --help");
     assert!(output.status.success(), "lltt --help завершился с ошибкой");
     let stdout = String::from_utf8_lossy(&output.stdout);

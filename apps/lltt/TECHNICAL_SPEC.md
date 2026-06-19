@@ -55,7 +55,7 @@ apps/lltt/
 │   ├── main.rs        # clap-дерево, dispatcher, обработка ошибок
 │   └── context.rs     # resolve_home, resolve_current_user_name, build_context, ContextError
 └── tests/
-    ├── cli_smoke.rs           # --help показывает 14 подкоманд; неизвестная команда → ошибка; NoCurrentUser → код 2
+    ├── cli_smoke.rs           # --help показывает подкоманды; неизвестная команда → ошибка; NoCurrentUser → код 2
     ├── cli_init.rs            # lltt init через бинарь
     ├── cli_cu.rs              # lltt cu, lltt cu posts через бинарь
     ├── cli_user.rs            # lltt user через бинарь
@@ -261,6 +261,7 @@ pub enum ContextError {
 | `liveletters-output` | `CommandContext` (общий тип для всех команд), `parse_visibility`, `read_body` |
 | `liveletters-init` | команда `init` |
 | `liveletters-cu` | команды `cu`, `cu posts` и `user` |
+| `liveletters-friend` | команда `friend <адрес>` |
 | `liveletters-feed` | команда `feed`, лента подписок |
 | `liveletters-inbox` | команды `inbox import` и `inbox list` |
 | `liveletters-post` | команда `post new` |
@@ -276,7 +277,7 @@ pub enum ContextError {
 Все тесты — интеграционные, через `assert_cmd`:
 
 - [`apps/lltt/tests/cli_smoke.rs`](tests/cli_smoke.rs):
-  - `help_lists_all_fourteen_subcommands` — `lltt --help` содержит имена подкоманд (init, cu, user, sub, feed, inbox, post, comment, outbox, thread, status, doctor, settings, sync);
+  - `help_lists_all_top_level_subcommands` — `lltt --help` содержит имена подкоманд верхнего уровня;
   - `unknown_subcommand_returns_error` — `lltt totally-bogus` возвращает ненулевой код и сообщение об ошибке;
   - `command_without_init_returns_no_current_user_error` — `lltt status` без `init` возвращает код 2 и сообщение про `<home>/current-user`;
   - `command_when_current_user_file_removed_returns_error` — `init`, создание `alice`, выбор `lltt cu alice`, затем удаление `<home>/current-user`, затем `lltt status` → код 2;

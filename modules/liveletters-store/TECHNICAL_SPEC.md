@@ -33,6 +33,9 @@
 - `user_settings`;
 - `mail_settings`;
 - `subscriptions`;
+- `friends`;
+- `pending_friends`;
+- `friend_of`;
 - `memberships`;
 - `raw_messages`;
 - `raw_events`;
@@ -65,6 +68,10 @@
   - `deferred_events`
   - `user_settings`
   - `mail_settings`
+  - `subscriptions`
+  - `friends`
+  - `pending_friends`
+  - `friend_of`
 - repository-like операции для чтения и записи этих сущностей;
 - home-scoped путь хранения по умолчанию;
 - тестовый сценарий с временным `HOME`.

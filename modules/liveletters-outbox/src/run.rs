@@ -59,6 +59,9 @@ fn format_delivery(delivery: &OutboxDelivery) -> String {
     match delivery {
         OutboxDelivery::Direct(addrs) => format!("direct: {}", addrs.join(", ")),
         OutboxDelivery::ResourceSubscribers => "resource subscribers".to_owned(),
+        OutboxDelivery::ResourceFriends { visibility } => {
+            format!("resource friends ({visibility})")
+        }
     }
 }
 

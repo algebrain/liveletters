@@ -138,6 +138,21 @@ pub fn subscription_revoked(
     }
 }
 
+pub fn friend_added(
+    record: Option<&UserSettingsRecord>,
+    owner: &str,
+    resource: &str,
+) -> SubjectAndBody {
+    let loc = locale_for(record);
+    let vars = Vars(&[("owner", owner), ("resource", resource)]);
+    SubjectAndBody {
+        subject: translate("friend_added.subject", loc, vars)
+            .expect("шаблон friend_added.subject присутствует в таблице"),
+        body: translate("friend_added.body", loc, vars)
+            .expect("шаблон friend_added.body присутствует в таблице"),
+    }
+}
+
 pub fn comment_created_redistribute(
     record: Option<&UserSettingsRecord>,
     sender: &str,

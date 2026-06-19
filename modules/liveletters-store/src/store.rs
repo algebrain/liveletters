@@ -107,6 +107,28 @@ impl Store {
                 PRIMARY KEY (profile_id, resource_email)
             );
 
+            CREATE TABLE IF NOT EXISTS friends (
+                owner_resource_email TEXT NOT NULL REFERENCES authors(email),
+                friend_email         TEXT NOT NULL REFERENCES authors(email),
+                PRIMARY KEY (owner_resource_email, friend_email)
+            );
+
+            CREATE TABLE IF NOT EXISTS pending_friends (
+                profile_id                TEXT NOT NULL,
+                owner_resource_email      TEXT NOT NULL REFERENCES authors(email),
+                friend_email              TEXT NOT NULL REFERENCES authors(email),
+                subscribed_resource_email TEXT NOT NULL REFERENCES authors(email),
+                requested_at              INTEGER NOT NULL,
+                last_attempt_at           INTEGER NOT NULL,
+                PRIMARY KEY (profile_id, owner_resource_email, friend_email)
+            );
+
+            CREATE TABLE IF NOT EXISTS friend_of (
+                profile_id     TEXT NOT NULL,
+                resource_email TEXT NOT NULL REFERENCES authors(email),
+                PRIMARY KEY (profile_id, resource_email)
+            );
+
             CREATE TABLE IF NOT EXISTS resources_owned (
                 profile_id       TEXT NOT NULL,
                 resource_email   TEXT NOT NULL REFERENCES authors(email),

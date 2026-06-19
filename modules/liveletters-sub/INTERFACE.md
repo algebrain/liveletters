@@ -93,7 +93,7 @@ pub enum SubError {
 | Операция | Файлы / таблицы |
 |---|---|
 | `Subscribe` | 1) апдейт `<home>/identities/<текущий>.toml` (добавление адреса в `meta.subscriptions`); 2) операции `liveletters_app_core::AppCore::subscribe` над таблицей `subscriptions` (запись `INSERT`). |
-| `List`     | Только чтение (`identities/<текущий>.toml` + `subscriptions` + `subscriptions` по `mail.publish`). |
+| `List`     | Только чтение (`identities/<текущий>.toml` + `subscriptions` + `friends` + `friend_of` по `mail.publish`). |
 | `Rm`       | 1) апдейт `<home>/identities/<текущий>.toml` (удаление адреса из `meta.subscriptions`); 2) операция `liveletters_app_core::AppCore::unsubscribe` (удаление из `subscriptions`). |
 
 ## Вывод
@@ -101,7 +101,7 @@ pub enum SubError {
 Операции печатают человекочитаемые строки на `stdout`:
 
 - `Subscribe`: `подписан на <resource>: посты будут приходить на <delivery>`
-- `List`:     две секции — «подписан на:» (по одной строке на адрес или `(пусто)`) и «мои подписчики:» (по одной строке на почтовый адрес подписчика или `(пусто)`).
+- `List`:     секции «подписан на:», «мои подписчики:», «мои друзья:» и «я в друзьях у:»; в пустой секции печатается `(пусто)`.
 - `Rm`:       `отписан от <resource>`
 
 В сетевом протоколе подписчик определяется почтовым адресом доставки.

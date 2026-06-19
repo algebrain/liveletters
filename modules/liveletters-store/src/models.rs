@@ -25,6 +25,7 @@ pub struct CommentRecord {
 pub enum OutboxDelivery {
     Direct(Vec<String>),
     ResourceSubscribers,
+    ResourceFriends { visibility: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,6 +144,28 @@ pub struct PendingSubscriptionRecord {
     pub resource_email: String,
     pub requested_at: u64,
     pub last_attempt_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FriendRecord {
+    pub owner_resource_email: String,
+    pub friend_email: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingFriendRecord {
+    pub profile_id: String,
+    pub owner_resource_email: String,
+    pub friend_email: String,
+    pub subscribed_resource_email: String,
+    pub requested_at: u64,
+    pub last_attempt_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FriendOfRecord {
+    pub profile_id: String,
+    pub resource_email: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

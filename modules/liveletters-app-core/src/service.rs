@@ -4,11 +4,12 @@ use crate::{
     AppCoreError, AppSettings, BootstrapState, CreateCommentCommand,
     CreateCommentFromIdentityCommand, CreateCommentResult, CreatePostCommand,
     CreatePostFromIdentityCommand, CreatePostResult, CurrentUserPosts, EditCommentCommand,
-    EditCommentResult, GetBootstrapStateQuery, GetCurrentUserPostsQuery, GetPendingOutboxQuery,
-    GetPostThreadQuery, GetSettingsQuery, HidePostCommand, HidePostResult, ListSubscriptionsQuery,
-    PendingOutbox, PostThread, ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult,
-    SaveSettingsCommand, SaveSettingsResult, SubscribeCommand, SubscribeResult, SubscriptionsList,
-    UnsubscribeCommand, UnsubscribeResult, commands, queries,
+    EditCommentResult, FriendCommand, FriendResult, GetBootstrapStateQuery,
+    GetCurrentUserPostsQuery, GetPendingOutboxQuery, GetPostThreadQuery, GetSettingsQuery,
+    HidePostCommand, HidePostResult, ListSubscriptionsQuery, PendingOutbox, PostThread,
+    ReprocessDeferredEventsCommand, ReprocessDeferredEventsResult, SaveSettingsCommand,
+    SaveSettingsResult, SubscribeCommand, SubscribeResult, SubscriptionsList, UnsubscribeCommand,
+    UnsubscribeResult, commands, queries,
 };
 
 pub struct AppCore<'a> {
@@ -117,6 +118,22 @@ impl<'a> AppCore<'a> {
         command: UnsubscribeCommand<'_>,
     ) -> Result<UnsubscribeResult, AppCoreError> {
         commands::unsubscribe(self.store, command)
+    }
+
+    pub fn friend(&self, command: FriendCommand<'_>) -> Result<FriendResult, AppCoreError> {
+        commands::friend(self.store, command)
+    }
+
+    pub fn complete_pending_friend_after_subscription(
+        &self,
+        profile_id: &str,
+        subscribed_resource_address: &str,
+    ) -> Result<Option<FriendResult>, AppCoreError> {
+        commands::complete_pending_friend_after_subscription(
+            self.store,
+            profile_id,
+            subscribed_resource_address,
+        )
     }
 
     pub fn list_subscriptions(

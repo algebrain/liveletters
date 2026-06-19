@@ -288,6 +288,32 @@ fn resource_subscribers_sends_one_email_per_subscriber() {
 }
 
 #[test]
+fn resource_friends_sends_only_to_subscribers_who_are_friends() {
+    let (_tmp, store) = open_store();
+    let (_host, port, rx) = spawn_smtp_capture();
+
+    save_subscription(&store, "blog-1", "bob@example.test");
+    save_subscription(&store, "blog-1", "eve@example.test");
+    store
+        .save_friend("blog-1", "bob@example.test")
+        .expect("save friend");
+
+    let message = sample_protocol_message("event-friends-1");
+    let mut record = outbox_record_for(&message);
+    record.delivery = OutboxDelivery::ResourceFriends {
+        visibility: "friends_only".into(),
+    };
+
+    let transport = make_transport(port);
+    let n = send_outbox_record(&store, &transport, "alice@example.test", &record)
+        .expect("send to friends");
+    assert_eq!(n, 1);
+
+    let collected = rx.recv().expect("rcpts collected");
+    assert_eq!(collected, vec!["bob@example.test".to_owned()]);
+}
+
+#[test]
 fn resource_subscribers_skips_when_no_subscribers() {
     let (_tmp, store) = open_store();
     let (_host, port, _rx) = spawn_smtp_capture();

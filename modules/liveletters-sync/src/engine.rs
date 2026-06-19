@@ -737,6 +737,22 @@ impl<'a> SyncEngine<'a> {
                     .map_err(ApplyEventError::Store)?;
                 Ok(())
             }
+            DomainEventPayload::FriendAdded {
+                resource_id,
+                friend_address,
+                ..
+            } => {
+                if let Some(filter) = &self.identity_filter
+                    && friend_address != filter.own_address
+                {
+                    return Err(ApplyEventError::Filtered("friend_added_for_other".into()));
+                }
+                let profile_id = self.profile_id.unwrap_or("default");
+                self.store
+                    .save_friend_of(profile_id, resource_id)
+                    .map_err(ApplyEventError::Store)?;
+                Ok(())
+            }
         }
     }
 
@@ -910,7 +926,114 @@ impl<'a> SyncEngine<'a> {
         self.store
             .remove_pending_subscription(profile_id, resource_address)
             .map_err(ApplyEventError::Store)?;
+        self.complete_pending_friend_after_subscription(profile_id, resource_address)?;
         Ok(())
+    }
+
+    fn complete_pending_friend_after_subscription(
+        &self,
+        profile_id: &str,
+        subscribed_resource_address: &str,
+    ) -> Result<(), ApplyEventError> {
+        let Some(pending) = self
+            .store
+            .find_pending_friend_by_subscribed_resource(profile_id, subscribed_resource_address)
+            .map_err(ApplyEventError::Store)?
+        else {
+            return Ok(());
+        };
+
+        self.store
+            .save_friend(&pending.owner_resource_email, &pending.friend_email)
+            .map_err(ApplyEventError::Store)?;
+        self.store
+            .remove_pending_friend(
+                profile_id,
+                &pending.owner_resource_email,
+                &pending.friend_email,
+            )
+            .map_err(ApplyEventError::Store)?;
+        let record = self.build_friend_added_message(
+            profile_id,
+            &pending.owner_resource_email,
+            &pending.friend_email,
+        )?;
+        self.enqueue_outgoing(&record)?;
+        Ok(())
+    }
+
+    fn build_friend_added_message(
+        &self,
+        profile_id: &str,
+        owner_resource_address: &str,
+        friend_address: &str,
+    ) -> Result<OutboxRecord, ApplyEventError> {
+        let user = self
+            .store
+            .get_user_settings_record(profile_id)
+            .map_err(ApplyEventError::Store)?
+            .ok_or_else(|| ApplyEventError::Invalid("missing_user_settings".into()))?;
+        let owner = self
+            .store
+            .get_author(&user.author_email)
+            .map_err(ApplyEventError::Store)?
+            .ok_or_else(|| ApplyEventError::Invalid("missing_owner_author".into()))?;
+        let created_at = unix_now();
+        let event_id = format!(
+            "friend-added:{}:{}:{}",
+            owner_resource_address, friend_address, created_at
+        );
+        let domain = user
+            .author_email
+            .split_once('@')
+            .map(|(_, domain)| domain)
+            .unwrap_or("liveletters.invalid");
+        let locale = parse_locale(&user.language).unwrap_or_else(|_| detect_system_locale());
+        let subject = translate(
+            "friend_added.subject",
+            locale,
+            Vars(&[
+                ("owner", &owner.nickname),
+                ("resource", owner_resource_address),
+            ]),
+        )
+        .expect("шаблон friend_added.subject присутствует в таблице");
+        let body = translate(
+            "friend_added.body",
+            locale,
+            Vars(&[
+                ("owner", &owner.nickname),
+                ("resource", owner_resource_address),
+            ]),
+        )
+        .expect("шаблон friend_added.body присутствует в таблице");
+        let message = ProtocolMessage::new(
+            MessageEnvelope::new("1", "friend_added", owner_resource_address, &event_id)
+                .map_err(|e| ApplyEventError::Invalid(format!("envelope: {e:?}")))?,
+            ProtocolIdentity::new(owner.nickname.clone(), owner.email.clone())
+                .map_err(|e| ApplyEventError::Invalid(format!("origin: {e:?}")))?,
+            None,
+            &body,
+            DomainEventPayload::FriendAdded {
+                resource_id: owner_resource_address.to_owned(),
+                friend_address: friend_address.to_owned(),
+                created_at,
+            },
+        )
+        .map_err(|e| ApplyEventError::Invalid(format!("protocol: {e:?}")))?;
+        let message_body = encode_message(&message)
+            .map_err(|e| ApplyEventError::Invalid(format!("encode: {e:?}")))?;
+        Ok(OutboxRecord {
+            event_id: event_id.clone(),
+            event_type: "friend_added".to_owned(),
+            author_email: owner.email,
+            resource_email: Some(owner_resource_address.to_owned()),
+            delivery: OutboxDelivery::Direct(vec![friend_address.to_owned()]),
+            message_body,
+            message_id: Some(format!("<{}@{}>", event_id, domain)),
+            subject: Some(subject),
+            human_readable_body: Some(body),
+        })
     }
 
     /// B: `SubscriptionConfirmed { accepted: false }` → удалить pending.
@@ -942,11 +1065,26 @@ impl<'a> SyncEngine<'a> {
             .store
             .list_subscriptions_for_resource(resource_email)
             .map_err(ApplyEventError::Store)?;
-        let recipients: Vec<String> = subs
-            .into_iter()
-            .map(|s| s.subscriber_email)
-            .filter(|addr| addr != origin.email())
-            .collect();
+        let post = self
+            .store
+            .get_post_record(post_id)
+            .map_err(ApplyEventError::Store)?
+            .ok_or_else(|| ApplyEventError::Deferred("missing_post".into()))?;
+        let mut recipients = Vec::new();
+        for sub in subs {
+            if sub.subscriber_email == origin.email() {
+                continue;
+            }
+            if post.visibility == "friends_only"
+                && !self
+                    .store
+                    .is_friend(resource_email, &sub.subscriber_email)
+                    .map_err(ApplyEventError::Store)?
+            {
+                continue;
+            }
+            recipients.push(sub.subscriber_email);
+        }
         if recipients.is_empty() {
             return Ok(());
         }
@@ -1099,6 +1237,15 @@ fn validate_protocol_message(
                 return Err("blank_subscription_field".into());
             }
         }
+        DomainEventPayload::FriendAdded {
+            resource_id,
+            friend_address,
+            ..
+        } => {
+            if resource_id.trim().is_empty() || friend_address.trim().is_empty() {
+                return Err("blank_friend_field".into());
+            }
+        }
     }
 
     match payload {
@@ -1142,6 +1289,7 @@ fn infer_event_type(payload: &DomainEventPayload) -> &'static str {
         DomainEventPayload::SubscriptionRequested { .. } => "subscription_requested",
         DomainEventPayload::SubscriptionConfirmed { .. } => "subscription_confirmed",
         DomainEventPayload::SubscriptionRevoked { .. } => "subscription_revoked",
+        DomainEventPayload::FriendAdded { .. } => "friend_added",
     }
 }
 
@@ -1157,7 +1305,8 @@ fn infer_resource_id(payload: &DomainEventPayload) -> &str {
         | DomainEventPayload::CommentEdited { resource_id, .. } => resource_id,
         DomainEventPayload::SubscriptionRequested { resource_id, .. }
         | DomainEventPayload::SubscriptionConfirmed { resource_id, .. }
-        | DomainEventPayload::SubscriptionRevoked { resource_id, .. } => resource_id,
+        | DomainEventPayload::SubscriptionRevoked { resource_id, .. }
+        | DomainEventPayload::FriendAdded { resource_id, .. } => resource_id,
     }
 }
 

@@ -2,7 +2,7 @@
 
 ## Назначение
 
-`liveletters-comment` — библиотечный крейт, реализующий команду `lltt comment`. Добавляет комментарий к записи в блоге: подбирает `comment_id` и `created_at`, читает тело из файла или stdin, записывает комментарий в `Store` и кладёт событие `comment_created` в `outbox`. Поддерживает вложенные ответы через `--parent`.
+`liveletters-comment` — библиотечный крейт, реализующий команду `lltt comment`. Добавляет комментарий к записи в блоге: подбирает `comment_id` и `created_at`, читает тело из файла или stdin, записывает комментарий в `Store` и кладёт событие `comment_created` в `outbox`. Поддерживает вложенные ответы через `--parent`. Видимость комментария наследуется от исходной записи.
 
 ## Где находится интерфейс
 
@@ -63,13 +63,10 @@ pub struct NewArgs {
     #[arg(long)]
     pub body_file: Option<std::path::PathBuf>,
 
-    /// Уровень видимости: `public` или `friends_only`.
-    #[arg(long, default_value = "public")]
-    pub visibility: String,
 }
 ```
 
-Поверхность CLI: `lltt comment new --post <id> [--parent <id>] [--body-file <path>] [--visibility <level>]`.
+Поверхность CLI: `lltt comment new --post <id> [--parent <id>] [--body-file <path>]`.
 
 ## `CommentError`
 
@@ -94,9 +91,6 @@ pub enum CommentError {
     #[error("файл с телом комментария не найден: {path}")]
     BodyFileNotFound { path: std::path::PathBuf },
 
-    #[error("{0}")]
-    UnknownVisibility(String),
-
     #[error("тело комментария пустое")]
     EmptyBody,
 }
@@ -108,9 +102,8 @@ pub enum CommentError {
 2. `liveletters_config::load_identity(...)` — `mail.publish`.
 3. `liveletters_output::read_body(...)` — читает тело.
 4. Если `body.trim().is_empty()` → `CommentError::EmptyBody`.
-5. `liveletters_output::parse_visibility(...)` — `public` или `friends_only`.
-6. `AppCore::create_comment_from_identity(...)` — генерирует `comment_id`; подставляет `author_id = identity.publish`, `created_at = unix_millis_now() / 1000`. Если пост с `args.post` не найден, `AppCore` возвращает `PostNotFound`.
-7. `print_created(comment_id)`.
+5. `AppCore::create_comment_from_identity(...)` — генерирует `comment_id`; подставляет `author_id = identity.publish`, `created_at = unix_millis_now() / 1000`, а видимость берёт из записи, к которой относится комментарий. Если пост с `args.post` не найден, `AppCore` возвращает `PostNotFound`.
+6. `print_created(comment_id)`.
 
 ## Что печатает
 
@@ -128,15 +121,15 @@ pub enum CommentError {
 
 - [`liveletters-app-core`](../../modules/liveletters-app-core/INTERFACE.md) — `CreateCommentFromIdentityCommand`.
 - [`liveletters-config`](../../modules/liveletters-config/INTERFACE.md) — `load_identity`, `MailSettings::publish`.
-- [`liveletters-output`](../../modules/liveletters-output/INTERFACE.md) — `read_body`, `parse_visibility`.
+- [`liveletters-output`](../../modules/liveletters-output/INTERFACE.md) — `read_body`.
 - [`liveletters-store`](../../modules/liveletters-store/INTERFACE.md) — `Store::open_for_home_dir`.
 
 ## Тесты
 
 - `tests/flow.rs` (5 тестов):
   - `comment_new_creates_persisted_comment_with_default_visibility`
-  - `comment_new_with_friends_only_visibility`
+  - `comment_new_inherits_friends_only_visibility_from_post`
   - `comment_new_with_parent_creates_reply`
   - `comment_new_rejects_empty_body`
   - `comment_new_to_missing_post_errors`
-- Покрытие через бинарь: `apps/lltt/tests/cli_comment.rs` (2 теста) — `init`+`post new`+`comment new`+SQL-проверка.
+- Покрытие через бинарь: `apps/lltt/tests/cli_comment.rs` — `init`+`post new`+`comment new`+SQL-проверка и отказ от устаревшего `--visibility`.

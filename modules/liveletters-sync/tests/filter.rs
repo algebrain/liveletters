@@ -83,6 +83,15 @@ fn subscription_revoked_email(
 }
 
 fn post_created_email(event_id: &str, post_id: &str, resource_id: &str) -> ReceivedEmail {
+    post_created_email_with_visibility(event_id, post_id, resource_id, "public")
+}
+
+fn post_created_email_with_visibility(
+    event_id: &str,
+    post_id: &str,
+    resource_id: &str,
+    visibility: &str,
+) -> ReceivedEmail {
     let message = ProtocolMessage::new(
         MessageEnvelope::new("1", "post_created", resource_id, event_id).unwrap(),
         identity("Alice", resource_id),
@@ -94,7 +103,7 @@ fn post_created_email(event_id: &str, post_id: &str, resource_id: &str) -> Recei
             created_at: 1,
             body: "Текст поста".into(),
             body_format: "plain".into(),
-            visibility: "public".into(),
+            visibility: visibility.into(),
         },
     )
     .unwrap();
@@ -437,6 +446,63 @@ fn applied_comment_created_creates_outbox_redistribution_to_other_subscribers() 
         body.contains("post-1"),
         "body должен содержать post_id: {body}"
     );
+}
+
+#[test]
+fn comment_on_friends_only_post_is_redistributed_only_to_friend_subscribers() {
+    let (store, _tmp) = open_temp_store();
+    ensure_author(&store, "alice-publish@example.org", "Alice");
+    ensure_author(&store, "bob@example.org", "Bob");
+    ensure_author(&store, "eve@example.org", "Eve");
+    ensure_author(&store, "mallory@example.org", "Mallory");
+    let engine = SyncEngine::new(&store);
+
+    let _ = engine
+        .ingest_batch(vec![post_created_email_with_visibility(
+            "post-private-1",
+            "post-private-1",
+            "alice-publish@example.org",
+            "friends_only",
+        )])
+        .unwrap();
+
+    for subscriber in ["bob@example.org", "eve@example.org"] {
+        store
+            .save_subscription(&SubscriptionRecord {
+                resource_email: "alice-publish@example.org".into(),
+                subscriber_email: subscriber.into(),
+            })
+            .unwrap();
+    }
+    store
+        .save_friend("alice-publish@example.org", "bob@example.org")
+        .unwrap();
+    store
+        .save_friend("alice-publish@example.org", "mallory@example.org")
+        .unwrap();
+
+    engine
+        .ingest_batch(vec![comment_created_email(
+            "comment-private-1",
+            "comment-private-1",
+            "post-private-1",
+            "alice-publish@example.org",
+            "alice-publish@example.org",
+        )])
+        .unwrap();
+
+    let outbox = store.list_outbox_records().unwrap();
+    let redist: Vec<_> = outbox
+        .iter()
+        .filter(|r| r.event_id.starts_with("redistribute:"))
+        .collect();
+    assert_eq!(redist.len(), 1);
+    match &redist[0].delivery {
+        liveletters_store::OutboxDelivery::Direct(addrs) => {
+            assert_eq!(addrs, &vec!["bob@example.org".to_owned()]);
+        }
+        other => panic!("ожидался Direct, получили {other:?}"),
+    }
 }
 
 #[test]

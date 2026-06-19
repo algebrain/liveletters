@@ -123,6 +123,29 @@ fn answer_replies_to_comment_by_prefix() {
 }
 
 #[test]
+fn answer_rejects_visibility_flag() {
+    let tmp = TempDir::new().unwrap();
+    common::init_user(tmp.path(), "alice");
+    let post_id = create_post(&tmp);
+
+    let body_path = tmp.path().join("c.txt");
+    fs::write(&body_path, "Первый комментарий").unwrap();
+
+    lltt()
+        .env("LIVELETTERS_HOME", tmp.path())
+        .args([
+            "answer",
+            &post_id,
+            "--body-file",
+            body_path.to_str().unwrap(),
+            "--visibility",
+            "friends_only",
+        ])
+        .assert()
+        .failure();
+}
+
+#[test]
 fn answer_rejects_unknown_post_with_human_message() {
     let tmp = TempDir::new().unwrap();
     common::init_user(tmp.path(), "alice");

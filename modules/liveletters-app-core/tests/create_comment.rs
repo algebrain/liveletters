@@ -1,4 +1,4 @@
-//! Тесты команды `create_comment` с фокусом на видимость (`public` / `friends_only`).
+//! Тесты команды `create_comment`: комментарий наследует видимость исходной записи.
 
 use liveletters_app_core::{AppCore, CreateCommentCommand, CreatePostCommand, Visibility};
 use liveletters_store::Store;
@@ -17,7 +17,7 @@ fn save_user(store: &Store) {
         .unwrap();
 }
 
-fn setup_post(store: &Store) {
+fn setup_post(store: &Store, visibility: Visibility) {
     let core = AppCore::new(store);
     core.create_post(CreatePostCommand {
         profile_id: "default",
@@ -26,12 +26,12 @@ fn setup_post(store: &Store) {
         author_id: "alice@example.test",
         created_at: 1_700_000_000,
         body: "Тело",
-        visibility: Visibility::Public,
+        visibility,
     })
     .unwrap();
 }
 
-fn create_with(store: &Store, visibility: Visibility) {
+fn create_with(store: &Store) {
     store
         .save_author("bob@example.org", "bob", "test")
         .expect("save comment author");
@@ -44,17 +44,16 @@ fn create_with(store: &Store, visibility: Visibility) {
         author_id: "bob@example.org",
         created_at: 1_700_000_100,
         body: "Комментарий",
-        visibility,
     })
     .unwrap();
 }
 
 #[test]
-fn create_comment_with_friends_only_persists_visibility() {
+fn create_comment_inherits_friends_only_from_post() {
     let (_dir, store) = open();
     save_user(&store);
-    setup_post(&store);
-    create_with(&store, Visibility::FriendsOnly);
+    setup_post(&store, Visibility::FriendsOnly);
+    create_with(&store);
 
     let record = store.get_comment_record("comment-1").unwrap().unwrap();
     assert_eq!(record.visibility, "friends_only");
@@ -70,11 +69,11 @@ fn create_comment_with_friends_only_persists_visibility() {
 }
 
 #[test]
-fn create_comment_with_public_persists_visibility() {
+fn create_comment_inherits_public_from_post() {
     let (_dir, store) = open();
     save_user(&store);
-    setup_post(&store);
-    create_with(&store, Visibility::Public);
+    setup_post(&store, Visibility::Public);
+    create_with(&store);
 
     let record = store.get_comment_record("comment-1").unwrap().unwrap();
     assert_eq!(record.visibility, "public");

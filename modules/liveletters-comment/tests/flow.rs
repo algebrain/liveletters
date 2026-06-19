@@ -12,7 +12,7 @@ fn post_id_from(store: &Store) -> String {
     posts[0].post_id.clone()
 }
 
-fn make_post(home: &common::TestHome) -> String {
+fn make_post(home: &common::TestHome, visibility: Visibility) -> String {
     let store = home.open_store();
     store
         .save_identity("alice", "alice@example.test", "alice", None, "ru", true)
@@ -28,7 +28,7 @@ fn make_post(home: &common::TestHome) -> String {
         profile_id: "alice",
         identity: &ident,
         body: "Запись для комментариев",
-        visibility: Visibility::Public,
+        visibility,
     })
     .unwrap();
     post_id_from(&store)
@@ -39,7 +39,7 @@ fn comment_new_creates_persisted_comment_with_default_visibility() {
     let home = common::TestHome::new();
     home.add_identity("bob");
     let ctx = home.ctx("bob");
-    let post_id = make_post(&home);
+    let post_id = make_post(&home, Visibility::Public);
 
     let body_path = home.path().join("c.txt");
     std::fs::write(&body_path, "Первый комментарий").unwrap();
@@ -48,7 +48,6 @@ fn comment_new_creates_persisted_comment_with_default_visibility() {
         action: CommentAction::New(NewArgs {
             target: post_id.clone(),
             body_file: Some(body_path),
-            visibility: "public".to_owned(),
         }),
     };
 
@@ -63,11 +62,11 @@ fn comment_new_creates_persisted_comment_with_default_visibility() {
 }
 
 #[test]
-fn comment_new_with_friends_only_visibility() {
+fn comment_new_inherits_friends_only_visibility_from_post() {
     let home = common::TestHome::new();
     home.add_identity("bob");
     let ctx = home.ctx("bob");
-    let post_id = make_post(&home);
+    let post_id = make_post(&home, Visibility::FriendsOnly);
 
     let body_path = home.path().join("c.txt");
     std::fs::write(&body_path, "Только для друзей").unwrap();
@@ -76,7 +75,6 @@ fn comment_new_with_friends_only_visibility() {
         action: CommentAction::New(NewArgs {
             target: post_id.clone(),
             body_file: Some(body_path),
-            visibility: "friends_only".to_owned(),
         }),
     };
 
@@ -93,7 +91,7 @@ fn comment_new_with_parent_creates_reply() {
     let home = common::TestHome::new();
     home.add_identity("bob");
     let ctx = home.ctx("bob");
-    let post_id = make_post(&home);
+    let post_id = make_post(&home, Visibility::Public);
 
     let root_body = home.path().join("root.txt");
     std::fs::write(&root_body, "Корневой").unwrap();
@@ -101,7 +99,6 @@ fn comment_new_with_parent_creates_reply() {
         action: CommentAction::New(NewArgs {
             target: post_id.clone(),
             body_file: Some(root_body),
-            visibility: "public".to_owned(),
         }),
     };
     run(&ctx, &root_args).expect("root comment should succeed");
@@ -118,7 +115,6 @@ fn comment_new_with_parent_creates_reply() {
         action: CommentAction::New(NewArgs {
             target: root_id.clone(),
             body_file: Some(reply_body),
-            visibility: "public".to_owned(),
         }),
     };
     run(&ctx, &reply_args).expect("reply should succeed");
@@ -137,7 +133,7 @@ fn comment_new_rejects_empty_body() {
     let home = common::TestHome::new();
     home.add_identity("bob");
     let ctx = home.ctx("bob");
-    let post_id = make_post(&home);
+    let post_id = make_post(&home, Visibility::Public);
 
     let body_path = home.path().join("c.txt");
     std::fs::write(&body_path, "  \n  ").unwrap();
@@ -146,7 +142,6 @@ fn comment_new_rejects_empty_body() {
         action: CommentAction::New(NewArgs {
             target: post_id,
             body_file: Some(body_path),
-            visibility: "public".to_owned(),
         }),
     };
 
@@ -167,7 +162,6 @@ fn comment_new_to_missing_post_errors() {
         action: CommentAction::New(NewArgs {
             target: "post-missing".to_owned(),
             body_file: Some(body_path),
-            visibility: "public".to_owned(),
         }),
     };
 

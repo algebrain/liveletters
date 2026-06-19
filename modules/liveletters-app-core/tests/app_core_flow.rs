@@ -96,7 +96,6 @@ fn creates_comment_and_exposes_thread_for_post() {
             author_id: "bob",
             created_at: 2,
             body: "First comment",
-            visibility: Visibility::Public,
         })
         .expect("comment should be created");
 
@@ -157,7 +156,6 @@ fn rejects_comment_for_missing_post() {
             author_id: "bob",
             created_at: 2,
             body: "First comment",
-            visibility: Visibility::Public,
         })
         .expect_err("missing post should be rejected");
 
@@ -236,7 +234,6 @@ fn edits_comment_and_returns_updated_thread() {
         author_id: "bob",
         created_at: 2,
         body: "First comment",
-        visibility: Visibility::Public,
     })
     .expect("comment should be created");
 

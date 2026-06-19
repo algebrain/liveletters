@@ -19,8 +19,4 @@ pub struct NewArgs {
     /// Файл с телом комментария. Если не указан — тело читается из stdin.
     #[arg(long)]
     pub body_file: Option<std::path::PathBuf>,
-
-    /// Уровень видимости: `public` или `friends_only`.
-    #[arg(long, default_value = "public")]
-    pub visibility: String,
 }

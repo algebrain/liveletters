@@ -6,7 +6,7 @@
 
 - обновляет локальный TOML (`meta.subscriptions`);
 - пишет запись в таблицу `subscriptions` (зеркало для быстрых запросов fan-out);
-- ставит в `outbox` событие `subscription_changed` (чтобы владелец блога узнал о подписке).
+- ставит в `outbox` протокольное событие подписки (чтобы владелец блога узнал о подписке).
 
 ## 2. Архитектура и зависимости
 
@@ -66,10 +66,8 @@ fn run(ctx, args):
                 subscriber_delivery_address: delivery,
             })?
             // subscribe() ВНУТРИ уже:
-            //   1) save_subscription() → таблица subscriptions
-            //   2) enqueue_outbox_record → событие subscription_changed (active=true)
-            //   НО: подписка добавляется в meta.subscriptions в IDENTITY через save_identity
-            //   отдельным вызовом в run() (см. ниже).
+            //   1) save_pending_subscription() → таблица pending_subscriptions
+            //   2) enqueue_outbox_record → событие subscription_requested
 
         List:
             let list = service.list_subscriptions(
@@ -78,7 +76,7 @@ fn run(ctx, args):
                     subscribed_addresses: identity.meta.subscriptions.iter().map(String::as_str),
                 }
             )?
-            print table
+            print sections: subscriptions, subscribers, friends, friend_of
 
         Rm:
             service.unsubscribe(UnsubscribeCommand {
@@ -108,7 +106,7 @@ NB: в текущей реализации команда `subscribe` через
 
 - Сейчас: текущее поведение команды (см. выше).
 - Команда `lltt sub list` может стать частью UI ленты без поломок.
-- События `subscription_changed`, поставленные в `outbox`, отправятся в push-фазе `lltt sync`; владелец блога через `liveletters-store::list_subscriptions_for_resource` увидит подписчиков и сможет развернуть (fan-out) свои будущие `PostCreated` адресно.
+- События подписки, поставленные в `outbox`, отправятся в push-фазе `lltt sync`; владелец блога через `liveletters-store::list_subscriptions_for_resource` увидит подписчиков и сможет развернуть свои будущие `PostCreated` адресно.
 
 ## 8. Файлы
 

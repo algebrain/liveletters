@@ -10,6 +10,7 @@ use liveletters_config as config;
 use liveletters_cu as cu;
 use liveletters_doctor as doctor;
 use liveletters_feed as feed;
+use liveletters_friend as friend;
 use liveletters_inbox as inbox;
 use liveletters_init as init;
 use liveletters_lltt_sync as lltt_sync;
@@ -39,6 +40,8 @@ enum Command {
     User(cu::Args),
     /// Управление подписками на блоги.
     Sub(sub::Args),
+    /// Добавить пользователя в друзья.
+    Friend(friend::Args),
     /// Показать ленту подписок.
     Feed(feed::Args),
     /// Управление входящей почтой.
@@ -113,6 +116,10 @@ fn main() -> ExitCode {
         Command::Sub(args) => {
             init_logger(&ctx);
             sub::run(&ctx, &args)
+        }
+        Command::Friend(args) => {
+            init_logger(&ctx);
+            friend::run(&ctx, &args)
         }
         Command::Feed(args) => {
             init_logger(&ctx);

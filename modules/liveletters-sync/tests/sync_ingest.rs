@@ -38,6 +38,9 @@ fn protocol_email(event_id: &str, payload: DomainEventPayload, human_body: &str)
         DomainEventPayload::SubscriptionRevoked { resource_id, .. } => {
             ("subscription_revoked", resource_id.as_str())
         }
+        DomainEventPayload::FriendAdded { resource_id, .. } => {
+            ("friend_added", resource_id.as_str())
+        }
     };
 
     let protocol_message = ProtocolMessage::new(

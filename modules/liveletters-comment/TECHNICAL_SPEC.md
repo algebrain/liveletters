@@ -8,7 +8,6 @@
 
 - Разбор `Args` (clap-деривация).
 - Чтение тела из файла или stdin.
-- Проверка видимости (`public` | `friends_only`).
 - Делегирование создания комментария в `AppCore::create_comment_from_identity`.
 - Печать ID созданного комментария.
 
@@ -29,18 +28,19 @@
 | `--parent` указывает на комментарий из другого поста | `AppCoreError::Domain(...)` — комментарий-сирота                                          |
 | Пустое тело (файл пуст или stdin пуст)          | `CommentError::EmptyBody`                                                                 |
 | `--body-file` указывает на несуществующий путь  | `CommentError::BodyFileNotFound`                                                          |
-| Неизвестный `--visibility`                      | `CommentError::UnknownVisibility`                                                         |
+| Передан `--visibility`                          | Ошибка разбора аргументов: у комментариев нет отдельной видимости                          |
 | Одновременное создание двух комментариев        | Коллизия `comment_id` маловероятна при ms-разрешении                                      |
 
 ## Решения, которые могут поменяться
 
 - `new_comment_id` через `unix_millis` — заменить на UUIDv7 при росте нагрузки.
 - Валидация `parent` — сейчас опирается на БД-уровень (`foreign key` или явная проверка). Если БД-уровень ослабнет, нужно добавить явную проверку в `AppCore`.
-- Уровни видимости — в текущей версии только `public` и `friends_only`.
+- Видимость комментария всегда наследуется от исходной записи. Команда
+  комментария её не принимает и не вычисляет сама.
 
 ## Текущее состояние
 
-- `Args { action: CommentAction::New(NewArgs { post, parent, body_file, visibility }) }`.
+- `Args { action: CommentAction::New(NewArgs { post, parent, body_file }) }`.
 - `run` делегирует в `AppCore::create_comment_from_identity`.
 - 5 integration + 2 e2e тестов.
 

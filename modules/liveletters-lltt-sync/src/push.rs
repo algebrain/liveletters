@@ -106,6 +106,24 @@ fn resolve_recipients(store: &Store, record: &OutboxRecord) -> Result<Vec<String
                 .map(|sub| sub.subscriber_email)
                 .collect())
         }
+        OutboxDelivery::ResourceFriends { visibility } => {
+            let resource = record.resource_email.as_deref().unwrap_or("");
+            let subscriptions = store.list_subscriptions_for_resource(resource)?;
+            if visibility != "friends_only" {
+                return Ok(subscriptions
+                    .into_iter()
+                    .map(|sub| sub.subscriber_email)
+                    .collect());
+            }
+
+            let mut recipients = Vec::new();
+            for sub in subscriptions {
+                if store.is_friend(resource, &sub.subscriber_email)? {
+                    recipients.push(sub.subscriber_email);
+                }
+            }
+            Ok(recipients)
+        }
     }
 }
 

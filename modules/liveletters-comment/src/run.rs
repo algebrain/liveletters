@@ -1,8 +1,8 @@
 use std::error::Error;
 use std::io::{self};
 
-use liveletters_app_core::{AppCore, CreateCommentFromIdentityCommand, Identity, Visibility};
-use liveletters_output::{CommandContext, parse_visibility, read_body};
+use liveletters_app_core::{AppCore, CreateCommentFromIdentityCommand, Identity};
+use liveletters_output::{CommandContext, read_body};
 use liveletters_store::Store;
 
 use crate::args::{CommentAction, NewArgs};
@@ -22,8 +22,7 @@ fn run_inner(ctx: &CommandContext, args: &Args) -> Result<(), CommentError> {
 fn run_new(ctx: &CommandContext, args: &NewArgs) -> Result<(), CommentError> {
     let body = read_body(args.body_file.as_deref(), &mut io::stdin().lock())
         .map_err(CommentError::IoFromOutput)?;
-    let visibility = parse_visibility(&args.visibility).map_err(CommentError::UnknownVisibility)?;
-    let result = create(ctx, &args.target, &body, visibility)?;
+    let result = create(ctx, &args.target, &body)?;
     print_created(result.comment().id().as_str());
     Ok(())
 }
@@ -35,7 +34,6 @@ pub fn create(
     ctx: &CommandContext,
     target: &str,
     body: &str,
-    visibility: Visibility,
 ) -> Result<liveletters_app_core::CreateCommentResult, CommentError> {
     if body.trim().is_empty() {
         return Err(CommentError::EmptyBody);
@@ -62,7 +60,6 @@ pub fn create(
                 post_id: target,
                 parent_comment_id: None,
                 body,
-                visibility,
             })
             .map_err(CommentError::AppCore);
     }
@@ -78,7 +75,6 @@ pub fn create(
                 post_id: &parent.post_id,
                 parent_comment_id: Some(target),
                 body,
-                visibility,
             })
             .map_err(CommentError::AppCore);
     }

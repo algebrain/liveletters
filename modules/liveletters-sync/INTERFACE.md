@@ -137,6 +137,10 @@
 Для событий изменения (`post_hidden`, `comment_edited`) проверка прав также
 идёт по `origin.email`: отдельного `actor_id` в протокольном payload нет.
 
+`FriendAdded` означает, что ресурс из `origin` добавил текущего получателя
+в друзья. При обработке сохраняется запись `friend_of`. Это не создаёт
+подписку и не меняет список локальных подписок получателя.
+
 Для события `post_created` payload содержит текст поста и `body_format`.
 Движок принимает форматы `plain`, `markdown`, `html`, отклоняет пустое тело и
 сохраняет в `posts.body` текст, полученный из письма.
@@ -468,6 +472,7 @@
   Тест: `subscription_confirmed_accepted_replay_does_not_change_db`.
 - `SubscriptionRevoked` — `delete_subscription` идемпотентен. Тест:
   `subscription_revoked_replay_does_not_change_db`.
+- `FriendAdded` — повторное уведомление не создаёт дубликат в `friend_of`.
 
 ## Связанные документы
 

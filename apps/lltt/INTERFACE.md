@@ -10,7 +10,7 @@
 4. диспетчеризует вызов в `run(...)` соответствующего командного крейта из [`modules/`](../../modules);
 5. вызывает `liveletters_log::shutdown()` перед выходом (сбрасывает буфер).
 
-Содержательной логики в самом `apps/lltt` нет — она разнесена по независимым крейтам (`liveletters-init`, `liveletters-cu`, `liveletters-sub`, `liveletters-feed`, `liveletters-inbox`, `liveletters-post`, `liveletters-comment`, `liveletters-outbox`, `liveletters-thread`, `liveletters-status`, `liveletters-doctor`, `liveletters-settings`, `liveletters-lltt-sync`, плюс общий `liveletters-output`). Каждый из них реализует свою подкоманду и документирован отдельно.
+Содержательной логики в самом `apps/lltt` нет — она разнесена по независимым крейтам (`liveletters-init`, `liveletters-cu`, `liveletters-sub`, `liveletters-friend`, `liveletters-feed`, `liveletters-inbox`, `liveletters-post`, `liveletters-comment`, `liveletters-outbox`, `liveletters-thread`, `liveletters-status`, `liveletters-doctor`, `liveletters-settings`, `liveletters-lltt-sync`, плюс общий `liveletters-output`). Каждый из них реализует свою подкоманду и документирован отдельно.
 
 ## Где находится интерфейс
 
@@ -21,7 +21,7 @@
 
 ## Подкоманды (clap-дерево)
 
-В корне дерева — 14 подкоманд верхнего уровня. Каждая имеет собственные `Args` в своём крейте.
+Каждая подкоманда имеет собственные `Args` в своём крейте.
 
 | Подкоманда | Крейт | Что делает |
 |---|---|---|
@@ -29,10 +29,11 @@
 | `cu` | `liveletters-cu` | Показать, выбрать или просмотреть текущего пользователя liveletters. См. раздел «Подкоманды `cu`» ниже. |
 | `user` | `liveletters-cu` | Управление списком идентичностей: создать черновик, добавить, показать, удалить, перечислить. См. раздел «Подкоманды `user`» ниже. |
 | `sub` | `liveletters-sub` | Управление подписками текущего пользователя liveletters на блоги других пользователей. См. раздел «Подкоманды `sub`» ниже. |
+| `friend` | `liveletters-friend` | Добавить адрес в друзья, чтобы он мог видеть записи `friends_only` при наличии подписки на ваш ресурс. |
 | `feed` | `liveletters-feed` | Показать ленту подписок текущего пользователя liveletters: посты ресурсов, на которые он подписан. Поддерживает `--limit <N>` (показать не более N последних постов подписок). |
 | `inbox` | `liveletters-inbox` | Управление входящей почтой. Подкоманды: `import <файл…>` — импортировать одно или несколько писем из `.eml`-файлов через `SyncEngine`; `list [--status <категория>] [--limit <N>]` — таблица последних N строк `raw_messages` с фильтром по статусу; `show <message_id>` — печать полного тела одного письма. |
 | `post` | `liveletters-post` | Создать запись в блоге. Подкоманда: `new [--body-file <path>] [--visibility <public\|friends_only>]` — тело из файла или из stdin, видимость по умолчанию `public`. |
-| `comment` | `liveletters-comment` | Создать комментарий к записи. Подкоманда: `new --post <id> [--parent <id>] [--body-file <path>] [--visibility <public\|friends_only>]`. |
+| `comment` | `liveletters-comment` | Создать комментарий к записи. Подкоманда: `new --post <id> [--parent <id>] [--body-file <path>]`. Видимость наследуется от исходной записи. |
 | `outbox` | `liveletters-outbox` | Показать исходящую очередь (read-only). Подкоманда: `list` — таблица `event_id \| event_type \| resource_id \| delivery`. |
 | `thread` | `liveletters-thread` | Показать обсуждение (запись + дерево комментариев). Использование: `lltt thread <post_id>`. |
 | `status` | `liveletters-status` | Краткий отчёт: 5 полей (постов, комментариев, отложенных, исходящих, последняя активность). |
@@ -43,7 +44,7 @@
 
 Подкоманды `sync` работают при наличии в `mail_settings` настроек SMTP/IMAP; обычно они попадают туда из почтовых секций черновика при `lltt user add`. Если настроек нет, команда возвращает `SyncError::MailSettingsMissing` (код 1) с подсказкой заполнить почту или запустить `lltt settings set smtp.host …`.
 
-`sync push` отправляет записи из `outbox` строго по их полю `delivery` (см. [`liveletters-lltt-sync::send_outbox_record`](../../modules/liveletters-lltt-sync/src/push.rs)): `Direct([адрес…])` — поштучно на каждый адрес, `ResourceSubscribers` — по одному письму каждому подписчику соответствующего ресурса. Сам push адресацию не вычисляет.
+`sync push` отправляет записи из `outbox` строго по их полю `delivery` (см. [`liveletters-lltt-sync::send_outbox_record`](../../modules/liveletters-lltt-sync/src/push.rs)): `Direct([адрес…])` — поштучно на каждый адрес, `ResourceSubscribers` — по одному письму каждому подписчику соответствующего ресурса, `ResourceFriends` — только подписчикам из списка друзей ресурса.
 
 ### Подкоманды `cu`
 
@@ -72,13 +73,13 @@
 
 ### Подкоманды `sub`
 
-Команда `lltt sub` управляет подписками текущего пользователя liveletters на блоги (т.е. на `mail.publish` других пользователей). Каждая подписка локально записывается в `identities/<текущий>.toml` (поле `meta.subscriptions`) **и** порождает исходящее событие `subscription_changed` в очереди `outbox`, чтобы владелец блога узнал о подписке и мог развернуть события этому подписчику.
+Команда `lltt sub` управляет подписками текущего пользователя liveletters на блоги (т.е. на `mail.publish` других пользователей). Новая подписка создаёт ожидание подтверждения и исходящее событие `subscription_requested`; после ответа владельца ресурса она становится подтверждённой.
 
 | Форма | Что делает |
 |---|---|
-| `lltt sub <адрес>` | Подписаться на блог по адресу `<адрес>` (внешний `mail.publish` другого пользователя). Адрес проверяется парсером `ResourceAddress::new()`. `delivery_address` берётся из `mail.receive[0]` текущего пользователя (если пусто — из `mail.publish`). Печатает `подписан на <адрес>: посты будут приходить на <delivery>`. |
-| `lltt sub list` | Печатает две секции: «подписан на:» (адреса внешних блогов или `(пусто)`) и «мои подписчики:» (почтовые адреса подписчиков или `(пусто)`). |
-| `lltt sub rm <адрес>` | Отписаться. Удаляет запись из `identities/<текущий>.toml` (из `meta.subscriptions`) и порождает исходящее событие `subscription_changed` в `outbox` с адресацией `Direct(vec![<адрес>])`, чтобы владелец блога удалил подписку у себя. Печатает `отписан от <адрес>`. |
+| `lltt sub <адрес>` | Запросить подписку на блог по адресу `<адрес>` (внешний `mail.publish` другого пользователя). Адрес проверяется парсером `ResourceAddress::new()`. Печатает, что подписка запрошена и ожидает подтверждения. |
+| `lltt sub list` | Печатает секции «подписан на:», «мои подписчики:», «мои друзья:» и «я в друзьях у:». |
+| `lltt sub rm <адрес>` | Отписаться. Удаляет ожидающую или подтверждённую подписку и порождает `subscription_revoked`, чтобы владелец блога удалил подписчика у себя. |
 
 Ошибки: невалидный адрес → `SubError::Domain` (код 1); нет `init` или отсутствует домашний каталог → ошибка контекста (код 2); `identities/<текущий>.toml` отсутствует → `SubError::Config(ConfigError::UnknownIdentity)` (код 1); неверное число токенов → `SubError::InvalidArgs` (код 1).
 

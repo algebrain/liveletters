@@ -421,8 +421,12 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 - `Direct(Vec<String>)` — письмо отправляется каждому адресу из списка (в порядке списка). Пустой список запрещён на границе `AppCore` и считается ошибкой `AppCoreError::InvalidDelivery`.
 - `ResourceSubscribers` — письмо отправляется каждому подписчику ресурса, указанного в `resource_email`.
+- `ResourceFriends { visibility }` — письмо отправляется подписчикам ресурса, которые одновременно есть в списке друзей владельца. Сейчас используется для `friends_only`.
 
-В таблице `outbox` поле хранится в виде `delivery_json TEXT NOT NULL` (ручная сериализация: `{"kind":"direct","addresses":[...]}` или `{"kind":"resource_subscribers"}`).
+В таблице `outbox` поле хранится в виде `delivery_json TEXT NOT NULL`
+(ручная сериализация: `{"kind":"direct","addresses":[...]}`,
+`{"kind":"resource_subscribers"}` или
+`{"kind":"resource_friends","visibility":"friends_only"}`).
 
 ### `RawMessageRecord`
 
@@ -494,6 +498,47 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 Создаётся командой `lltt sub <addr>`. Удаляется при получении
 `SubscriptionConfirmed` (через `pending → subscriptions`) или DSN-bounce.
+
+### `FriendRecord`
+
+Запись о том, что владелец ресурса считает адрес другом.
+
+Поля:
+
+- `owner_resource_email` — ресурс владельца списка друзей
+- `friend_email` — адрес друга
+
+Эта таблица определяет, кто может получать `friends_only` при рассылке
+постов и комментариев владельца.
+
+### `PendingFriendRecord`
+
+Промежуточная запись для `lltt friend <addr>`, когда текущий пользователь
+ещё не подписан на указанный адрес.
+
+Поля:
+
+- `profile_id`
+- `owner_resource_email`
+- `friend_email`
+- `subscribed_resource_email`
+- `requested_at`
+- `last_attempt_at`
+
+После получения `SubscriptionConfirmed` запись удаляется, создаётся
+`FriendRecord`, а в `outbox` кладётся `friend_added`.
+
+### `FriendOfRecord`
+
+Локальная запись получателя о том, что некоторый ресурс считает его
+другом.
+
+Поля:
+
+- `profile_id`
+- `resource_email`
+
+Создаётся при обработке входящего `friend_added`.
 
 ### `BounceRecord`
 
@@ -605,7 +650,7 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 
 Когда используется:
 
-- после того как `app-core` собрал protocol message и выбрал адресацию (`Direct` или `ResourceSubscribers`);
+- после того как `app-core` собрал protocol message и выбрал адресацию (`Direct`, `ResourceSubscribers` или `ResourceFriends`);
 - когда нужно зафиксировать, что сообщение готово к дальнейшей доставке.
 
 #### `list_outbox_records()`

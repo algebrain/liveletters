@@ -125,7 +125,6 @@ fn comment_created_subject_uses_localized_template() {
         author_id: "alice",
         created_at: 2,
         body: "Первый",
-        visibility: Visibility::Public,
     })
     .unwrap();
 
@@ -160,7 +159,6 @@ fn comment_edited_subject_uses_localized_template() {
         author_id: "alice",
         created_at: 2,
         body: "Original",
-        visibility: Visibility::Public,
     })
     .unwrap();
     app.edit_comment(EditCommentCommand {

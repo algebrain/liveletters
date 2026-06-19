@@ -153,6 +153,39 @@ fn import_all_direct_emails(
                 .expect("list subscriptions for resource");
             subs.into_iter().map(|s| s.subscriber_email).collect()
         }
+        liveletters_store::OutboxDelivery::ResourceFriends { visibility } => {
+            let resource_id = match liveletters_protocol::decode_message(&record.message_body)
+                .expect("decode message")
+                .payload()
+            {
+                liveletters_protocol::DomainEventPayload::PostCreated { resource_id, .. } => {
+                    resource_id.clone()
+                }
+                liveletters_protocol::DomainEventPayload::CommentCreated {
+                    resource_id, ..
+                } => resource_id.clone(),
+                other => panic!(
+                    "ResourceFriends ожидался только для PostCreated/CommentCreated, \
+                     а у нас {other:?}"
+                ),
+            };
+            let store = open_user_store(home, user);
+            let subs = store
+                .list_subscriptions_for_resource(&resource_id)
+                .expect("list subscriptions for resource");
+            let mut recipients = Vec::new();
+            for sub in subs {
+                if visibility == "friends_only"
+                    && !store
+                        .is_friend(&resource_id, &sub.subscriber_email)
+                        .expect("is friend")
+                {
+                    continue;
+                }
+                recipients.push(sub.subscriber_email);
+            }
+            recipients
+        }
     };
     assert!(
         !recipients.is_empty(),
@@ -234,6 +267,9 @@ fn subscribe_and_confirm(home: &std::path::Path, subscriber: &str, target: &str)
             liveletters_store::OutboxDelivery::ResourceSubscribers => {
                 panic!("subscription_confirmed не должен быть ResourceSubscribers")
             }
+            liveletters_store::OutboxDelivery::ResourceFriends { .. } => {
+                panic!("subscription_confirmed не должен быть ResourceFriends")
+            }
         };
         // Доставляем только если адресат — наш текущий подписчик.
         if to != format!("{subscriber}@example.org") {
@@ -302,6 +338,138 @@ fn two_users_subscribe_posts_appear_in_feed() {
     assert!(
         stdout.contains("Первый пост"),
         "feed должен содержать 'Первый пост':\n{stdout}"
+    );
+}
+
+#[test]
+fn private_post_and_own_comment_go_only_to_friend_subscriber() {
+    let home = TempDir::new().expect("tempdir");
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home.path())
+        .args(["init", "--force"])
+        .assert()
+        .success();
+    setup_user(home.path(), "alice");
+    setup_user(home.path(), "bob");
+    setup_user(home.path(), "eve");
+
+    // Alice добавляет Bob в друзья. Это сначала обычная подписка Alice на Bob,
+    // затем после подтверждения Alice отправляет Bob событие friend_added.
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home.path())
+        .args(["cu", "alice"])
+        .assert()
+        .success();
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home.path())
+        .args(["friend", "bob@example.org"])
+        .assert()
+        .success();
+    import_all_direct_emails(
+        home.path(),
+        "alice",
+        "alice@example.org",
+        "subscription_requested",
+    );
+    import_all_direct_emails(
+        home.path(),
+        "bob",
+        "bob@example.org",
+        "subscription_confirmed",
+    );
+    import_all_direct_emails(home.path(), "alice", "alice@example.org", "friend_added");
+
+    assert!(
+        open_user_store(home.path(), "alice")
+            .is_friend("alice@example.org", "bob@example.org")
+            .unwrap()
+    );
+    assert_eq!(
+        open_user_store(home.path(), "bob")
+            .list_friend_of("bob")
+            .unwrap()[0]
+            .resource_email,
+        "alice@example.org"
+    );
+
+    // Bob и Eve оба подписываются на Alice, но только Bob находится в друзьях Alice.
+    subscribe_and_confirm(home.path(), "bob", "alice");
+    subscribe_and_confirm(home.path(), "eve", "alice");
+
+    let body_path = home.path().join("private.txt");
+    std::fs::write(&body_path, "Приватный пост Алисы").unwrap();
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home.path())
+        .args(["cu", "alice"])
+        .assert()
+        .success();
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home.path())
+        .args([
+            "post",
+            "new",
+            "--visibility",
+            "friends_only",
+            "--body-file",
+            body_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    let post_id = open_user_store(home.path(), "alice").list_posts().unwrap()[0]
+        .post_id
+        .clone();
+
+    import_all_direct_emails(home.path(), "alice", "alice@example.org", "post_created");
+
+    assert_eq!(
+        open_user_store(home.path(), "bob")
+            .list_posts()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(
+        open_user_store(home.path(), "eve")
+            .list_posts()
+            .unwrap()
+            .is_empty(),
+        "Eve подписана на Alice, но не в друзьях, поэтому приватный пост не доставляется"
+    );
+
+    let comment_path = home.path().join("private-comment.txt");
+    std::fs::write(&comment_path, "Комментарий Алисы к приватному посту").unwrap();
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home.path())
+        .args(["cu", "alice"])
+        .assert()
+        .success();
+    lltt_cmd()
+        .env("LIVELETTERS_HOME", home.path())
+        .args([
+            "comment",
+            "new",
+            &post_id,
+            "--body-file",
+            comment_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    import_all_direct_emails(home.path(), "alice", "alice@example.org", "comment_created");
+
+    assert_eq!(
+        open_user_store(home.path(), "bob")
+            .list_comments_for_post(&post_id)
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(
+        open_user_store(home.path(), "eve")
+            .list_comments_for_post(&post_id)
+            .unwrap()
+            .is_empty(),
+        "Eve не должна получить комментарий к приватному посту"
     );
 }
 
@@ -505,6 +673,9 @@ fn bob_comments_alice_post_alice_distributes_to_subscriber() {
                      а не ResourceSubscribers — иначе bob получит своё же письмо"
                 );
             }
+            liveletters_store::OutboxDelivery::ResourceFriends { .. } => {
+                panic!("пересылка комментария не должна оставаться ResourceFriends")
+            }
         }
         // event_type — технический идентификатор
         assert_eq!(
@@ -647,6 +818,9 @@ fn alice_redistributes_bobs_comment_to_other_subscriber() {
                     "пересылка должна быть уже разрешена в Direct([eve]), \
                      а не ResourceSubscribers — иначе bob получит своё же письмо"
                 );
+            }
+            liveletters_store::OutboxDelivery::ResourceFriends { .. } => {
+                panic!("пересылка комментария не должна оставаться ResourceFriends")
             }
         }
         // event_type — технический идентификатор

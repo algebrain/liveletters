@@ -17,6 +17,7 @@ liveletters-store = { path = "../../modules/liveletters-store" }
 liveletters-init = { path = "../../modules/liveletters-init" }
 liveletters-cu = { path = "../../modules/liveletters-cu" }
 liveletters-sub = { path = "../../modules/liveletters-sub" }
+liveletters-friend = { path = "../../modules/liveletters-friend" }
 liveletters-feed = { path = "../../modules/liveletters-feed" }
 liveletters-inbox = { path = "../../modules/liveletters-inbox" }
 liveletters-post = { path = "../../modules/liveletters-post" }

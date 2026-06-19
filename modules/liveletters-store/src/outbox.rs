@@ -150,10 +150,19 @@ pub fn encode_delivery(delivery: &OutboxDelivery) -> String {
             )
         }
         OutboxDelivery::ResourceSubscribers => "{\"kind\":\"resource_subscribers\"}".to_owned(),
+        OutboxDelivery::ResourceFriends { visibility } => format!(
+            "{{\"kind\":\"resource_friends\",\"visibility\":\"{}\"}}",
+            json_escape(visibility)
+        ),
     }
 }
 
 pub fn decode_delivery(raw: &str) -> Result<OutboxDelivery, StoreError> {
+    if raw.contains("\"kind\":\"resource_friends\"") {
+        return Ok(OutboxDelivery::ResourceFriends {
+            visibility: parse_string_field(raw, "visibility")?,
+        });
+    }
     if raw.contains("\"kind\":\"resource_subscribers\"") {
         return Ok(OutboxDelivery::ResourceSubscribers);
     }
@@ -162,6 +171,41 @@ pub fn decode_delivery(raw: &str) -> Result<OutboxDelivery, StoreError> {
     }
     Err(StoreError::InvalidColumn(format!(
         "delivery_json: неизвестный формат: {raw}"
+    )))
+}
+
+fn parse_string_field(raw: &str, field: &str) -> Result<String, StoreError> {
+    let needle = format!("\"{field}\":\"");
+    let start = raw
+        .find(&needle)
+        .ok_or_else(|| StoreError::InvalidColumn(format!("delivery_json: {field} не найден")))?;
+    let rest = &raw[start + needle.len()..];
+    let mut value = String::new();
+    let mut escape = false;
+    for c in rest.chars() {
+        if escape {
+            match c {
+                '"' => value.push('"'),
+                '\\' => value.push('\\'),
+                'n' => value.push('\n'),
+                'r' => value.push('\r'),
+                't' => value.push('\t'),
+                'b' => value.push('\u{0008}'),
+                'f' => value.push('\u{000C}'),
+                '/' => value.push('/'),
+                other => value.push(other),
+            }
+            escape = false;
+            continue;
+        }
+        match c {
+            '\\' => escape = true,
+            '"' => return Ok(value),
+            c => value.push(c),
+        }
+    }
+    Err(StoreError::InvalidColumn(format!(
+        "delivery_json: {field} без закрывающей кавычки"
     )))
 }
 

@@ -83,6 +83,26 @@ pub fn list_subscriptions(
             println!("  {}", sub.subscriber_delivery_address);
         }
     }
+
+    let friends = store.list_friends_for_resource(&publish)?;
+    println!("мои друзья:");
+    if friends.is_empty() {
+        println!("  (пусто)");
+    } else {
+        for friend in friends {
+            println!("  {}", friend.friend_email);
+        }
+    }
+
+    let friend_of = store.list_friend_of(&ctx.identity_name)?;
+    println!("я в друзьях у:");
+    if friend_of.is_empty() {
+        println!("  (пусто)");
+    } else {
+        for record in friend_of {
+            println!("  {}", record.resource_email);
+        }
+    }
     Ok(())
 }
 

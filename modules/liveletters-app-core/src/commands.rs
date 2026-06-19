@@ -21,7 +21,7 @@ use crate::{
     AppCoreError, AppSettings, DeferredReprocessingSummary, new_comment_id, new_post_id,
     post_created, post_hidden, subscription_requested, subscription_revoked, unix_millis_now,
 };
-use crate::{comment_created, comment_edited};
+use crate::{comment_created, comment_edited, friend_added};
 
 pub struct CreatePostCommand<'a> {
     pub profile_id: &'a str,
@@ -53,7 +53,6 @@ pub struct CreateCommentCommand<'a> {
     pub author_id: &'a str,
     pub created_at: u64,
     pub body: &'a str,
-    pub visibility: Visibility,
 }
 
 pub struct CreateCommentFromIdentityCommand<'a> {
@@ -62,7 +61,6 @@ pub struct CreateCommentFromIdentityCommand<'a> {
     pub post_id: &'a str,
     pub parent_comment_id: Option<&'a str>,
     pub body: &'a str,
-    pub visibility: Visibility,
 }
 
 pub struct HidePostCommand<'a> {
@@ -100,6 +98,13 @@ pub struct SaveSettingsCommand<'a> {
     pub imap_mailbox: &'a str,
 }
 
+pub struct FriendCommand<'a> {
+    pub profile_id: &'a str,
+    pub owner_resource_address: &'a str,
+    pub friend_address: &'a str,
+    pub created_at: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreatePostResult {
     post: Post,
@@ -132,6 +137,13 @@ pub struct ReprocessDeferredEventsResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SaveSettingsResult {
     settings: AppSettings,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FriendResult {
+    pub friend_address: String,
+    pub subscription_requested: bool,
+    pub friend_added_event_id: Option<String>,
 }
 
 impl CreatePostResult {
@@ -241,7 +253,7 @@ pub fn create_post(
         "post_created",
         &i18n.subject,
         post.resource_id().as_str(),
-        OutboxDelivery::ResourceSubscribers,
+        delivery_for_visibility(post.visibility()),
         ProtocolMessage::new(
             MessageEnvelope::new(
                 "1",
@@ -266,6 +278,15 @@ pub fn create_post(
     Ok(CreatePostResult { post, event })
 }
 
+fn delivery_for_visibility(visibility: Visibility) -> OutboxDelivery {
+    match visibility {
+        Visibility::FriendsOnly => OutboxDelivery::ResourceFriends {
+            visibility: encode_visibility(visibility),
+        },
+        _ => OutboxDelivery::ResourceSubscribers,
+    }
+}
+
 pub fn create_comment(
     store: &Store,
     command: CreateCommentCommand<'_>,
@@ -283,7 +304,7 @@ pub fn create_comment(
     let author_id = AccountId::new(command.author_id)?;
     let created_at = Timestamp::from_unix_seconds(command.created_at);
     let body = CommentBody::new(command.body)?;
-    let visibility = command.visibility;
+    let visibility = decode_visibility(&post_record.visibility);
 
     let comment = Comment::new(
         comment_id.clone(),
@@ -331,7 +352,7 @@ pub fn create_comment(
     );
 
     let delivery = if author_id.as_str() == post_record.author_email.as_str() {
-        OutboxDelivery::ResourceSubscribers
+        delivery_for_visibility(comment.visibility())
     } else {
         OutboxDelivery::Direct(vec![event.resource_id().as_str().to_owned()])
     };
@@ -408,7 +429,6 @@ pub fn create_comment_from_identity(
             author_id: &command.identity.publish,
             created_at,
             body: command.body,
-            visibility: command.visibility,
         },
     )
 }
@@ -1012,6 +1032,135 @@ pub fn subscribe(
         resource_address: resource.as_str().to_owned(),
         delivery_address: delivery.as_str().to_owned(),
     })
+}
+
+pub fn friend(store: &Store, command: FriendCommand<'_>) -> Result<FriendResult, AppCoreError> {
+    let owner = ResourceAddress::new(command.owner_resource_address)?;
+    let friend = ResourceAddress::new(command.friend_address)?;
+    store.save_author(owner.as_str(), owner.as_str(), "friend")?;
+    let friend_nickname = friend
+        .as_str()
+        .split('@')
+        .next()
+        .filter(|local| !local.is_empty())
+        .unwrap_or(friend.as_str());
+    store.save_author(friend.as_str(), friend_nickname, "friend")?;
+
+    let local_subscriptions = store.list_local_subscriptions(command.profile_id)?;
+    if local_subscriptions
+        .iter()
+        .any(|addr| addr == friend.as_str())
+    {
+        store.save_friend(owner.as_str(), friend.as_str())?;
+        let event_id = enqueue_friend_added(
+            store,
+            command.profile_id,
+            owner.as_str(),
+            friend.as_str(),
+            command.created_at,
+        )?;
+        return Ok(FriendResult {
+            friend_address: friend.as_str().to_owned(),
+            subscription_requested: false,
+            friend_added_event_id: Some(event_id),
+        });
+    }
+
+    store.save_pending_friend(
+        command.profile_id,
+        owner.as_str(),
+        friend.as_str(),
+        friend.as_str(),
+        command.created_at,
+    )?;
+    subscribe(
+        store,
+        SubscribeCommand {
+            profile_id: command.profile_id,
+            resource_address: friend.as_str(),
+            subscriber_delivery_address: owner.as_str(),
+            created_at: command.created_at,
+        },
+    )?;
+    Ok(FriendResult {
+        friend_address: friend.as_str().to_owned(),
+        subscription_requested: true,
+        friend_added_event_id: None,
+    })
+}
+
+pub fn complete_pending_friend_after_subscription(
+    store: &Store,
+    profile_id: &str,
+    subscribed_resource_address: &str,
+) -> Result<Option<FriendResult>, AppCoreError> {
+    let Some(pending) = store
+        .find_pending_friend_by_subscribed_resource(profile_id, subscribed_resource_address)?
+    else {
+        return Ok(None);
+    };
+
+    store.save_friend(&pending.owner_resource_email, &pending.friend_email)?;
+    store.remove_pending_friend(
+        profile_id,
+        &pending.owner_resource_email,
+        &pending.friend_email,
+    )?;
+    let event_id = enqueue_friend_added(
+        store,
+        profile_id,
+        &pending.owner_resource_email,
+        &pending.friend_email,
+        unix_millis_now() / 1000,
+    )?;
+    Ok(Some(FriendResult {
+        friend_address: pending.friend_email,
+        subscription_requested: false,
+        friend_added_event_id: Some(event_id),
+    }))
+}
+
+fn enqueue_friend_added(
+    store: &Store,
+    profile_id: &str,
+    owner_resource_address: &str,
+    friend_address: &str,
+    created_at: u64,
+) -> Result<String, AppCoreError> {
+    let event_id = EventId::new(&format!(
+        "friend-added:{owner_resource_address}:{friend_address}:{created_at}"
+    ))?;
+    let record = store.get_user_settings_record(profile_id)?;
+    let owner_name = display_author(store, record.as_ref())?;
+    let origin = protocol_origin(store, record.as_ref())?;
+    let i18n = friend_added(record.as_ref(), &owner_name, owner_resource_address);
+    let message = ProtocolMessage::new(
+        MessageEnvelope::new(
+            "1",
+            "friend_added",
+            owner_resource_address,
+            event_id.as_str(),
+        )?,
+        origin,
+        None,
+        &i18n.body,
+        DomainEventPayload::FriendAdded {
+            resource_id: owner_resource_address.to_owned(),
+            friend_address: friend_address.to_owned(),
+            created_at,
+        },
+    )?;
+    enqueue_message(
+        store,
+        profile_id,
+        event_id.as_str(),
+        "friend_added",
+        &i18n.subject,
+        owner_resource_address,
+        OutboxDelivery::Direct(vec![friend_address.to_owned()]),
+        message,
+    )?;
+    Ok(event_id.as_str().to_owned())
 }
 
 pub struct UnsubscribeCommand<'a> {

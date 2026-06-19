@@ -281,6 +281,7 @@ Nickname <email@example.org>
 - `SubscriptionRequested` (B → A: запрос на подписку)
 - `SubscriptionConfirmed` (A → B: автоматический ответ)
 - `SubscriptionRevoked` (B → A: отзыв подписки, без подтверждения)
+- `FriendAdded` (A → B: A добавил B в друзья)
 
 ## Что означает каждый вариант payload
 
@@ -383,6 +384,20 @@ B отправляет A, чтобы отписаться. Подтвержде�
 - `resource_id`
 - `subscriber_delivery_address`
 - `created_at`
+
+### `FriendAdded`
+
+A отправляет B после того, как A добавил B в друзья.
+
+Поля:
+
+- `resource_id` — ресурс A, чьи закрытые записи теперь доступны B
+- `friend_address` — адрес B
+- `created_at`
+
+Ник и почтовый адрес A передаются через `origin`. При получении B
+сохраняет у себя, что ресурс A считает его другом. Это не создаёт подписку
+B на A и не вызывает отправку старых записей.
 
 ## Почему payload сделан именно enum, а не произвольной картой
 

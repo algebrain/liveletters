@@ -658,6 +658,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "liveletters-friend"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "liveletters-app-core",
+ "liveletters-output",
+ "liveletters-store",
+ "liveletters-utils",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "liveletters-i18n"
 version = "0.1.0"
 dependencies = [
@@ -906,6 +919,7 @@ dependencies = [
  "liveletters-cu",
  "liveletters-doctor",
  "liveletters-feed",
+ "liveletters-friend",
  "liveletters-inbox",
  "liveletters-init",
  "liveletters-lltt-sync",

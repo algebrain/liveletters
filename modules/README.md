@@ -122,10 +122,17 @@
 
 #### [`liveletters-sub`](./liveletters-sub/)
 
-Команда `lltt sub`. Управляет подписками текущего пользователя liveletters на блоги других пользователей: `subscribe` (добавление в локальные подписки + событие `subscription_changed` в `outbox`), `list` (список подписок) и `rm` (отписка с событием `unsubscribe`).
+Команда `lltt sub`. Управляет подписками текущего пользователя liveletters на блоги других пользователей: запрос подписки, просмотр подтверждённых и ожидающих подписок, отмена ожидания и отписка.
 
 - [INTERFACE.md](./liveletters-sub/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-sub/TECHNICAL_SPEC.md)
+
+#### [`liveletters-friend`](./liveletters-friend/)
+
+Команда `lltt friend`. Добавляет адрес в список друзей текущего пользователя: друзья могут видеть записи `friends_only`, если они подписаны на ресурс владельца.
+
+- [INTERFACE.md](./liveletters-friend/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-friend/TECHNICAL_SPEC.md)
 
 #### [`liveletters-feed`](./liveletters-feed/)
 
