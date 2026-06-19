@@ -1,8 +1,8 @@
 # Модули LiveLetters
 
-Рабочее пространство `liveletters2` состоит из 27 крейтов.
+Рабочее пространство `liveletters2` состоит из набора крейтов.
 
-Для каждого крейта ниже приведено краткое описание его назначения (без кода) и ссылки на два документа: `INTERFACE.md` с публичной поверхностью и `TECHNICAL_SPEC.md` с архитектурой и обоснованиями.
+Для каждого крейта ниже приведено краткое описание его назначения. Где есть отдельные документы, рядом даны ссылки на `INTERFACE.md` с публичной поверхностью и `TECHNICAL_SPEC.md` с архитектурой и обоснованиями.
 
 ## Базовые библиотеки
 
@@ -12,6 +12,13 @@
 
 - [INTERFACE.md](./liveletters-domain/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-domain/TECHNICAL_SPEC.md)
+
+#### [`liveletters-utils`](./liveletters-utils/)
+
+Общие утилиты без привязки к хранению, почте или командам: разбор протокольной идентичности вида `Имя <email>`, нормализация адресов, работа с текстом и временем. Используется там, где нужно единообразное поведение в разных частях проекта.
+
+- [INTERFACE.md](./liveletters-utils/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-utils/TECHNICAL_SPEC.md)
 
 #### [`liveletters-store`](./liveletters-store/)
 
@@ -47,6 +54,13 @@
 
 - [INTERFACE.md](./liveletters-mail/INTERFACE.md)
 - [TECHNICAL_SPEC.md](./liveletters-mail/TECHNICAL_SPEC.md)
+
+#### [`liveletters-bounce`](./liveletters-bounce/)
+
+Распознаёт автоматические почтовые уведомления о недоставке. Помогает сопоставлять отказ доставки с исходящим запросом подписки и переводить такую подписку из ожидания в состояние ошибки.
+
+- [INTERFACE.md](./liveletters-bounce/INTERFACE.md)
+- [TECHNICAL_SPEC.md](./liveletters-bounce/TECHNICAL_SPEC.md)
 
 #### [`liveletters-protocol`](./liveletters-protocol/)
 
