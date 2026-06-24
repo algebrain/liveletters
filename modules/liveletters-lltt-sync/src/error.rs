@@ -18,6 +18,8 @@ pub enum SyncError {
     OutboxDecode(String),
     #[error("неизвестный режим безопасности почты: {0}")]
     UnknownMailSecurity(String),
+    #[error("ошибка чтения config.toml: {0}")]
+    Config(#[from] liveletters_config::ConfigError),
 }
 
 impl From<liveletters_protocol::ProtocolError> for SyncError {

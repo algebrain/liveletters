@@ -12,8 +12,9 @@ pub mod transport;
 pub use config::{ImapMailboxConfig, MailAuth, MailSecurity, SmtpTransportConfig};
 pub use errors::TransportError;
 pub use liveletters_mime::{
-    ExtractedMailParts, MimeError, OutgoingEmail, ParsedEmail, ReceivedEmail, build_protocol_email,
-    decode_protocol_message, extract_liveletters_parts, parse_email,
+    ExtractedMailParts, MimeError, MimeLimits, OutgoingEmail, ParsedEmail, ReceivedEmail,
+    build_protocol_email, decode_protocol_message, extract_liveletters_parts,
+    extract_liveletters_parts_with_limits, parse_email, parse_email_with_limits,
 };
 pub use retry::MailRetryPolicy;
 pub use status::{FetchBatch, FetchStatus, MailboxCursor, SendStatus};

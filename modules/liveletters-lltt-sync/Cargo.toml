@@ -13,6 +13,7 @@ network = ["dep:liveletters-mail", "liveletters-mail/network"]
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
+liveletters-config = { path = "../liveletters-config" }
 liveletters-log = { path = "../liveletters-log" }
 liveletters-mail = { path = "../liveletters-mail", optional = true }
 liveletters-mime = { path = "../liveletters-mime" }

@@ -624,7 +624,9 @@ pub fn reprocess_deferred_events(
             SyncMessageOutcome::Invalid { .. } => invalid += 1,
             SyncMessageOutcome::Filtered { .. } => filtered += 1,
             SyncMessageOutcome::Deferred { .. } => still_deferred += 1,
-            SyncMessageOutcome::Duplicate { .. } | SyncMessageOutcome::Malformed { .. } => {}
+            SyncMessageOutcome::Duplicate { .. }
+            | SyncMessageOutcome::Malformed { .. }
+            | SyncMessageOutcome::RateLimited { .. } => {}
         }
     }
 

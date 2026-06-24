@@ -1,6 +1,7 @@
 use liveletters_i18n::{Vars, detect_system_locale, parse_locale, translate};
 use liveletters_mail::{
-    ReceivedEmail, decode_protocol_message, extract_liveletters_parts, parse_email,
+    MimeLimits, ReceivedEmail, decode_protocol_message, extract_liveletters_parts_with_limits,
+    parse_email_with_limits,
 };
 use liveletters_protocol::{
     DomainEventPayload, MessageEnvelope, ProtocolIdentity, ProtocolMessage, encode_message,
@@ -11,12 +12,15 @@ use liveletters_store::{
 };
 use liveletters_utils::{email::looks_like_email, time::unix_now};
 
+use crate::limits::{BatchCounters, IngestLimits};
 use crate::{SyncError, SyncMessageOutcome, SyncReport};
 
 pub struct SyncEngine<'a> {
     store: &'a Store,
     identity_filter: Option<IdentityFilter<'a>>,
     profile_id: Option<&'a str>,
+    mime_limits: MimeLimits,
+    ingest_limits: IngestLimits,
 }
 
 struct IdentityFilter<'a> {
@@ -30,6 +34,8 @@ impl<'a> SyncEngine<'a> {
             store,
             identity_filter: None,
             profile_id: None,
+            mime_limits: MimeLimits::default(),
+            ingest_limits: IngestLimits::default(),
         }
     }
 
@@ -46,6 +52,18 @@ impl<'a> SyncEngine<'a> {
                 subscribed: subscribed_refs,
             }),
             profile_id: None,
+            mime_limits: MimeLimits::default(),
+            ingest_limits: IngestLimits::default(),
+        }
+    }
+
+    pub fn new_with_limits(store: &'a Store, ingest_limits: IngestLimits) -> Self {
+        Self {
+            store,
+            identity_filter: None,
+            profile_id: None,
+            mime_limits: MimeLimits::default(),
+            ingest_limits,
         }
     }
 
@@ -54,11 +72,29 @@ impl<'a> SyncEngine<'a> {
         self
     }
 
+    pub fn with_limits(mut self, ingest_limits: IngestLimits) -> Self {
+        self.ingest_limits = ingest_limits;
+        self
+    }
+
+    pub fn with_mime_limits(mut self, mime_limits: MimeLimits) -> Self {
+        self.mime_limits = mime_limits;
+        self
+    }
+
     pub fn ingest_batch(&self, messages: Vec<ReceivedEmail>) -> Result<SyncReport, SyncError> {
         let mut outcomes = Vec::new();
 
+        let known_authors: Vec<String> = self
+            .store
+            .list_author_emails()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+        let mut counters = BatchCounters::from_known(known_authors);
+
         for message in messages {
-            let outcome = self.ingest_one(message)?;
+            let outcome = self.ingest_one(message, &mut counters)?;
             log_outcome(&outcome);
             outcomes.push(outcome);
         }
@@ -69,6 +105,8 @@ impl<'a> SyncEngine<'a> {
     pub fn reprocess_deferred(&self) -> Result<SyncReport, SyncError> {
         let deferred_records = self.store.list_deferred_event_records()?;
         let mut outcomes = Vec::new();
+        let mut counters = BatchCounters::default();
+        let disabled = IngestLimits::disabled();
 
         for record in deferred_records {
             let payload: DomainEventPayload = serde_json::from_str(&record.payload_json)
@@ -84,84 +122,107 @@ impl<'a> SyncEngine<'a> {
 
             let origin = ProtocolIdentity::parse(&record.origin)
                 .map_err(|e| SyncError::Invalid(format!("deferred origin: {e}")))?;
-            let outcome =
-                match self.apply_payload(&payload, infer_resource_id(&payload), &envelope, &origin)
-                {
-                    Ok(()) => {
-                        self.store.delete_deferred_event_record(&record.event_id)?;
-                        self.store.save_raw_event_record(&RawEventRecord {
-                            event_id: record.event_id.clone(),
-                            event_type: record.event_type.clone(),
-                            resource_id: infer_resource_id(&payload).to_owned(),
-                            payload_json: record.payload_json,
-                            apply_status: "applied".into(),
-                            failure_reason: None,
-                        })?;
-                        SyncMessageOutcome::Applied {
-                            message_id: format!("deferred:{}", record.event_id),
-                            event_id: record.event_id,
-                        }
+            let outcome = match self.apply_payload(
+                &payload,
+                infer_resource_id(&payload),
+                &envelope,
+                &origin,
+                disabled,
+                &mut counters,
+            ) {
+                Ok(()) => {
+                    self.store.delete_deferred_event_record(&record.event_id)?;
+                    self.store.save_raw_event_record(&RawEventRecord {
+                        event_id: record.event_id.clone(),
+                        event_type: record.event_type.clone(),
+                        resource_id: infer_resource_id(&payload).to_owned(),
+                        payload_json: record.payload_json,
+                        apply_status: "applied".into(),
+                        failure_reason: None,
+                    })?;
+                    SyncMessageOutcome::Applied {
+                        message_id: format!("deferred:{}", record.event_id),
+                        event_id: record.event_id,
                     }
-                    Err(ApplyEventError::Deferred(reason)) => SyncMessageOutcome::Deferred {
+                }
+                Err(ApplyEventError::Deferred(reason)) => SyncMessageOutcome::Deferred {
+                    message_id: format!("deferred:{}", record.event_id),
+                    event_id: record.event_id,
+                    reason,
+                },
+                Err(ApplyEventError::Replay(reason)) => {
+                    self.store.delete_deferred_event_record(&record.event_id)?;
+                    self.store.save_raw_event_record(&RawEventRecord {
+                        event_id: record.event_id.clone(),
+                        event_type: record.event_type.clone(),
+                        resource_id: infer_resource_id(&payload).to_owned(),
+                        payload_json: record.payload_json,
+                        apply_status: "replay".into(),
+                        failure_reason: Some(reason.clone()),
+                    })?;
+                    SyncMessageOutcome::Replay {
                         message_id: format!("deferred:{}", record.event_id),
                         event_id: record.event_id,
                         reason,
-                    },
-                    Err(ApplyEventError::Replay(reason)) => {
-                        self.store.delete_deferred_event_record(&record.event_id)?;
-                        self.store.save_raw_event_record(&RawEventRecord {
-                            event_id: record.event_id.clone(),
-                            event_type: record.event_type.clone(),
-                            resource_id: infer_resource_id(&payload).to_owned(),
-                            payload_json: record.payload_json,
-                            apply_status: "replay".into(),
-                            failure_reason: Some(reason.clone()),
-                        })?;
-                        SyncMessageOutcome::Replay {
-                            message_id: format!("deferred:{}", record.event_id),
-                            event_id: record.event_id,
-                            reason,
-                        }
                     }
-                    Err(ApplyEventError::Unauthorized(reason)) => {
-                        self.store.delete_deferred_event_record(&record.event_id)?;
-                        self.store.save_raw_event_record(&RawEventRecord {
-                            event_id: record.event_id.clone(),
-                            event_type: record.event_type.clone(),
-                            resource_id: infer_resource_id(&payload).to_owned(),
-                            payload_json: record.payload_json,
-                            apply_status: "unauthorized".into(),
-                            failure_reason: Some(reason.clone()),
-                        })?;
-                        SyncMessageOutcome::Unauthorized {
-                            message_id: format!("deferred:{}", record.event_id),
-                            event_id: record.event_id,
-                            reason,
-                        }
-                    }
-                    Err(ApplyEventError::Invalid(reason)) => {
-                        self.store.delete_deferred_event_record(&record.event_id)?;
-                        self.store.save_raw_event_record(&RawEventRecord {
-                            event_id: record.event_id.clone(),
-                            event_type: record.event_type.clone(),
-                            resource_id: infer_resource_id(&payload).to_owned(),
-                            payload_json: record.payload_json,
-                            apply_status: "invalid".into(),
-                            failure_reason: Some(reason.clone()),
-                        })?;
-                        SyncMessageOutcome::Invalid {
-                            message_id: format!("deferred:{}", record.event_id),
-                            event_id: record.event_id,
-                            reason,
-                        }
-                    }
-                    Err(ApplyEventError::Store(error)) => return Err(SyncError::Store(error)),
-                    Err(ApplyEventError::Filtered(reason)) => SyncMessageOutcome::Filtered {
+                }
+                Err(ApplyEventError::Unauthorized(reason)) => {
+                    self.store.delete_deferred_event_record(&record.event_id)?;
+                    self.store.save_raw_event_record(&RawEventRecord {
+                        event_id: record.event_id.clone(),
+                        event_type: record.event_type.clone(),
+                        resource_id: infer_resource_id(&payload).to_owned(),
+                        payload_json: record.payload_json,
+                        apply_status: "unauthorized".into(),
+                        failure_reason: Some(reason.clone()),
+                    })?;
+                    SyncMessageOutcome::Unauthorized {
                         message_id: format!("deferred:{}", record.event_id),
                         event_id: record.event_id,
                         reason,
-                    },
-                };
+                    }
+                }
+                Err(ApplyEventError::Invalid(reason)) => {
+                    self.store.delete_deferred_event_record(&record.event_id)?;
+                    self.store.save_raw_event_record(&RawEventRecord {
+                        event_id: record.event_id.clone(),
+                        event_type: record.event_type.clone(),
+                        resource_id: infer_resource_id(&payload).to_owned(),
+                        payload_json: record.payload_json,
+                        apply_status: "invalid".into(),
+                        failure_reason: Some(reason.clone()),
+                    })?;
+                    SyncMessageOutcome::Invalid {
+                        message_id: format!("deferred:{}", record.event_id),
+                        event_id: record.event_id,
+                        reason,
+                    }
+                }
+                Err(ApplyEventError::Store(error)) => return Err(SyncError::Store(error)),
+                Err(ApplyEventError::Filtered(reason)) => SyncMessageOutcome::Filtered {
+                    message_id: format!("deferred:{}", record.event_id),
+                    event_id: record.event_id,
+                    reason,
+                },
+                // При reprocess применяются disabled-лимиты, поэтому эта
+                // ветка на практике недостижима. На случай если лимиты
+                // включат — сохраняем статус и возвращаем исход.
+                Err(ApplyEventError::RateLimited(reason)) => {
+                    self.store.save_raw_event_record(&RawEventRecord {
+                        event_id: record.event_id.clone(),
+                        event_type: record.event_type.clone(),
+                        resource_id: infer_resource_id(&payload).to_owned(),
+                        payload_json: record.payload_json,
+                        apply_status: "rate_limited".into(),
+                        failure_reason: Some(reason.clone()),
+                    })?;
+                    SyncMessageOutcome::RateLimited {
+                        message_id: format!("deferred:{}", record.event_id),
+                        event_id: record.event_id,
+                        reason,
+                    }
+                }
+            };
 
             outcomes.push(outcome);
         }
@@ -169,15 +230,15 @@ impl<'a> SyncEngine<'a> {
         Ok(SyncReport::new(outcomes))
     }
 
-    fn ingest_one(&self, message: ReceivedEmail) -> Result<SyncMessageOutcome, SyncError> {
-        let parsed = match parse_email(&message.raw_message) {
+    fn ingest_one(
+        &self,
+        message: ReceivedEmail,
+        counters: &mut BatchCounters,
+    ) -> Result<SyncMessageOutcome, SyncError> {
+        let parsed = match parse_email_with_limits(&message.raw_message, self.mime_limits) {
             Ok(parsed) => parsed,
             Err(error) => {
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "malformed".into(),
-                })?;
+                self.save_raw(message.message_id.clone(), message.raw_message, "malformed")?;
                 return Ok(SyncMessageOutcome::Malformed {
                     message_id: message.message_id,
                     reason: format!("{error:?}"),
@@ -185,20 +246,17 @@ impl<'a> SyncEngine<'a> {
             }
         };
 
-        let parts = match extract_liveletters_parts(&parsed) {
-            Ok(parts) => parts,
-            Err(error) => {
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "malformed".into(),
-                })?;
-                return Ok(SyncMessageOutcome::Malformed {
-                    message_id: message.message_id,
-                    reason: format!("{error:?}"),
-                });
-            }
-        };
+        let parts: liveletters_mail::ExtractedMailParts =
+            match extract_liveletters_parts_with_limits(&parsed, self.mime_limits) {
+                Ok(parts) => parts,
+                Err(error) => {
+                    self.save_raw(message.message_id.clone(), message.raw_message, "malformed")?;
+                    return Ok(SyncMessageOutcome::Malformed {
+                        message_id: message.message_id,
+                        reason: format!("{error:?}"),
+                    });
+                }
+            };
 
         let protocol_message = match decode_protocol_message(parts.technical_body()) {
             Ok(protocol_message) => protocol_message,
@@ -211,11 +269,7 @@ impl<'a> SyncEngine<'a> {
                 {
                     return self.handle_bounce(message, &bounce);
                 }
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "malformed".into(),
-                })?;
+                self.save_raw(message.message_id.clone(), message.raw_message, "malformed")?;
                 return Ok(SyncMessageOutcome::Malformed {
                     message_id: message.message_id,
                     reason: format!("{error:?}"),
@@ -233,11 +287,7 @@ impl<'a> SyncEngine<'a> {
                 apply_status: "invalid".into(),
                 failure_reason: Some(reason.clone()),
             })?;
-            self.store.save_raw_message_record(&RawMessageRecord {
-                message_id: message.message_id.clone(),
-                raw_message: message.raw_message,
-                status: "invalid".into(),
-            })?;
+            self.save_raw(message.message_id.clone(), message.raw_message, "invalid")?;
             return Ok(SyncMessageOutcome::Invalid {
                 message_id: message.message_id,
                 event_id: protocol_message.envelope().event_id().to_owned(),
@@ -247,11 +297,7 @@ impl<'a> SyncEngine<'a> {
 
         let event_id = protocol_message.envelope().event_id().to_owned();
         if self.store.has_raw_event(&event_id)? {
-            self.store.save_raw_message_record(&RawMessageRecord {
-                message_id: message.message_id.clone(),
-                raw_message: message.raw_message,
-                status: "duplicate".into(),
-            })?;
+            self.save_raw(message.message_id.clone(), message.raw_message, "duplicate")?;
             return Ok(SyncMessageOutcome::Duplicate {
                 message_id: message.message_id,
                 event_id,
@@ -260,6 +306,32 @@ impl<'a> SyncEngine<'a> {
 
         let payload_json = serde_json::to_string(protocol_message.payload())
             .map_err(SyncError::SerializePayload)?;
+
+        // Квота событий от одного отправителя (origin/source) за батч.
+        let source_email = protocol_message
+            .source()
+            .map(|s| s.email().to_owned())
+            .unwrap_or_else(|| protocol_message.origin().email().to_owned());
+        if let Some(reason) = counters
+            .observe_event(
+                self.ingest_limits,
+                protocol_message.origin().email(),
+                &source_email,
+            )
+            .denied_reason()
+        {
+            return self.persist_rate_limited(message, event_id, reason);
+        }
+
+        // Квота новых авторов. Срабатывает до записи в `authors`, чтобы база
+        // не раздувалась мусорными отправителями.
+        if let Some(reason) = counters
+            .check_new_author(self.ingest_limits, protocol_message.origin().email())
+            .denied_reason()
+        {
+            return self.persist_rate_limited(message, event_id, reason);
+        }
+
         // `origin` — первичный автор события. Даже если письмо пришло через
         // пересылку (`source`), в `authors` должен попасть именно он.
         self.store.save_author(
@@ -281,6 +353,8 @@ impl<'a> SyncEngine<'a> {
             protocol_message.envelope().resource_id(),
             protocol_message.envelope(),
             protocol_message.origin(),
+            self.ingest_limits,
+            counters,
         );
 
         match apply_result {
@@ -293,17 +367,21 @@ impl<'a> SyncEngine<'a> {
                     apply_status: "applied".into(),
                     failure_reason: None,
                 })?;
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "applied".into(),
-                })?;
+                self.save_raw(message.message_id.clone(), message.raw_message, "applied")?;
                 Ok(SyncMessageOutcome::Applied {
                     message_id: message.message_id,
                     event_id,
                 })
             }
             Err(ApplyEventError::Deferred(reason)) => {
+                let total = self.store.count_deferred_events()?;
+                if let Some(rl_reason) = counters
+                    .check_deferred(self.ingest_limits, total, protocol_message.origin().email())
+                    .denied_reason()
+                {
+                    return self.persist_rate_limited(message, event_id, rl_reason);
+                }
+                counters.note_deferred_added();
                 self.store
                     .save_deferred_event_record(&DeferredEventRecord {
                         event_id: event_id.clone(),
@@ -320,11 +398,7 @@ impl<'a> SyncEngine<'a> {
                     apply_status: "deferred".into(),
                     failure_reason: Some(reason.clone()),
                 })?;
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "deferred".into(),
-                })?;
+                self.save_raw(message.message_id.clone(), message.raw_message, "deferred")?;
                 Ok(SyncMessageOutcome::Deferred {
                     message_id: message.message_id,
                     event_id,
@@ -340,11 +414,7 @@ impl<'a> SyncEngine<'a> {
                     apply_status: "replay".into(),
                     failure_reason: Some(reason.clone()),
                 })?;
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "replay".into(),
-                })?;
+                self.save_raw(message.message_id.clone(), message.raw_message, "replay")?;
                 Ok(SyncMessageOutcome::Replay {
                     message_id: message.message_id,
                     event_id,
@@ -360,11 +430,11 @@ impl<'a> SyncEngine<'a> {
                     apply_status: "unauthorized".into(),
                     failure_reason: Some(reason.clone()),
                 })?;
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "unauthorized".into(),
-                })?;
+                self.save_raw(
+                    message.message_id.clone(),
+                    message.raw_message,
+                    "unauthorized",
+                )?;
                 Ok(SyncMessageOutcome::Unauthorized {
                     message_id: message.message_id,
                     event_id,
@@ -380,11 +450,7 @@ impl<'a> SyncEngine<'a> {
                     apply_status: "invalid".into(),
                     failure_reason: Some(reason.clone()),
                 })?;
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "invalid".into(),
-                })?;
+                self.save_raw(message.message_id.clone(), message.raw_message, "invalid")?;
                 Ok(SyncMessageOutcome::Invalid {
                     message_id: message.message_id,
                     event_id,
@@ -400,12 +466,28 @@ impl<'a> SyncEngine<'a> {
                     apply_status: "filtered".into(),
                     failure_reason: Some(reason.clone()),
                 })?;
-                self.store.save_raw_message_record(&RawMessageRecord {
-                    message_id: message.message_id.clone(),
-                    raw_message: message.raw_message,
-                    status: "filtered".into(),
-                })?;
+                self.save_raw(message.message_id.clone(), message.raw_message, "filtered")?;
                 Ok(SyncMessageOutcome::Filtered {
+                    message_id: message.message_id,
+                    event_id,
+                    reason,
+                })
+            }
+            Err(ApplyEventError::RateLimited(reason)) => {
+                self.store.save_raw_event_record(&RawEventRecord {
+                    event_id: event_id.clone(),
+                    event_type: protocol_message.envelope().event_type().to_owned(),
+                    resource_id: protocol_message.envelope().resource_id().to_owned(),
+                    payload_json,
+                    apply_status: "rate_limited".into(),
+                    failure_reason: Some(reason.clone()),
+                })?;
+                self.save_raw(
+                    message.message_id.clone(),
+                    message.raw_message,
+                    "rate_limited",
+                )?;
+                Ok(SyncMessageOutcome::RateLimited {
                     message_id: message.message_id,
                     event_id,
                     reason,
@@ -413,6 +495,44 @@ impl<'a> SyncEngine<'a> {
             }
             Err(ApplyEventError::Store(error)) => Err(SyncError::Store(error)),
         }
+    }
+
+    /// Записывает сырое письмо со статусом `rate_limited` и возвращает исход
+    /// `RateLimited`. Используется при срабатывании квот на этапе,
+    /// предшествующем применению события (new author, per-origin/per-source,
+    /// deferred quota), когда событие ещё не успело оставить след в БД.
+    fn persist_rate_limited(
+        &self,
+        message: ReceivedEmail,
+        event_id: String,
+        reason: &'static str,
+    ) -> Result<SyncMessageOutcome, SyncError> {
+        let message_id = message.message_id.clone();
+        self.save_raw(message.message_id, message.raw_message, "rate_limited")?;
+        Ok(SyncMessageOutcome::RateLimited {
+            message_id,
+            event_id,
+            reason: reason.to_owned(),
+        })
+    }
+
+    /// Сохраняет сырое письмо с указанным статусом и текущим временем.
+    /// Заменяет собой многословную конструкцию `RawMessageRecord { ... }` с
+    /// `received_at: unix_now()` в каждой точке записи.
+    fn save_raw(
+        &self,
+        message_id: String,
+        raw_message: String,
+        status: &str,
+    ) -> Result<(), SyncError> {
+        self.store
+            .save_raw_message_record(&RawMessageRecord {
+                message_id,
+                raw_message,
+                status: status.to_owned(),
+                received_at: unix_now(),
+            })
+            .map_err(SyncError::Store)
     }
 
     /// Обработка DSN-bounce: сопоставляем с нашим исходящим по `Message-ID`,
@@ -424,11 +544,11 @@ impl<'a> SyncEngine<'a> {
     ) -> Result<SyncMessageOutcome, SyncError> {
         let Some(message_id) = &bounce.original_message_id else {
             // Не наш DSN — игнор
-            self.store.save_raw_message_record(&RawMessageRecord {
-                message_id: message.message_id.clone(),
-                raw_message: message.raw_message,
-                status: "bounce.ignored".into(),
-            })?;
+            self.save_raw(
+                message.message_id.clone(),
+                message.raw_message,
+                "bounce.ignored",
+            )?;
             return Ok(SyncMessageOutcome::Filtered {
                 message_id: message.message_id,
                 event_id: "<unknown>".to_owned(),
@@ -442,11 +562,11 @@ impl<'a> SyncEngine<'a> {
             .map_err(SyncError::Store)?
         else {
             // DSN для чужого Message-ID — игнор
-            self.store.save_raw_message_record(&RawMessageRecord {
-                message_id: message.message_id.clone(),
-                raw_message: message.raw_message,
-                status: "bounce.unmatched".into(),
-            })?;
+            self.save_raw(
+                message.message_id.clone(),
+                message.raw_message,
+                "bounce.unmatched",
+            )?;
             return Ok(SyncMessageOutcome::Filtered {
                 message_id: message.message_id,
                 event_id: "<unknown>".to_owned(),
@@ -461,11 +581,11 @@ impl<'a> SyncEngine<'a> {
                 "bounce для {event_type} пока не обрабатывается: {message_id}",
                 event_type = outgoing.event_type
             ));
-            self.store.save_raw_message_record(&RawMessageRecord {
-                message_id: message.message_id.clone(),
-                raw_message: message.raw_message,
-                status: "bounce.unsupported_event".into(),
-            })?;
+            self.save_raw(
+                message.message_id.clone(),
+                message.raw_message,
+                "bounce.unsupported_event",
+            )?;
             return Ok(SyncMessageOutcome::Filtered {
                 message_id: message.message_id,
                 event_id: outgoing.event_id,
@@ -492,11 +612,11 @@ impl<'a> SyncEngine<'a> {
             })
             .map_err(SyncError::Store)?;
 
-        self.store.save_raw_message_record(&RawMessageRecord {
-            message_id: message.message_id.clone(),
-            raw_message: message.raw_message,
-            status: "bounce.applied".into(),
-        })?;
+        self.save_raw(
+            message.message_id.clone(),
+            message.raw_message,
+            "bounce.applied",
+        )?;
 
         liveletters_log::log_warn(format!(
             "доставка не удалась: subscription_requested -> {recipient}: {status} {diag}",
@@ -517,6 +637,8 @@ impl<'a> SyncEngine<'a> {
         resource_id: &str,
         envelope: &liveletters_protocol::MessageEnvelope,
         origin: &ProtocolIdentity,
+        limits: IngestLimits,
+        counters: &mut BatchCounters,
     ) -> Result<(), ApplyEventError> {
         if let Some(filter) = &self.identity_filter
             && matches!(
@@ -696,6 +818,20 @@ impl<'a> SyncEngine<'a> {
                         subscriber_email: subscriber_delivery_address.clone(),
                     })
                     .map_err(ApplyEventError::Store)?;
+
+                // Квота автоматических ответов. Подписка как локальное
+                // состояние владельца уже сохранена; подавляется только
+                // исходящее письмо, чтобы один pull не породил лавину
+                // `subscription_confirmed` на произвольные адреса.
+                if counters
+                    .check_auto_response(limits)
+                    .denied_reason()
+                    .is_some()
+                {
+                    return Err(ApplyEventError::RateLimited(
+                        "auto_response_quota_exceeded".to_owned(),
+                    ));
+                }
 
                 // A автоматически отвечает B: формируем SubscriptionConfirmed
                 // и кладём в свой outbox. B получит его через sync.
@@ -1183,6 +1319,7 @@ enum ApplyEventError {
     Unauthorized(String),
     Invalid(String),
     Filtered(String),
+    RateLimited(String),
     Store(StoreError),
 }
 
@@ -1362,6 +1499,13 @@ fn log_outcome(outcome: &SyncMessageOutcome) {
         } => {
             format!("sync.ingest outcome=duplicate message_id={message_id} event_id={event_id}")
         }
+        SyncMessageOutcome::RateLimited {
+            message_id,
+            event_id,
+            reason,
+        } => format!(
+            "sync.ingest outcome=rate_limited message_id={message_id} event_id={event_id} reason={reason}"
+        ),
     };
     liveletters_log::log_info(line);
 }

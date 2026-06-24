@@ -13,6 +13,7 @@ fn builds_sync_health_from_store_state() {
             message_id: "message-1".into(),
             raw_message: "From: alice@example.test\n\nok".into(),
             status: "applied".into(),
+            received_at: 0,
         })
         .unwrap();
     store
@@ -20,6 +21,7 @@ fn builds_sync_health_from_store_state() {
             message_id: "message-2".into(),
             raw_message: "From: alice@example.test\n\nbad".into(),
             status: "malformed".into(),
+            received_at: 0,
         })
         .unwrap();
     store
@@ -36,6 +38,7 @@ fn builds_sync_health_from_store_state() {
             message_id: "message-3".into(),
             raw_message: "From: alice@example.test\n\nunauthorized".into(),
             status: "unauthorized".into(),
+            received_at: 0,
         })
         .unwrap();
     store
@@ -43,6 +46,7 @@ fn builds_sync_health_from_store_state() {
             message_id: "message-4".into(),
             raw_message: "From: alice@example.test\n\ninvalid".into(),
             status: "invalid".into(),
+            received_at: 0,
         })
         .unwrap();
     store
@@ -50,6 +54,7 @@ fn builds_sync_health_from_store_state() {
             message_id: "message-5".into(),
             raw_message: "From: alice@example.test\n\nreplay".into(),
             status: "replay".into(),
+            received_at: 0,
         })
         .unwrap();
 
@@ -72,6 +77,7 @@ fn raw_message_preview_masks_email_addresses() {
             message_id: "message-1".into(),
             raw_message: "From: alice@example.test\nTo: bob@example.test\n\nhello".into(),
             status: "applied".into(),
+            received_at: 0,
         })
         .unwrap();
 

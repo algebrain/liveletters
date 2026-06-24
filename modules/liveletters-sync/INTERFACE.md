@@ -315,6 +315,32 @@
 
 Для внешнего слоя это сигнал, что сбой произошел на границе transport/protocol parsing.
 
+### `RateLimited { message_id, event_id, reason }`
+
+Событие корректно, но отклонено локальной защитной квотой получателя. Полный
+список квот — в [`IngestLimits`](../liveletters-config/src/security.rs) и
+публичной спецификации `docs/protocol-v1.md`. Возможные причины:
+
+- `events_per_origin_quota_exceeded` / `events_per_source_quota_exceeded`;
+- `new_authors_quota_exceeded`;
+- `deferred_total_quota_exceeded` / `deferred_per_origin_quota_exceeded`;
+- `auto_response_quota_exceeded` (подписка сохраняется, подавляется только
+  исходящее письмо).
+
+Письмо сохраняется со статусом `rate_limited` в `raw_messages`, но событие не
+применяется и не откладывается.
+
+## Лимиты и политика удержания
+
+`IngestLimits` — квоты на один `ingest_batch` (один `sync pull`).
+`RetentionPolicy` — TTL и квота числа мусорных `raw_messages`, действуют между
+pull-ами. Значения по умолчанию консервативны; для тонкой настройки
+используется per-user `users/<name>/config.toml` (см.
+[`liveletters-config::SecurityConfig`](../liveletters-config/src/security.rs)).
+
+`SyncEngine` принимает лимиты через `with_limits` / `with_mime_limits` /
+`new_with_limits`; при отсутствии явных указаний применяются кодовые defaults.
+
 ## Что делает sync-модуль со store
 
 Хотя `liveletters-sync` сам не является persistence-слоем, он активно использует `Store` как технический журнал и materialized state boundary.

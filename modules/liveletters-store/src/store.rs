@@ -180,7 +180,8 @@ impl Store {
             CREATE TABLE IF NOT EXISTS raw_messages (
                 message_id   TEXT PRIMARY KEY,
                 raw_message  TEXT NOT NULL,
-                status       TEXT NOT NULL
+                status       TEXT NOT NULL,
+                received_at  INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS raw_events (
@@ -213,6 +214,31 @@ impl Store {
             "#,
         )?;
 
+        self.migrate_raw_messages_received_at()?;
+
+        Ok(())
+    }
+
+    /// Добавляет колонку `received_at` в `raw_messages`, если её нет
+    /// (базы, созданные до введения политики удержания).
+    fn migrate_raw_messages_received_at(&self) -> Result<(), StoreError> {
+        let mut stmt = self
+            .connection()
+            .prepare("PRAGMA table_info(raw_messages)")?;
+        let mut has_col = false;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        for row in rows {
+            if row? == "received_at" {
+                has_col = true;
+                break;
+            }
+        }
+        if !has_col {
+            self.connection().execute(
+                "ALTER TABLE raw_messages ADD COLUMN received_at INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
         Ok(())
     }
 }

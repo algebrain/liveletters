@@ -123,12 +123,19 @@ imap.initial_lookback_days   # см. ниже
 применено событий:    <M>
 дубликатов:           <K>
 некорректных писем:   <L>
+лимиты:               <R>
+доставок не удалось:  <B>
+подписок в ожидании:  <P>
 ```
 
 `<N>` — количество писем, отданных IMAP-сервером за одну сессию
 (с `UID > last_seen_uid` и заголовком `X-LiveLetters-Protocol: v1`);
-обычные письма не скачиваются целиком. `<M>` / `<K>` / `<L>` — подсчёт
-по исходам `SyncReport` (`Applied` / `Duplicate` / `Malformed`).
+обычные письма не скачиваются целиком. `<M>` / `<K>` / `<L>` / `<R>` / `<B>` —
+подсчёт по исходам `SyncReport` (`Applied` / `Duplicate` / `Malformed` /
+`RateLimited` / bounce). `<R>` (лимиты) — сколько событий отклонено локальными
+защитными квотами из per-user `users/<name>/config.toml`. В конце `pull`
+выполняется чистка мусорных `raw_messages` по политике удержания
+(`raw_messages_ttl_days`, `raw_messages_max_kept`).
 
 ### `lltt sync push`
 

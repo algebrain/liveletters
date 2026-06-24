@@ -3,6 +3,7 @@ mod global;
 mod identity;
 mod io;
 mod mapping;
+mod security;
 
 pub use error::ConfigError;
 pub use global::GlobalConfig;
@@ -15,6 +16,7 @@ pub use io::{
 };
 pub use liveletters_log::{LogConfig, LogDestination, LogLevel};
 pub use mapping::{map_identity_to_settings, settings_to_identity};
+pub use security::SecurityConfig;
 
 pub fn crate_name() -> &'static str {
     "liveletters-config"

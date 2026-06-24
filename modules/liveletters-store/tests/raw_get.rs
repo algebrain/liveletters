@@ -13,6 +13,7 @@ fn get_returns_existing() {
             message_id: "msg-1".to_owned(),
             raw_message: "raw-body".to_owned(),
             status: "applied".to_owned(),
+            received_at: 0,
         })
         .unwrap();
 

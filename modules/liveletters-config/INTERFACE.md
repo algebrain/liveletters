@@ -64,9 +64,12 @@
 ├── logs/
 │   └── liveletters.log      ← журнал, см. liveletters-log
 ├── current-user             ← read_current_identity / write_current_identity
-└── identities/
-    ├── alice.toml           ← save_identity(home, "alice", …)
-    └── bob.toml             ← save_identity(home, "bob", …)
+├── identities/
+│   ├── alice.toml           ← save_identity(home, "alice", …)
+│   └── bob.toml             ← save_identity(home, "bob", …)
+└── users/
+    └── <name>/
+        └── config.toml      ← SecurityConfig (per-user настройки безопасности)
 ```
 
 - `config.toml` содержит `schema_version: u32` и опциональную секцию `[log]`; при отсутствии файла `load_global` возвращает `GlobalConfig::default()`;
@@ -74,7 +77,8 @@
 - каждая идентичность — отдельный файл в `identities/`; имя файла — это имя идентичности плюс расширение `.toml`;
 - `save_identity` создаёт каталог `identities/` через `fs::create_dir_all` при первом сохранении;
 - `load_identity` возвращает `ConfigError::UnknownIdentity(name)`, если файл не существует;
-- `list_identities` возвращает отсортированный список имён без расширения `.toml`; если каталог `identities/` отсутствует, возвращается пустой `Vec`.
+- `list_identities` возвращает отсортированный список имён без расширения `.toml`; если каталог `identities/` отсутствует, возвращается пустой `Vec`;
+- `users/<name>/config.toml` — per-user настройки безопасности (`SecurityConfig`); создаётся один раз при `lltt user add`, читается командным слоем sync/инбокса; подробно — в разделе «`SecurityConfig`» ниже.
 
 ## Структура `IdentityConfig`
 
@@ -271,6 +275,44 @@ pub struct GlobalConfig {
 - при ошибке парсинга возвращает `ConfigError::Toml(_)`.
 
 `save_global(home, &GlobalConfig)` — атомарно записывает глобальный конфиг в `home/config.toml`; используется командой `lltt settings set log.*`.
+
+## Per-user настройки безопасности: `SecurityConfig`
+
+`SecurityConfig` объединяет все квоты и лимиты, ранее жившие как кодовые
+константы: `mime_limits` (из `liveletters-mime`), `ingest_limits` и
+`retention` (из `liveletters-sync`). Файл — `users/<name>/config.toml`;
+создаётся один раз при `lltt user add` и читается командным слоем sync/инбокса.
+Файл намеренно не документирован и не редактируется через `lltt settings`;
+ручные правки возможны на свой страх и риск.
+
+Поведение при чтении — «переопределение»: каждое поле подсекции несёт
+собственный serde-default. Отсутствующий в файле ключ заменяется кодовым
+значением; заданный — уважается. Пример частичного переопределения:
+
+```toml
+schema_version = 1
+
+[ingest_limits]
+max_deferred_total = 5
+```
+
+остальные лимиты останутся кодовыми.
+
+API:
+
+- `SecurityConfig::load(state_home) -> Result<SecurityConfig, ConfigError>` —
+  читает `state_home/config.toml`; при отсутствии файла возвращает кодовые
+  defaults (обратная совместимость со старыми per-user каталогами и tempdir-
+  тестами);
+- `SecurityConfig::default_toml() -> String` — каноническое TOML-представление
+  defaults, используется при первичной записи;
+- `SecurityConfig::ensure_default_file(state_home) -> Result<(), ConfigError>`
+  — записывает defaults, только если файла ещё нет (идемпотентно; не
+  перезаписывает пользовательские правки).
+
+Подробное руководство по каждому параметру (смысл, когда менять, последствия)
+вынесено в отдельный публичный документ `apps/lltt/SECURITY_CONFIG.md`
+(планируется).
 
 ### Секция `[log]`: `LogConfig`
 

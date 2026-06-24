@@ -53,7 +53,13 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
 
     let next_uid = compute_next_cursor_uid(cursor_uid, &received);
 
-    let engine = SyncEngine::new(&store).with_profile_id(&profile_id);
+    // Per-user настройки безопасности: `users/<name>/config.toml`. Нет файла —
+    // кодовые defaults (обратная совместимость со старыми per-user каталогами).
+    let security = liveletters_config::SecurityConfig::load(&ctx.state_home)?;
+    let engine = SyncEngine::new(&store)
+        .with_profile_id(&profile_id)
+        .with_limits(security.ingest_limits)
+        .with_mime_limits(security.mime_limits);
     let report = engine.ingest_batch(received)?;
     let counts = tally(&report);
 
@@ -66,14 +72,34 @@ pub fn run(ctx: &CommandContext) -> Result<(), SyncError> {
     println!("применено событий:    {}", counts.applied);
     println!("дубликатов:           {}", counts.duplicates);
     println!("некорректных писем:   {}", counts.malformed);
+    println!("лимиты:               {}", counts.rate_limited);
     println!("доставок не удалось:  {}", counts.bounced);
     println!("подписок в ожидании:  {}", pending);
     liveletters_log::log_info(format!(
-        "sync.pull summary profile={profile_id} applied={} duplicates={} malformed={} bounced={} pending={}",
-        counts.applied, counts.duplicates, counts.malformed, counts.bounced, pending,
+        "sync.pull summary profile={profile_id} applied={} duplicates={} malformed={} rate_limited={} bounced={} pending={}",
+        counts.applied,
+        counts.duplicates,
+        counts.malformed,
+        counts.rate_limited,
+        counts.bounced,
+        pending,
     ));
 
     store.save_sync_cursor(&profile_id, next_uid)?;
+
+    // Политика удержания мусорных raw_messages: TTL и квота. Выполняется после
+    // применения, чтобы не мешать диагностике текущего pull-а.
+    let purged_ttl = store
+        .cleanup_old_raw_messages(security.retention.raw_messages_ttl_days)
+        .unwrap_or(0);
+    let purged_quota = store
+        .enforce_raw_messages_quota(security.retention.raw_messages_max_kept)
+        .unwrap_or(0);
+    if purged_ttl + purged_quota > 0 {
+        liveletters_log::log_info(format!(
+            "sync.pull retention profile={profile_id} purged_ttl={purged_ttl} purged_quota={purged_quota}"
+        ));
+    }
 
     Ok(())
 }
@@ -84,6 +110,7 @@ pub struct OutcomeCounts {
     pub duplicates: usize,
     pub malformed: usize,
     pub bounced: usize,
+    pub rate_limited: usize,
 }
 
 pub fn tally(report: &SyncReport) -> OutcomeCounts {
@@ -93,6 +120,7 @@ pub fn tally(report: &SyncReport) -> OutcomeCounts {
             SyncMessageOutcome::Applied { .. } => counts.applied += 1,
             SyncMessageOutcome::Duplicate { .. } => counts.duplicates += 1,
             SyncMessageOutcome::Malformed { .. } => counts.malformed += 1,
+            SyncMessageOutcome::RateLimited { .. } => counts.rate_limited += 1,
             SyncMessageOutcome::Filtered { reason, .. } if reason.contains("bounce") => {
                 counts.bounced += 1;
             }

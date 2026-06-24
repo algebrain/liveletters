@@ -1,17 +1,28 @@
 use rusqlite::params;
 
 use crate::{DeferredEventRecord, RawEventRecord, RawMessageRecord, Store, StoreError};
+use liveletters_utils::time::unix_now;
+
+/// Статусы сырых писем, подлежащие регулярной чистке (мусорные). Всё, что
+/// представляет осмысленную историю (`applied`, `duplicate`, `bounce.*`),
+/// чисткой не затрагивается.
+const CLEANABLE_STATUSES: &[&str] = &["malformed", "invalid", "rate_limited"];
 
 impl Store {
     pub fn save_raw_message_record(&self, record: &RawMessageRecord) -> Result<(), StoreError> {
         self.connection().execute(
             r#"
             INSERT OR REPLACE INTO raw_messages
-                (message_id, raw_message, status)
+                (message_id, raw_message, status, received_at)
             VALUES
-                (?1, ?2, ?3)
+                (?1, ?2, ?3, ?4)
             "#,
-            params![record.message_id, record.raw_message, record.status],
+            params![
+                record.message_id,
+                record.raw_message,
+                record.status,
+                record.received_at as i64,
+            ],
         )?;
 
         Ok(())
@@ -20,7 +31,7 @@ impl Store {
     pub fn list_raw_message_records(&self) -> Result<Vec<RawMessageRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
             r#"
-            SELECT message_id, raw_message, status
+            SELECT message_id, raw_message, status, received_at
             FROM raw_messages
             ORDER BY rowid ASC
             "#,
@@ -31,6 +42,7 @@ impl Store {
                 message_id: row.get(0)?,
                 raw_message: row.get(1)?,
                 status: row.get(2)?,
+                received_at: row.get::<_, i64>(3)? as u64,
             })
         })?;
 
@@ -47,7 +59,7 @@ impl Store {
         message_id: &str,
     ) -> Result<Option<RawMessageRecord>, StoreError> {
         let mut stmt = self.connection().prepare(
-            "SELECT message_id, raw_message, status FROM raw_messages WHERE message_id = ?1",
+            "SELECT message_id, raw_message, status, received_at FROM raw_messages WHERE message_id = ?1",
         )?;
         let mut rows = stmt.query([message_id])?;
         match rows.next()? {
@@ -55,6 +67,7 @@ impl Store {
                 message_id: row.get(0)?,
                 raw_message: row.get(1)?,
                 status: row.get(2)?,
+                received_at: row.get::<_, i64>(3)? as u64,
             })),
             None => Ok(None),
         }
@@ -70,7 +83,7 @@ impl Store {
             Some(s) => {
                 let mut stmt = conn.prepare(
                     r#"
-                    SELECT message_id, raw_message, status
+                    SELECT message_id, raw_message, status, received_at
                     FROM raw_messages
                     WHERE status = ?1
                     ORDER BY rowid DESC
@@ -82,6 +95,7 @@ impl Store {
                         message_id: row.get(0)?,
                         raw_message: row.get(1)?,
                         status: row.get(2)?,
+                        received_at: row.get::<_, i64>(3)? as u64,
                     })
                 })?;
                 let mut v = Vec::new();
@@ -93,7 +107,7 @@ impl Store {
             None => {
                 let mut stmt = conn.prepare(
                     r#"
-                    SELECT message_id, raw_message, status
+                    SELECT message_id, raw_message, status, received_at
                     FROM raw_messages
                     ORDER BY rowid DESC
                     LIMIT ?1
@@ -104,6 +118,7 @@ impl Store {
                         message_id: row.get(0)?,
                         raw_message: row.get(1)?,
                         status: row.get(2)?,
+                        received_at: row.get::<_, i64>(3)? as u64,
                     })
                 })?;
                 let mut v = Vec::new();
@@ -114,6 +129,98 @@ impl Store {
             }
         };
         Ok(records)
+    }
+
+    pub fn count_raw_messages(&self) -> Result<u64, StoreError> {
+        let n: i64 =
+            self.connection()
+                .query_row("SELECT COUNT(*) FROM raw_messages", [], |row| row.get(0))?;
+        Ok(n as u64)
+    }
+
+    pub fn count_raw_messages_by_status(&self, status: &str) -> Result<u64, StoreError> {
+        let n: i64 = self.connection().query_row(
+            "SELECT COUNT(*) FROM raw_messages WHERE status = ?1",
+            params![status],
+            |row| row.get(0),
+        )?;
+        Ok(n as u64)
+    }
+
+    /// Удалить сырые письма с «мусорными» статусами (`malformed`, `invalid`,
+    /// `rate_limited`) старше `days` суток. Возвращает число удалённых строк.
+    pub fn cleanup_old_raw_messages(&self, days: u32) -> Result<u64, StoreError> {
+        let now = unix_now();
+        let cutoff = now.saturating_sub((days as u64) * 86_400);
+        self.cleanup_raw_messages_before(cutoff)
+    }
+
+    /// Удалить сырые письма с «мусорными» статусами, у которых `received_at`
+    /// строго меньше `threshold_unix`. Низкоуровневая основа для
+    /// [`Self::cleanup_old_raw_messages`]; удобна для детерминированных тестов.
+    pub fn cleanup_raw_messages_before(&self, threshold_unix: u64) -> Result<u64, StoreError> {
+        let placeholders = CLEANABLE_STATUSES
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "DELETE FROM raw_messages WHERE status IN ({placeholders}) AND received_at < ?"
+        );
+        let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = CLEANABLE_STATUSES
+            .iter()
+            .map(|s| Box::new((*s).to_owned()) as Box<dyn rusqlite::ToSql>)
+            .collect();
+        params_vec.push(Box::new(threshold_unix as i64));
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|b| b.as_ref()).collect();
+        let deleted = self.connection().execute(&sql, params_refs.as_slice())?;
+        Ok(deleted as u64)
+    }
+
+    /// Удалить самые старые «мусорные» сырые письма, пока их суммарное число не
+    /// станет не больше `max_rows`. Возвращает число удалённых строк.
+    pub fn enforce_raw_messages_quota(&self, max_rows: usize) -> Result<u64, StoreError> {
+        let placeholders = CLEANABLE_STATUSES
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+        let count_sql =
+            format!("SELECT COUNT(*) FROM raw_messages WHERE status IN ({placeholders})");
+        let params_vec: Vec<Box<dyn rusqlite::ToSql>> = CLEANABLE_STATUSES
+            .iter()
+            .map(|s| Box::new((*s).to_owned()) as Box<dyn rusqlite::ToSql>)
+            .collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|b| b.as_ref()).collect();
+        let total: i64 =
+            self.connection()
+                .query_row(&count_sql, params_refs.as_slice(), |row| row.get(0))?;
+        let excess = (total as usize).saturating_sub(max_rows);
+        if excess == 0 {
+            return Ok(0);
+        }
+
+        let delete_sql = format!(
+            "DELETE FROM raw_messages WHERE message_id IN ( \
+               SELECT message_id FROM raw_messages \
+               WHERE status IN ({placeholders}) \
+               ORDER BY received_at ASC, rowid ASC \
+               LIMIT ? \
+             )"
+        );
+        let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = CLEANABLE_STATUSES
+            .iter()
+            .map(|s| Box::new((*s).to_owned()) as Box<dyn rusqlite::ToSql>)
+            .collect();
+        params_vec.push(Box::new(excess as i64));
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|b| b.as_ref()).collect();
+        let deleted = self
+            .connection()
+            .execute(&delete_sql, params_refs.as_slice())?;
+        Ok(deleted as u64)
     }
 
     pub fn save_raw_event_record(&self, record: &RawEventRecord) -> Result<(), StoreError> {

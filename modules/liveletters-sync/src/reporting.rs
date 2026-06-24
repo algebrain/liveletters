@@ -37,6 +37,11 @@ pub enum SyncMessageOutcome {
         message_id: String,
         reason: String,
     },
+    RateLimited {
+        message_id: String,
+        event_id: String,
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

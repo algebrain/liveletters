@@ -18,6 +18,7 @@ fn save_message(store: &liveletters_store::Store, id: &str, status: &str) {
             message_id: id.into(),
             raw_message: "From: alice@example.test\n\nhello".into(),
             status: status.into(),
+            received_at: 0,
         })
         .unwrap();
 }

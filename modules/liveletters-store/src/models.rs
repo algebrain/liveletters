@@ -51,6 +51,9 @@ pub struct RawMessageRecord {
     pub message_id: String,
     pub raw_message: String,
     pub status: String,
+    /// Unix-секунды получения письма. Используется политикой удержания
+    /// (`cleanup_old_raw_messages`).
+    pub received_at: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

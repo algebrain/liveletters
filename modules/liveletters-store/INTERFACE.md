@@ -252,6 +252,19 @@ pub fn resolve_data_dir_from_env() -> Option<PathBuf>;
 - был ли apply успешным;
 - если нет, то почему.
 
+`raw_messages` несёт колонку `received_at` (unix-секунды получения). Для
+регулярной чистки мусора предоставлены методы:
+
+- `count_raw_messages()`, `count_raw_messages_by_status(status)`;
+- `cleanup_old_raw_messages(days)` — удаляет `malformed`/`invalid`/`rate_limited`
+  старше N суток (поверх `cleanup_raw_messages_before(threshold)` с абсолютным
+  порогом, удобным для детерминированных тестов);
+- `enforce_raw_messages_quota(max_rows)` — удаляет самые старые мусорные записи
+  сверх квоты.
+
+Эти методы вызываются `lltt sync pull` по per-user политике удержания из
+`liveletters-config::SecurityConfig`.
+
 ### 4. Очередь отложенных событий
 
 Сюда относятся:

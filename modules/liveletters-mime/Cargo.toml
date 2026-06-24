@@ -11,3 +11,4 @@ path = "src/lib.rs"
 liveletters-protocol = { path = "../liveletters-protocol" }
 mailparse = { workspace = true }
 base64 = { workspace = true }
+serde = { workspace = true }

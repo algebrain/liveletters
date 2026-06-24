@@ -593,6 +593,8 @@ dependencies = [
  "liveletters-app-core",
  "liveletters-domain",
  "liveletters-log",
+ "liveletters-mime",
+ "liveletters-sync",
  "serde",
  "tempfile",
  "thiserror",
@@ -710,6 +712,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "clap",
+ "liveletters-config",
  "liveletters-log",
  "liveletters-mail",
  "liveletters-mime",
@@ -748,6 +751,7 @@ dependencies = [
  "base64",
  "liveletters-protocol",
  "mailparse",
+ "serde",
 ]
 
 [[package]]
@@ -883,6 +887,7 @@ dependencies = [
  "liveletters-protocol",
  "liveletters-store",
  "liveletters-utils",
+ "serde",
  "serde_json",
  "tempfile",
 ]

@@ -14,6 +14,7 @@ fn show_returns_full_body() {
             message_id: "msg-1".to_owned(),
             raw_message: "From: a\nSubject: hello\n\nbody content".to_owned(),
             status: "applied".to_owned(),
+            received_at: 0,
         })
         .unwrap();
 

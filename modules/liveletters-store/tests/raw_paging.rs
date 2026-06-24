@@ -14,6 +14,7 @@ fn paged_returns_newest_first() {
                 message_id: format!("msg-{i}"),
                 raw_message: format!("body-{i}"),
                 status: "applied".to_owned(),
+                received_at: 0,
             })
             .unwrap();
     }
@@ -38,6 +39,7 @@ fn paged_with_status_filter() {
                 message_id: i.to_owned(),
                 raw_message: format!("body-{i}"),
                 status: status.to_owned(),
+                received_at: 0,
             })
             .unwrap();
     }

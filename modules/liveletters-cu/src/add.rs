@@ -61,6 +61,11 @@ pub fn run(
         std::fs::write(from, obfuscated)?;
     }
     let store = Store::open_for_home_dir(ctx.home.join("users").join(name))?;
+    // Per-user файл настроек безопасности. Создаётся из кодовых defaults
+    // один раз и не перезаписывается при повторных вызовах; правки уважаются.
+    // Намеренно в обход `lltt settings`: недокументированная ручная настройка.
+    liveletters_config::SecurityConfig::ensure_default_file(&user_state_home)
+        .map_err(CuError::Config)?;
     save_identity_to_db(&store, name, &cfg)?;
     println!("добавлен {name}");
     Ok(())

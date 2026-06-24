@@ -69,6 +69,20 @@ impl Store {
         Ok(records)
     }
 
+    /// Только колонка `email` из `authors`. Используется для снимка «известных
+    /// авторов» в начале `ingest_batch` при подсчёте `max_new_authors_per_batch`.
+    pub fn list_author_emails(&self) -> Result<Vec<String>, StoreError> {
+        let mut stmt = self
+            .connection()
+            .prepare("SELECT email FROM authors ORDER BY email")?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     /// Сохранить идентичность: UPSERT в `authors` + UPSERT в `user_settings`.
     /// Атомарно в одной транзакции.
     pub fn save_identity(

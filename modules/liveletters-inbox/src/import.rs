@@ -63,7 +63,8 @@ pub fn run(home: &Path, files: &[PathBuf]) -> Result<(), InboxError> {
                 }
                 SyncMessageOutcome::Replay { reason, .. }
                 | SyncMessageOutcome::Unauthorized { reason, .. }
-                | SyncMessageOutcome::Invalid { reason, .. } => {
+                | SyncMessageOutcome::Invalid { reason, .. }
+                | SyncMessageOutcome::RateLimited { reason, .. } => {
                     println!("{}: отклонено ({reason})", file.display());
                     total_rejected += 1;
                 }

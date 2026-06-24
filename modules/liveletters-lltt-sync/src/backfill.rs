@@ -38,7 +38,11 @@ pub fn run(ctx: &CommandContext, days: u32) -> Result<(), SyncError> {
     let received = batch.into_emails();
     let count = received.len();
 
-    let engine = SyncEngine::new(&store);
+    // Per-user настройки безопасности применяются и к backfill-у.
+    let security = liveletters_config::SecurityConfig::load(&ctx.state_home)?;
+    let engine = SyncEngine::new(&store)
+        .with_limits(security.ingest_limits)
+        .with_mime_limits(security.mime_limits);
     let report = engine.ingest_batch(received)?;
 
     let applied = report
@@ -46,9 +50,17 @@ pub fn run(ctx: &CommandContext, days: u32) -> Result<(), SyncError> {
         .iter()
         .filter(|o| matches!(o, liveletters_sync::SyncMessageOutcome::Applied { .. }))
         .count();
+    let rate_limited = report
+        .outcomes()
+        .iter()
+        .filter(|o| matches!(o, liveletters_sync::SyncMessageOutcome::RateLimited { .. }))
+        .count();
 
     println!("получено писем (backfill): {count}");
     println!("применено:                 {applied}");
+    if rate_limited > 0 {
+        println!("лимиты:                    {rate_limited}");
+    }
     // НЕ сохраняем sync-курсор: backfill не сдвигает основной
     // курсор, чтобы не подтягивать одни и те же письма дважды.
 

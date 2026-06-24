@@ -1,9 +1,11 @@
 mod engine;
 mod errors;
+mod limits;
 mod reporting;
 
 pub use engine::SyncEngine;
 pub use errors::SyncError;
+pub use limits::{IngestLimits, RetentionPolicy};
 pub use reporting::{SyncMessageOutcome, SyncReport};
 
 pub fn crate_name() -> &'static str {

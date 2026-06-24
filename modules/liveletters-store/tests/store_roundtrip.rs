@@ -289,6 +289,7 @@ fn raw_message_and_event_journals_can_be_saved() {
             message_id: "message-1".into(),
             raw_message: "raw email".into(),
             status: "applied".into(),
+            received_at: 0,
         })
         .unwrap();
     store

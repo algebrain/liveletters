@@ -42,6 +42,7 @@ fn doctor_reports_malformed_in_raw_messages() {
             message_id: "m-1".into(),
             raw_message: "...".into(),
             status: "malformed".into(),
+            received_at: 0,
         })
         .unwrap();
     let ctx = ctx_for(&tmp);
